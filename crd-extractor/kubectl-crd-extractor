@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Check if python3 is installed
+if ! command -v python3 &> /dev/null; then
+    printf "python3 is required for this plugin, and is not installed on your machine"
+    printf "please visit https://www.python.org/downloads/ and install it"
+    exit 1
+fi
+
+# Create temp folder for CRDs
+TMP_CRD_DIR=$HOME/.datree/crds
+mkdir -p $TMP_CRD_DIR
+
+# Extract CRDs from cluster
+NUM_OF_CRDS=0
+while read -r crd 
+do
+    ResourceKind=${crd%%.*}
+    kubectl get crds ${crd} -o yaml > "$TMP_CRD_DIR/${ResourceKind}.yaml" 2>&1 
+    let NUM_OF_CRDS++
+done < <(kubectl get crds 2>&1 | tail -n +2)
+
+# Download converter script
+curl https://raw.githubusercontent.com/yannh/kubeconform/master/scripts/openapi2jsonschema.py --output $TMP_CRD_DIR/openapi2jsonschema.py 2>/dev/null
+
+# Create final schemas directory
+SCHEMAS_DIR=$HOME/.datree/crdSchemas
+mkdir -p $SCHEMAS_DIR
+cd $SCHEMAS_DIR
+
+# Convert crds to jsonSchema
+python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
+
+if [ $? == 0 ]; then
+    printf "Successfully converted $NUM_OF_CRDS CRDs to JSON schema\n"
+    printf "To execute a Datree policy check against your CRs - run 'datree test --schema-location $HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json /path/to/file'\n"
+    printf "\nWould you like your public CRs to be checked automatically in the future? No problem! Add your schemas to our CRD-catalog and help us support popular CRs in future Datree policy checks :)\n"
+    printf "For more information visit https://www.github.com/datreeio/crds-catalog \n"
+fi
+
+rm -rf $TMP_CRD_DIR

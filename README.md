@@ -12,7 +12,7 @@ This repository also contains a handy utility that extracts all CRDs from a clus
 
 ### Supported Platforms
 
-This tool supports **MacOS** and **Linux**.
+This utility supports **MacOS** and **Linux**.
 
 ### Prerequisites
 The following programs are required to be installed on the machine running this utility:
@@ -21,8 +21,8 @@ The following programs are required to be installed on the machine running this 
 
 ### Usage
 To use the crd-extractor:
-1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/kubectl-crd-extractor.zip) from this repository.
-2. Extract, and run the script:
+1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
+2. Extract, and run the utility:
 ```
 ./crd-extractor
 ```

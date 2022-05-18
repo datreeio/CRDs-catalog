@@ -2,23 +2,27 @@
 
 ## Overview
 
-This repository aggregates popular k8s CRDs in JSON schema format. These schemas can be used by Datree and other tools to validate CRs.
+This repository aggregates popular k8s CRDs in JSON schema format. These schemas are used by various tools such as Datree and Kubeconform to perform resource validation on custom resources.
 
-<!---
-## kubectl crd-extractor plugin
+Would you like your public CRs to be automatically validated by these tools in the future? No problem! Add your schemas to this repository by creating a pull request, and help us support popular CRs in future validations :)
 
-This repository also contains a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/) that extracts all CRDs from a cluster and converts them to JSON schema.
+## CRD Extractor
+
+This repository also contains a handy utility that extracts all CRDs from a cluster and converts them to JSON schema.
 
 ### Supported Platforms
-This plugin supports **MacOS** and **Linux**.
 
-<br/>
+This tool supports **MacOS** and **Linux**.
 
-### Installation
-Installation is done via [krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/) - the official kubectl plugin manager.
-1. Install [krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
-2. Install the crd-extractor plugin:
+### Prerequisites
+The following programs are required to be installed on the machine running this utility:
+* [python3](https://www.python.org/downloads/)
+* [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+
+### Usage
+To use the crd-extractor:
+1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/kubectl-crd-extractor.zip) from this repository.
+2. Extract, and run the script:
 ```
-kubectl krew install crd-extractor
+./crd-extractor
 ```
--->

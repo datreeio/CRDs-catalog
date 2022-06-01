@@ -1,0 +1,256 @@
+{
+  "description": "EgressRouter is a feature allowing the user to define an egress router that acts as a bridge between pods and external systems. The egress router runs a service that redirects egress traffic originating from a pod or a group of pods to a remote external system or multiple destinations as per configuration. \n It is consumed by the cluster-network-operator. More specifically, given an EgressRouter CR with <name>, the CNO will create and manage: - A service called <name> - An egress pod called <name> - A NAD called <name> \n EgressRouter is a single egressrouter pod configuration object.",
+  "type": "object",
+  "required": [
+    "spec"
+  ],
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "network.operator.openshift.io/v1"
+      ]
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "EgressRouter"
+      ]
+    },
+    "metadata": {
+      "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+      "$ref": "_definitions.json#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta_v2"
+    },
+    "spec": {
+      "description": "Specification of the desired egress router.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "addresses",
+        "mode",
+        "networkInterface"
+      ],
+      "properties": {
+        "addresses": {
+          "description": "List of IP addresses to configure on the pod's secondary interface.",
+          "type": "array",
+          "items": {
+            "description": "EgressRouterAddress contains a pair of IP CIDR and gateway to be configured on the router's interface",
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "ip"
+            ],
+            "properties": {
+              "gateway": {
+                "description": "IP address of the next-hop gateway, if it cannot be automatically determined. Can be IPv4 or IPv6.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ip": {
+                "description": "IP is the address to configure on the router's interface. Can be IPv4 or IPv6.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mode": {
+          "description": "Mode depicts the mode that is used for the egress router. The default mode is \"Redirect\" and is the only supported mode currently.",
+          "type": "string",
+          "enum": [
+            "Redirect"
+          ]
+        },
+        "networkInterface": {
+          "description": "Specification of interface to create/use. The default is macvlan. Currently only macvlan is supported.",
+          "type": "object",
+          "properties": {
+            "macvlan": {
+              "description": "Arguments specific to the interfaceType macvlan",
+              "type": [
+                "object",
+                "null"
+              ],
+              "required": [
+                "mode"
+              ],
+              "properties": {
+                "master": {
+                  "description": "Name of the master interface. Need not be specified if it can be inferred from the IP address.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mode": {
+                  "description": "Mode depicts the mode that is used for the macvlan interface; one of Bridge|Private|VEPA|Passthru. The default mode is \"Bridge\".",
+                  "type": "string",
+                  "enum": [
+                    "Bridge",
+                    "Private",
+                    "VEPA",
+                    "Passthru"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "redirect": {
+          "description": "Redirect represents the configuration parameters specific to redirect mode.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "fallbackIP": {
+              "description": "FallbackIP specifies the remote destination's IP address. Can be IPv4 or IPv6. If no redirect rules are specified, all traffic from the router are redirected to this IP. If redirect rules are specified, then any connections on any other port (undefined in the rules) on the router will be redirected to this IP. If redirect rules are specified and no fallback IP is provided, connections on other ports will simply be rejected.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "redirectRules": {
+              "description": "List of L4RedirectRules that define the DNAT redirection from the pod to the destination in redirect mode.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "description": "L4RedirectRule defines a DNAT redirection from a given port to a destination IP and port.",
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "required": [
+                  "destinationIP",
+                  "port",
+                  "protocol"
+                ],
+                "properties": {
+                  "destinationIP": {
+                    "description": "IP specifies the remote destination's IP address. Can be IPv4 or IPv6.",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the port number to which clients should send traffic to be redirected.",
+                    "type": "integer",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1
+                  },
+                  "protocol": {
+                    "description": "Protocol can be TCP, SCTP or UDP.",
+                    "type": "string",
+                    "enum": [
+                      "TCP",
+                      "UDP",
+                      "SCTP"
+                    ]
+                  },
+                  "targetPort": {
+                    "description": "TargetPort allows specifying the port number on the remote destination to which the traffic gets redirected to. If unspecified, the value from \"Port\" is used.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "description": "Observed status of EgressRouter.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "conditions"
+      ],
+      "properties": {
+        "conditions": {
+          "description": "Observed status of the egress router",
+          "type": "array",
+          "items": {
+            "description": "EgressRouterStatusCondition represents the state of the egress router's managed and monitored components.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "status",
+              "type"
+            ],
+            "properties": {
+              "lastTransitionTime": {
+                "description": "LastTransitionTime is the time of the last update to the current status property.",
+                "format": "date-time"
+              },
+              "message": {
+                "description": "Message provides additional information about the current condition. This is only to be consumed by humans.  It may contain Line Feed characters (U+000A), which should be rendered as new lines.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason": {
+                "description": "Reason is the CamelCase reason for the condition's current status.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "Status of the condition, one of True, False, Unknown.",
+                "type": "string",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "description": "Type specifies the aspect reported by this condition; one of Available, Progressing, Degraded",
+                "type": "string",
+                "enum": [
+                  "Available",
+                  "Progressing",
+                  "Degraded"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-kubernetes-group-version-kind": [
+    {
+      "group": "network.operator.openshift.io",
+      "kind": "EgressRouter",
+      "version": "v1"
+    }
+  ],
+  "$schema": "http://json-schema.org/schema#"
+}

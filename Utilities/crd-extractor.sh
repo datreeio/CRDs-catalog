@@ -19,11 +19,11 @@ if ! pip3 show pyyaml &> /dev/null; then
     #printf "would you like to install it? y/n"
 
     while true; do
-        read -p "Do you wish to install this program? " yn
+        read -p "Do you wish to install this program? (y/n) " yn
         case $yn in
             [Yy]* ) pip3 install pyyaml; break;;
             [Nn]* ) echo "Exiting..."; exit;;
-            * ) echo "Please answer yes or no.";;
+            * ) echo "Please answer 'y' (yes) or 'n' (no).";;
         esac
     done
 fi

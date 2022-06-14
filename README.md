@@ -20,7 +20,9 @@ The following programs are required to be installed on the machine running this 
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 
 ### Usage
-To use the CRD Extractor, run the following script:
+To use the CRD Extractor:  
+1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
+2. Extract, and run the utility:
 ```
-./Utilities/crd-extractor.sh
+./crd-extractor.sh
 ```

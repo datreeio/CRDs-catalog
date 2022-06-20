@@ -26,3 +26,8 @@ To use the CRD Extractor:
 ```
 ./crd-extractor.sh
 ```
+### What does this utility do?
+1. Checks that the prerequisites are installed.
+2. Extracts your CRDs from your cluster using kubectl.
+3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform) repo that converts your CRDs from openAPI to JSON schema.
+4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`

@@ -20,9 +20,14 @@ The following programs are required to be installed on the machine running this 
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 
 ### Usage
-To use the crd-extractor:
+To use the CRD Extractor:  
 1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
 2. Extract, and run the utility:
 ```
-./crd-extractor
+./crd-extractor.sh
 ```
+### What does this utility do?
+1. Checks that the prerequisites are installed.
+2. Extracts your CRDs from your cluster using kubectl.
+3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform) repo that converts your CRDs from openAPI to JSON schema.
+4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`

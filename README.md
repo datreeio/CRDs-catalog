@@ -2,13 +2,19 @@
 
 ## Overview
 
-This repository aggregates popular k8s CRDs in JSON schema format. These schemas are used by various tools such as Datree and Kubeconform to perform resource validation on custom resources.
+This repository aggregates popular k8s CRDs in JSON schema format. These schemas are used by various tools such as [Datree](https://github.com/datreeio/datree), [Kubeconform](https://github.com/yannh/kubeconform) and [Kubeval](https://github.com/instrumenta/kubeval) to perform resource validation on custom resources.
 
 Would you like your public CRs to be automatically validated by these tools in the future? No problem! Add your schemas to this repository by creating a pull request, and help us support popular CRs in future validations :)
 
 ## CRD Extractor
 
 This repository also contains a handy utility that extracts all CRDs from a cluster and converts them to JSON schema.
+
+### What does this utility do?
+1. Checks that the prerequisites are installed.
+2. Extracts your CRDs from your cluster using kubectl.
+3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform) repo that converts your CRDs from openAPI to JSON schema.
+4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`
 
 ### Supported Platforms
 
@@ -26,8 +32,3 @@ To use the CRD Extractor:
 ```
 ./crd-extractor.sh
 ```
-### What does this utility do?
-1. Checks that the prerequisites are installed.
-2. Extracts your CRDs from your cluster using kubectl.
-3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform) repo that converts your CRDs from openAPI to JSON schema.
-4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`

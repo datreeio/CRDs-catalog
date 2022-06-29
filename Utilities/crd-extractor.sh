@@ -59,6 +59,11 @@ cd $SCHEMAS_DIR
 # Convert crds to jsonSchema
 python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
 
+# Copy and rename files to support kubeval
+mkdir -p $SCHEMAS_DIR/master-standalone
+cp $SCHEMAS_DIR/*.json $SCHEMAS_DIR/master-standalone
+find $SCHEMAS_DIR/master-standalone -name '*json' -exec bash -c ' mv $0 ${0/\_/-stable-}' {} \;
+
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
@@ -67,8 +72,9 @@ if [ $? == 0 ]; then
     printf "${GREEN}Successfully converted $NUM_OF_CRDS CRDs to JSON schema${NC}\n"
     
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
-    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}datree:${NC}\n\$ datree test --schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n\n"
+    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
+    printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
 fi
 
 rm -rf $TMP_CRD_DIR

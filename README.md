@@ -1,8 +1,8 @@
 # CRDs Catalog
 
-This repository aggregates over 100 popular Kubernetes CRDs (`CustomResourceDefinition`) in JSON schema format. Those schemas can be used by various tools such as [Datree](https://github.com/datreeio/datree), [Kubeconform](https://github.com/yannh/kubeconform) and [Kubeval](https://github.com/instrumenta/kubeval), as alternative to `kubectl --dry-run`, to perform validation on custom (and native) Kuberentes resources.  
+This repository aggregates over 100 popular Kubernetes CRDs (`CustomResourceDefinition`) in JSON schema format. These schemas can be used by various tools such as [Datree](https://github.com/datreeio/datree), [Kubeconform](https://github.com/yannh/kubeconform) and [Kubeval](https://github.com/instrumenta/kubeval), as an alternative to `kubectl --dry-run`, to perform validation on custom (and native) Kuberentes resources.  
 
-Running Kubernetes schema validation check helps apply the **"shift-left approach"** on machines **without** giving them access to your cluster (e.g. locally or on CI).
+Running Kubernetes schema validation checks helps apply the **"shift-left approach"** on machines **without** giving them access to your cluster (e.g. locally or on CI).
 
 ## How to use the schemas in the catalog
 ### Datree

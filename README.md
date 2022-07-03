@@ -1,10 +1,24 @@
 # CRDs Catalog
 
-## Overview
+This repository aggregates over 100 popular Kubernetes CRDs (`CustomResourceDefinition`) in JSON schema format. Those schemas can be used by various tools such as [Datree](https://github.com/datreeio/datree), [Kubeconform](https://github.com/yannh/kubeconform) and [Kubeval](https://github.com/instrumenta/kubeval), as alternative to `kubectl --dry-run`, to perform validation on custom (and native) Kuberentes resources.  
 
-This repository aggregates popular k8s CRDs in JSON schema format. These schemas are used by various tools such as [Datree](https://github.com/datreeio/datree), [Kubeconform](https://github.com/yannh/kubeconform) and [Kubeval](https://github.com/instrumenta/kubeval) to perform resource validation on custom resources.
+Running Kubernetes schema validation check helps apply the **"shift-left approach"** on machines **without** giving them access to your cluster (e.g. locally or on CI).
 
-Would you like your public CRs to be automatically validated by these tools in the future? No problem! Add your schemas to this repository by creating a pull request, and help us support popular CRs in future validations :)
+## How to use the schemas in the catalog
+### Datree
+```
+datree test [MANIFEST]
+```
+### Kubeconform
+```
+kubconform -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/[GITHUB-ORG]/{{ .ResourceKind }}_{{ .KindSuffix }}.json' [MANIFEST]
+```
+### kubeval
+```
+Only supported with the CRD Extractor
+```
+
+👉 If you encounter custom resources that are not part of the catalog, or you want to validate the schemas in an air-gapped environment, use the [CRD Extractor](#crd-extractor). 
 
 ## CRD Extractor
 
@@ -13,7 +27,7 @@ This repository also contains a handy utility that extracts all CRDs from a clus
 ### What does this utility do?
 1. Checks that the prerequisites are installed.
 2. Extracts your CRDs from your cluster using kubectl.
-3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform) repo that converts your CRDs from openAPI to JSON schema.
+3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py) repo that converts your CRDs from openAPI to JSON schema.
 4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`
 
 ### Supported Platforms
@@ -32,3 +46,11 @@ To use the CRD Extractor:
 ```
 ./crd-extractor.sh
 ```
+
+## Contributing CRDs to the catalog
+If you the catalog is missing public custom resources (CRs), and you would them to be automatically validated by these tools, you can open an issue or use to **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.
+
+## Resources
+* [opensource.com - Why you need to use Kubernetes schema validation tools](https://opensource.com/article/21/7/kubernetes-schema-validation)
+* [redhat.com - Validating OpenShift Manifests in a GitOps World](https://cloud.redhat.com/blog/validating-openshift-manifests-in-a-gitops-world)
+* [kubeval/issues/47 - cannot validate CustomResourceDefinitions](https://github.com/instrumenta/kubeval/issues/47)

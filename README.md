@@ -11,7 +11,7 @@ datree test [MANIFEST]
 ```
 ### Kubeconform
 ```
-kubconform -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/[GITHUB-ORG]/{{ .ResourceKind }}_{{ .KindSuffix }}.json' [MANIFEST]
+kubeconform -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/[GITHUB-ORG]/{{ .ResourceKind }}_{{ .KindSuffix }}.json' [MANIFEST]
 ```
 ### kubeval
 ```

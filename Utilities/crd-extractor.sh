@@ -60,6 +60,7 @@ cd $SCHEMAS_DIR
 python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
 
 # Copy and rename files to support kubeval
+rm -rf $SCHEMAS_DIR/master-standalone
 mkdir -p $SCHEMAS_DIR/master-standalone
 cp $SCHEMAS_DIR/*.json $SCHEMAS_DIR/master-standalone
 find $SCHEMAS_DIR/master-standalone -name '*json' -exec bash -c ' mv -f $0 ${0/\_/-stable-}' {} \;

@@ -48,7 +48,7 @@ To use the CRD Extractor:
 ```
 
 ## Contributing CRDs to the catalog
-If the catalog is missing public custom resources (CRs), and you would them to be automatically validated by these tools, you can open an issue or use to **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.
+If the catalog is missing public custom resources (CRs) that you would like to automatically validate using these tools, you can open an issue or use the **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.
 
 ## Resources
 * [opensource.com - Why you need to use Kubernetes schema validation tools](https://opensource.com/article/21/7/kubernetes-schema-validation)

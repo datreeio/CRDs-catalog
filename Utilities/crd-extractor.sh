@@ -40,7 +40,7 @@ do
     ResourceKind=${crd%%.*}
     kubectl get crds ${crd} -o yaml > "$TMP_CRD_DIR/${ResourceKind}.yaml" 2>&1 
     let NUM_OF_CRDS++
-done < <(kubectl get crds 2>&1 | tail -n +2)
+done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 
 # If no CRDs exist in the cluster, exit
 if [ $NUM_OF_CRDS == 0 ]; then

@@ -44,7 +44,7 @@ done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 
 # If no CRDs exist in the cluster, exit
 if [ $NUM_OF_CRDS == 0 ]; then
-    printf "No CRDs found in your cluster, exiting...\n"
+    printf "No CRDs found in the cluster, exiting...\n"
     exit 0
 fi
 
@@ -73,7 +73,7 @@ if [ $? == 0 ]; then
     printf "${GREEN}Successfully converted $NUM_OF_CRDS CRDs to JSON schema${NC}\n"
     
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
-    printf "\n- ${CYAN}datree:${NC}\n\$ datree test --schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n\n"
+    printf "\n- ${CYAN}datree:${NC}\n\$ datree test --schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
 fi

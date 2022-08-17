@@ -58,6 +58,7 @@ cd $SCHEMAS_DIR
 
 # Convert crds to jsonSchema
 python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
+conversionResult=$?
 
 # Copy and rename files to support kubeval
 rm -rf $SCHEMAS_DIR/master-standalone
@@ -69,7 +70,7 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-if [ $? == 0 ]; then
+if [ $conversionResult == 0 ]; then
     printf "${GREEN}Successfully converted $NUM_OF_CRDS CRDs to JSON schema${NC}\n"
     
     printf "\nTo validate a CR using various tools, run the relevant command:\n"

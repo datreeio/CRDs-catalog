@@ -47,6 +47,8 @@ To use the CRD Extractor:
 ./crd-extractor.sh
 ```
 
+![image](https://user-images.githubusercontent.com/19731161/185790837-2abadcd5-9b26-451b-b3cd-7e0c46c68b58.png)
+
 ## Contributing CRDs to the catalog
 If the catalog is missing public custom resources (CRs) that you would like to automatically validate using these tools, you can open an issue or use the **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.
 

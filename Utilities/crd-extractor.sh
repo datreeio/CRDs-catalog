@@ -44,7 +44,7 @@ done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 
 # If no CRDs exist in the cluster, exit
 if [ $NUM_OF_CRDS == 0 ]; then
-    printf "No CRDs found in your cluster, exiting...\n"
+    printf "No CRDs found in the cluster, exiting...\n"
     exit 0
 fi
 
@@ -58,6 +58,7 @@ cd $SCHEMAS_DIR
 
 # Convert crds to jsonSchema
 python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
+conversionResult=$?
 
 # Copy and rename files to support kubeval
 rm -rf $SCHEMAS_DIR/master-standalone
@@ -69,11 +70,11 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-if [ $? == 0 ]; then
+if [ $conversionResult == 0 ]; then
     printf "${GREEN}Successfully converted $NUM_OF_CRDS CRDs to JSON schema${NC}\n"
     
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
-    printf "\n- ${CYAN}datree:${NC}\n\$ datree test --schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n\n"
+    printf "\n- ${CYAN}datree:${NC}\n\$ datree test --schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
 fi

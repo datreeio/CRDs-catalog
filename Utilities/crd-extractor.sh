@@ -38,7 +38,7 @@ NUM_OF_CRDS=0
 while read -r crd 
 do
     resourceKind=${crd%% *}
-    kubectl get crds "$resourceKind" -o yaml > "$TMP_CRD_DIR/$resourceKind.yaml" 2>&1 
+    kubectl get crds "$resourceKind" -o yaml > "$TMP_CRD_DIR/"$resourceKind".yaml" 2>&1 
     let NUM_OF_CRDS++
 done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 

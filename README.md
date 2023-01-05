@@ -53,10 +53,9 @@ To use the CRD Extractor:
 
 ---
 
-## Shifting left CRD validation
+## Shifting left CRD validation - Video by Datree
 
-
- <a href="https://www.youtube.com/watch?v=YUoH8WNrrwM"><img src="https://img.youtube.com/vi/YUoH8WNrrwM/0.jpg" alt="IMAGE ALT TEXT"></a>
+[![](https://markdown-videos.deta.dev/youtube/YUoH8WNrrwM)](https://youtu.be/YUoH8WNrrwM)
 
 ---
 

@@ -20,6 +20,8 @@ Only supported with the CRD Extractor
 
 👉 If you encounter custom resources that are not part of the catalog, or you want to validate the schemas in an air-gapped environment, use the [CRD Extractor](#crd-extractor). 
 
+---
+
 ## CRD Extractor
 
 This repository also contains a handy utility that extracts all CRDs from a cluster and converts them to JSON schema.
@@ -48,6 +50,15 @@ To use the CRD Extractor:
 ```
 
 ![image](https://user-images.githubusercontent.com/19731161/185790837-2abadcd5-9b26-451b-b3cd-7e0c46c68b58.png)
+
+---
+
+## Shifting left CRD validation
+
+
+ <a href="https://www.youtube.com/watch?v=YUoH8WNrrwM"><img src="https://img.youtube.com/vi/YUoH8WNrrwM/0.jpg" alt="IMAGE ALT TEXT"></a>
+
+---
 
 ## Contributing CRDs to the catalog
 If the catalog is missing public custom resources (CRs) that you would like to automatically validate using these tools, you can open an issue or use the **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.

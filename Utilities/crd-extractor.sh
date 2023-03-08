@@ -14,7 +14,7 @@ if ! command -v kubectl &> /dev/null; then
 fi
 
 # Check if the pyyaml module is installed
-if ! pip3 show pyyaml &> /dev/null; then
+if ! echo 'import yaml' | python3 &> /dev/null; then
     printf "the python3 module 'yaml' is required, and is not installed on your machine.\n"
     #printf "would you like to install it? y/n"
 

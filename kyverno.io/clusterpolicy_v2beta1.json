@@ -1132,6 +1132,10 @@
                           },
                           "type": "array"
                         },
+                        "foreach": {
+                          "description": "Foreach declares a nested foreach iterator",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        },
                         "list": {
                           "description": "List specifies a JMESPath expression that results in one or more elements to which the validation logic is applied.",
                           "type": "string"
@@ -1287,7 +1291,7 @@
                 "description": "Preconditions are used to determine if a policy rule should be applied by evaluating a set of conditions. The declaration can contain nested `any` or `all` statements. A direct list of conditions (without `any` or `all` statements is supported for backwards compatibility but See: https://kyverno.io/docs/writing-policies/preconditions/",
                 "properties": {
                   "all": {
-                    "description": "AllConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, all of the conditions need to pass",
+                    "description": "AllConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, all of the conditions need to pass.",
                     "items": {
                       "properties": {
                         "key": {
@@ -1325,7 +1329,7 @@
                     "type": "array"
                   },
                   "any": {
-                    "description": "AnyConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, at least one of the conditions need to pass",
+                    "description": "AnyConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, at least one of the conditions need to pass.",
                     "items": {
                       "properties": {
                         "key": {
@@ -1380,7 +1384,7 @@
                         "description": "Multiple conditions can be declared under an `any` or `all` statement. A direct list of conditions (without `any` or `all` statements) is also supported for backwards compatibility See: https://kyverno.io/docs/writing-policies/validate/#deny-rules",
                         "properties": {
                           "all": {
-                            "description": "AllConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, all of the conditions need to pass",
+                            "description": "AllConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, all of the conditions need to pass.",
                             "items": {
                               "properties": {
                                 "key": {
@@ -1418,7 +1422,7 @@
                             "type": "array"
                           },
                           "any": {
-                            "description": "AnyConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, at least one of the conditions need to pass",
+                            "description": "AnyConditions enable variable-based conditional rule execution. This is useful for finer control of when an rule is applied. A condition can reference object data using JMESPath notation. Here, at least one of the conditions need to pass.",
                             "items": {
                               "properties": {
                                 "key": {
@@ -1574,6 +1578,10 @@
                         "elementScope": {
                           "description": "ElementScope specifies whether to use the current list element as the scope for validation. Defaults to \"true\" if not specified. When set to \"false\", \"request.object\" is used as the validation scope within the foreach block to allow referencing other elements in the subtree.",
                           "type": "boolean"
+                        },
+                        "foreach": {
+                          "description": "Foreach declares a nested foreach iterator",
+                          "x-kubernetes-preserve-unknown-fields": true
                         },
                         "list": {
                           "description": "List specifies a JMESPath expression that results in one or more elements to which the validation logic is applied.",
@@ -1782,8 +1790,12 @@
                                   "keys": {
                                     "description": "Keys specifies one or more public keys",
                                     "properties": {
+                                      "kms": {
+                                        "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                        "type": "string"
+                                      },
                                       "publicKeys": {
-                                        "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                        "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                         "type": "string"
                                       },
                                       "rekor": {
@@ -1799,6 +1811,30 @@
                                         ],
                                         "type": "object",
                                         "additionalProperties": false
+                                      },
+                                      "secret": {
+                                        "description": "Reference to a Secret resource that contains a public key",
+                                        "properties": {
+                                          "name": {
+                                            "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                            "type": "string"
+                                          },
+                                          "namespace": {
+                                            "description": "Namespace name where the Secret exists.",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "namespace"
+                                        ],
+                                        "type": "object",
+                                        "additionalProperties": false
+                                      },
+                                      "signatureAlgorithm": {
+                                        "default": "sha256",
+                                        "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                        "type": "string"
                                       }
                                     },
                                     "type": "object",
@@ -2071,8 +2107,12 @@
                                       "keys": {
                                         "description": "Keys specifies one or more public keys",
                                         "properties": {
+                                          "kms": {
+                                            "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                            "type": "string"
+                                          },
                                           "publicKeys": {
-                                            "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                            "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                             "type": "string"
                                           },
                                           "rekor": {
@@ -2088,6 +2128,30 @@
                                             ],
                                             "type": "object",
                                             "additionalProperties": false
+                                          },
+                                          "secret": {
+                                            "description": "Reference to a Secret resource that contains a public key",
+                                            "properties": {
+                                              "name": {
+                                                "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                                "type": "string"
+                                              },
+                                              "namespace": {
+                                                "description": "Namespace name where the Secret exists.",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "name",
+                                              "namespace"
+                                            ],
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "signatureAlgorithm": {
+                                            "default": "sha256",
+                                            "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                            "type": "string"
                                           }
                                         },
                                         "type": "object",
@@ -2311,8 +2375,12 @@
                                 "keys": {
                                   "description": "Keys specifies one or more public keys",
                                   "properties": {
+                                    "kms": {
+                                      "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                      "type": "string"
+                                    },
                                     "publicKeys": {
-                                      "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                      "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                       "type": "string"
                                     },
                                     "rekor": {
@@ -2328,6 +2396,30 @@
                                       ],
                                       "type": "object",
                                       "additionalProperties": false
+                                    },
+                                    "secret": {
+                                      "description": "Reference to a Secret resource that contains a public key",
+                                      "properties": {
+                                        "name": {
+                                          "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                          "type": "string"
+                                        },
+                                        "namespace": {
+                                          "description": "Namespace name where the Secret exists.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name",
+                                        "namespace"
+                                      ],
+                                      "type": "object",
+                                      "additionalProperties": false
+                                    },
+                                    "signatureAlgorithm": {
+                                      "default": "sha256",
+                                      "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                      "type": "string"
                                     }
                                   },
                                   "type": "object",
@@ -2392,11 +2484,13 @@
           "type": "boolean"
         },
         "validationFailureAction": {
-          "default": "audit",
-          "description": "ValidationFailureAction defines if a validation policy rule violation should block the admission review request (enforce), or allow (audit) the admission review request and report an error in a policy report. Optional. Allowed values are audit or enforce. The default value is \"audit\".",
+          "default": "Audit",
+          "description": "ValidationFailureAction defines if a validation policy rule violation should block the admission review request (enforce), or allow (audit) the admission review request and report an error in a policy report. Optional. Allowed values are audit or enforce. The default value is \"Audit\".",
           "enum": [
             "audit",
-            "enforce"
+            "enforce",
+            "Audit",
+            "Enforce"
           ],
           "type": "string"
         },
@@ -2408,7 +2502,9 @@
                 "description": "ValidationFailureAction defines the policy validation failure action",
                 "enum": [
                   "audit",
-                  "enforce"
+                  "enforce",
+                  "Audit",
+                  "Enforce"
                 ],
                 "type": "string"
               },
@@ -3877,6 +3973,10 @@
                               },
                               "type": "array"
                             },
+                            "foreach": {
+                              "description": "Foreach declares a nested foreach iterator",
+                              "x-kubernetes-preserve-unknown-fields": true
+                            },
                             "list": {
                               "description": "List specifies a JMESPath expression that results in one or more elements to which the validation logic is applied.",
                               "type": "string"
@@ -4162,6 +4262,10 @@
                               "description": "ElementScope specifies whether to use the current list element as the scope for validation. Defaults to \"true\" if not specified. When set to \"false\", \"request.object\" is used as the validation scope within the foreach block to allow referencing other elements in the subtree.",
                               "type": "boolean"
                             },
+                            "foreach": {
+                              "description": "Foreach declares a nested foreach iterator",
+                              "x-kubernetes-preserve-unknown-fields": true
+                            },
                             "list": {
                               "description": "List specifies a JMESPath expression that results in one or more elements to which the validation logic is applied.",
                               "type": "string"
@@ -4369,8 +4473,12 @@
                                       "keys": {
                                         "description": "Keys specifies one or more public keys",
                                         "properties": {
+                                          "kms": {
+                                            "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                            "type": "string"
+                                          },
                                           "publicKeys": {
-                                            "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                            "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                             "type": "string"
                                           },
                                           "rekor": {
@@ -4386,6 +4494,30 @@
                                             ],
                                             "type": "object",
                                             "additionalProperties": false
+                                          },
+                                          "secret": {
+                                            "description": "Reference to a Secret resource that contains a public key",
+                                            "properties": {
+                                              "name": {
+                                                "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                                "type": "string"
+                                              },
+                                              "namespace": {
+                                                "description": "Namespace name where the Secret exists.",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "name",
+                                              "namespace"
+                                            ],
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "signatureAlgorithm": {
+                                            "default": "sha256",
+                                            "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                            "type": "string"
                                           }
                                         },
                                         "type": "object",
@@ -4672,8 +4804,12 @@
                                           "keys": {
                                             "description": "Keys specifies one or more public keys",
                                             "properties": {
+                                              "kms": {
+                                                "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                                "type": "string"
+                                              },
                                               "publicKeys": {
-                                                "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                                "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                                 "type": "string"
                                               },
                                               "rekor": {
@@ -4689,6 +4825,30 @@
                                                 ],
                                                 "type": "object",
                                                 "additionalProperties": false
+                                              },
+                                              "secret": {
+                                                "description": "Reference to a Secret resource that contains a public key",
+                                                "properties": {
+                                                  "name": {
+                                                    "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                                    "type": "string"
+                                                  },
+                                                  "namespace": {
+                                                    "description": "Namespace name where the Secret exists.",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "name",
+                                                  "namespace"
+                                                ],
+                                                "type": "object",
+                                                "additionalProperties": false
+                                              },
+                                              "signatureAlgorithm": {
+                                                "default": "sha256",
+                                                "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                                "type": "string"
                                               }
                                             },
                                             "type": "object",
@@ -4912,8 +5072,12 @@
                                     "keys": {
                                       "description": "Keys specifies one or more public keys",
                                       "properties": {
+                                        "kms": {
+                                          "description": "KMS provides the URI to the public key stored in a Key Management System. See: https://github.com/sigstore/cosign/blob/main/KMS.md",
+                                          "type": "string"
+                                        },
                                         "publicKeys": {
-                                          "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
+                                          "description": "Keys is a set of X.509 public keys used to verify image signatures. The keys can be directly specified or can be a variable reference to a key specified in a ConfigMap (see https://kyverno.io/docs/writing-policies/variables/), or reference a standard Kubernetes Secret elsewhere in the cluster by specifying it in the format \"k8s://<namespace>/<secret_name>\". The named Secret must specify a key `cosign.pub` containing the public key used for verification, (see https://github.com/sigstore/cosign/blob/main/KMS.md#kubernetes-secret). When multiple keys are specified each key is processed as a separate staticKey entry (.attestors[*].entries.keys) within the set of attestors and the count is applied across the keys.",
                                           "type": "string"
                                         },
                                         "rekor": {
@@ -4929,6 +5093,30 @@
                                           ],
                                           "type": "object",
                                           "additionalProperties": false
+                                        },
+                                        "secret": {
+                                          "description": "Reference to a Secret resource that contains a public key",
+                                          "properties": {
+                                            "name": {
+                                              "description": "Name of the secret. The provided secret must contain a key named cosign.pub.",
+                                              "type": "string"
+                                            },
+                                            "namespace": {
+                                              "description": "Namespace name where the Secret exists.",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "name",
+                                            "namespace"
+                                          ],
+                                          "type": "object",
+                                          "additionalProperties": false
+                                        },
+                                        "signatureAlgorithm": {
+                                          "default": "sha256",
+                                          "description": "Specify signature algorithm for public keys. Supported values are sha256 and sha512",
+                                          "type": "string"
                                         }
                                       },
                                       "type": "object",
@@ -5071,6 +5259,35 @@
         "ready": {
           "description": "Ready indicates if the policy is ready to serve the admission request. Deprecated in favor of Conditions",
           "type": "boolean"
+        },
+        "rulecount": {
+          "description": "RuleCount describes total number of rules in a policy",
+          "properties": {
+            "generate": {
+              "description": "Count for generate rules in policy",
+              "type": "integer"
+            },
+            "mutate": {
+              "description": "Count for mutate rules in policy",
+              "type": "integer"
+            },
+            "validate": {
+              "description": "Count for validate rules in policy",
+              "type": "integer"
+            },
+            "verifyimages": {
+              "description": "Count for verify image rules in policy",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "generate",
+            "mutate",
+            "validate",
+            "verifyimages"
+          ],
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "required": [

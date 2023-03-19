@@ -1,0 +1,344 @@
+{
+    "description": "AzureMachineProviderSpec is the type that will be embedded in a Machine.Spec.ProviderSpec field for an Azure virtual machine. It is used by the Azure machine actuator to create a single Machine. Required parameters such as location that are not specified by this configuration, will be defaulted by the actuator. Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
+    "properties": {
+        "acceleratedNetworking": {
+            "description": "AcceleratedNetworking enables or disables Azure accelerated networking feature. Set to false by default. If true, then this will depend on whether the requested VMSize is supported. If set to true with an unsupported VMSize, Azure will return an error.",
+            "type": "boolean"
+        },
+        "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+        },
+        "applicationSecurityGroups": {
+            "description": "Application Security Groups that need to be attached to the machine's interface. No application security groups will be attached if zero-length.",
+            "items": {
+                "type": "string"
+            },
+            "type": "array"
+        },
+        "availabilitySet": {
+            "description": "AvailabilitySet specifies the availability set to use for this instance. Availability set should be precreated, before using this field.",
+            "type": "string"
+        },
+        "credentialsSecret": {
+            "description": "CredentialsSecret is a reference to the secret with Azure credentials.",
+            "properties": {
+                "name": {
+                    "description": "name is unique within a namespace to reference a secret resource.",
+                    "type": "string"
+                },
+                "namespace": {
+                    "description": "namespace defines the space within which the secret name must be unique.",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "dataDisks": {
+            "description": "DataDisk specifies the parameters that are used to add one or more data disks to the machine.",
+            "items": {
+                "description": "DataDisk specifies the parameters that are used to add one or more data disks to the machine. A Data Disk is a managed disk that's attached to a virtual machine to store application data. It differs from an OS Disk as it doesn't come with a pre-installed OS, and it cannot contain the boot volume. It is registered as SCSI drive and labeled with the chosen `lun`. e.g. for `lun: 0` the raw disk device will be available at `/dev/disk/azure/scsi1/lun0`. \n As the Data Disk disk device is attached raw to the virtual machine, it will need to be partitioned, formatted with a filesystem and mounted, in order for it to be usable. This can be done by creating a custom userdata Secret with custom Ignition configuration to achieve the desired initialization. At this stage the previously defined `lun` is to be used as the \"device\" key for referencing the raw disk device to be initialized. Once the custom userdata Secret has been created, it can be referenced in the Machine's `.providerSpec.userDataSecret`. For further guidance and examples, please refer to the official OpenShift docs.",
+                "properties": {
+                    "cachingType": {
+                        "description": "CachingType specifies the caching requirements. Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is CachingTypeNone.",
+                        "enum": [
+                            "None",
+                            "ReadOnly",
+                            "ReadWrite"
+                        ],
+                        "type": "string"
+                    },
+                    "deletionPolicy": {
+                        "description": "DeletionPolicy specifies the data disk deletion policy upon Machine deletion. Possible values are \"Delete\",\"Detach\". When \"Delete\" is used the data disk is deleted when the Machine is deleted. When \"Detach\" is used the data disk is detached from the Machine and retained when the Machine is deleted.",
+                        "enum": [
+                            "Delete",
+                            "Detach"
+                        ],
+                        "type": "string"
+                    },
+                    "diskSizeGB": {
+                        "description": "DiskSizeGB is the size in GB to assign to the data disk.",
+                        "format": "int32",
+                        "minimum": 4,
+                        "type": "integer",
+                        "maximum": 2147483647
+                    },
+                    "lun": {
+                        "description": "Lun Specifies the logical unit number of the data disk. This value is used to identify data disks within the VM and therefore must be unique for each data disk attached to a VM. This value is also needed for referencing the data disks devices within userdata to perform disk initialization through Ignition (e.g. partition/format/mount). The value must be between 0 and 63.",
+                        "format": "int32",
+                        "maximum": 63,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "managedDisk": {
+                        "description": "ManagedDisk specifies the Managed Disk parameters for the data disk. Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is a ManagedDisk with with storageAccountType: \"Premium_LRS\" and diskEncryptionSet.id: \"Default\".",
+                        "properties": {
+                            "diskEncryptionSet": {
+                                "description": "DiskEncryptionSet is the disk encryption set properties. Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is a DiskEncryptionSet with id: \"Default\".",
+                                "properties": {
+                                    "id": {
+                                        "description": "ID is the disk encryption set ID Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is: \"Default\".",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                            },
+                            "storageAccountType": {
+                                "description": "StorageAccountType is the storage account type to use. Possible values include \"Standard_LRS\", \"Premium_LRS\" and \"UltraSSD_LRS\".",
+                                "enum": [
+                                    "Standard_LRS",
+                                    "Premium_LRS",
+                                    "UltraSSD_LRS"
+                                ],
+                                "type": "string"
+                            }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "nameSuffix": {
+                        "description": "NameSuffix is the suffix to be appended to the machine name to generate the disk name. Each disk name will be in format <machineName>_<nameSuffix>. NameSuffix name must start and finish with an alphanumeric character and can only contain letters, numbers, underscores, periods or hyphens. The overall disk name must not exceed 80 chars in length.",
+                        "maxLength": 78,
+                        "pattern": "^[a-zA-Z0-9](?:[\\w\\.-]*[a-zA-Z0-9])?$",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "deletionPolicy",
+                    "diskSizeGB",
+                    "lun",
+                    "nameSuffix"
+                ],
+                "type": "object",
+                "additionalProperties": false
+            },
+            "type": "array"
+        },
+        "image": {
+            "description": "Image is the OS image to use to create the instance.",
+            "properties": {
+                "offer": {
+                    "description": "Offer specifies the name of a group of related images created by the publisher. For example, UbuntuServer, WindowsServer",
+                    "type": "string"
+                },
+                "publisher": {
+                    "description": "Publisher is the name of the organization that created the image",
+                    "type": "string"
+                },
+                "resourceID": {
+                    "description": "ResourceID specifies an image to use by ID",
+                    "type": "string"
+                },
+                "sku": {
+                    "description": "SKU specifies an instance of an offer, such as a major release of a distribution. For example, 18.04-LTS, 2019-Datacenter",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "Type identifies the source of the image and related information, such as purchase plans. Valid values are \"ID\", \"MarketplaceWithPlan\", \"MarketplaceNoPlan\", and omitted, which means no opinion and the platform chooses a good default which may change over time. Currently that default is \"MarketplaceNoPlan\" if publisher data is supplied, or \"ID\" if not. For more information about purchase plans, see: https://docs.microsoft.com/en-us/azure/virtual-machines/linux/cli-ps-findimage#check-the-purchase-plan-information",
+                    "type": "string"
+                },
+                "version": {
+                    "description": "Version specifies the version of an image sku. The allowed formats are Major.Minor.Build or 'latest'. Major, Minor, and Build are decimal numbers. Specify 'latest' to use the latest version of an image available at deploy time. Even if you use 'latest', the VM image will not automatically update after deploy time even if a new version becomes available.",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "internalLoadBalancer": {
+            "description": "InternalLoadBalancerName to use for this instance",
+            "type": "string"
+        },
+        "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+        },
+        "location": {
+            "description": "Location is the region to use to create the instance",
+            "type": "string"
+        },
+        "managedIdentity": {
+            "description": "ManagedIdentity to set managed identity name",
+            "type": "string"
+        },
+        "metadata": {
+            "type": "object"
+        },
+        "natRule": {
+            "description": "NatRule to set inbound NAT rule of the load balancer",
+            "format": "int64",
+            "type": "integer",
+            "minimum": -9223372036854776000,
+            "maximum": 9223372036854776000
+        },
+        "networkResourceGroup": {
+            "description": "NetworkResourceGroup is the resource group for the virtual machine's network",
+            "type": "string"
+        },
+        "osDisk": {
+            "description": "OSDisk represents the parameters for creating the OS disk.",
+            "properties": {
+                "cachingType": {
+                    "description": "CachingType specifies the caching requirements. Possible values include: 'None', 'ReadOnly', 'ReadWrite'. Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is `None`.",
+                    "enum": [
+                        "None",
+                        "ReadOnly",
+                        "ReadWrite"
+                    ],
+                    "type": "string"
+                },
+                "diskSettings": {
+                    "description": "DiskSettings describe ephemeral disk settings for the os disk.",
+                    "properties": {
+                        "ephemeralStorageLocation": {
+                            "description": "EphemeralStorageLocation enables ephemeral OS when set to 'Local'. Possible values include: 'Local'. See https://docs.microsoft.com/en-us/azure/virtual-machines/ephemeral-os-disks for full details. Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is that disks are saved to remote Azure storage.",
+                            "enum": [
+                                "Local"
+                            ],
+                            "type": "string"
+                        }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                },
+                "diskSizeGB": {
+                    "description": "DiskSizeGB is the size in GB to assign to the data disk.",
+                    "format": "int32",
+                    "type": "integer",
+                    "minimum": -2147483648,
+                    "maximum": 2147483647
+                },
+                "managedDisk": {
+                    "description": "ManagedDisk specifies the Managed Disk parameters for the OS disk.",
+                    "properties": {
+                        "diskEncryptionSet": {
+                            "description": "DiskEncryptionSet is the disk encryption set properties",
+                            "properties": {
+                                "id": {
+                                    "description": "ID is the disk encryption set ID Empty value means no opinion and the platform chooses a default, which is subject to change over time. Currently the default is: \"Default\".",
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                        },
+                        "storageAccountType": {
+                            "description": "StorageAccountType is the storage account type to use. Possible values include \"Standard_LRS\", \"Premium_LRS\".",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                },
+                "osType": {
+                    "description": "OSType is the operating system type of the OS disk. Possible values include \"Linux\" and \"Windows\".",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "publicIP": {
+            "description": "PublicIP if true a public IP will be used",
+            "type": "boolean"
+        },
+        "publicLoadBalancer": {
+            "description": "PublicLoadBalancer to use for this instance",
+            "type": "string"
+        },
+        "resourceGroup": {
+            "description": "ResourceGroup is the resource group for the virtual machine",
+            "type": "string"
+        },
+        "securityGroup": {
+            "description": "Network Security Group that needs to be attached to the machine's interface. No security group will be attached if empty.",
+            "type": "string"
+        },
+        "securityProfile": {
+            "description": "SecurityProfile specifies the Security profile settings for a virtual machine.",
+            "properties": {
+                "encryptionAtHost": {
+                    "description": "This field indicates whether Host Encryption should be enabled or disabled for a virtual machine or virtual machine scale set. Default is disabled.",
+                    "type": "boolean"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "spotVMOptions": {
+            "description": "SpotVMOptions allows the ability to specify the Machine should use a Spot VM",
+            "properties": {
+                "maxPrice": {
+                    "anyOf": [
+                        {
+                            "type": "integer"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "MaxPrice defines the maximum price the user is willing to pay for Spot VM instances",
+                    "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                    "x-kubernetes-int-or-string": true
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "sshPublicKey": {
+            "description": "SSHPublicKey is the public key to use to SSH to the virtual machine.",
+            "type": "string"
+        },
+        "subnet": {
+            "description": "Subnet to use for this instance",
+            "type": "string"
+        },
+        "tags": {
+            "additionalProperties": {
+                "type": "string"
+            },
+            "description": "Tags is a list of tags to apply to the machine.",
+            "type": "object"
+        },
+        "ultraSSDCapability": {
+            "description": "UltraSSDCapability enables or disables Azure UltraSSD capability for a virtual machine. This can be used to allow/disallow binding of Azure UltraSSD to the Machine both as Data Disks or via Persistent Volumes. This Azure feature is subject to a specific scope and certain limitations. More informations on this can be found in the official Azure documentation for Ultra Disks: (https://docs.microsoft.com/en-us/azure/virtual-machines/disks-enable-ultra-ssd?tabs=azure-portal#ga-scope-and-limitations). \n When omitted, if at least one Data Disk of type UltraSSD is specified, the platform will automatically enable the capability. If a Perisistent Volume backed by an UltraSSD is bound to a Pod on the Machine, when this field is ommitted, the platform will *not* automatically enable the capability (unless already enabled by the presence of an UltraSSD as Data Disk). This may manifest in the Pod being stuck in `ContainerCreating` phase. This defaulting behaviour may be subject to change in future. \n When set to \"Enabled\", if the capability is available for the Machine based on the scope and limitations described above, the capability will be set on the Machine. This will thus allow UltraSSD both as Data Disks and Persistent Volumes. If set to \"Enabled\" when the capability can't be available due to scope and limitations, the Machine will go into \"Failed\" state. \n When set to \"Disabled\", UltraSSDs will not be allowed either as Data Disks nor as Persistent Volumes. In this case if any UltraSSDs are specified as Data Disks on a Machine, the Machine will go into a \"Failed\" state. If instead any UltraSSDs are backing the volumes (via Persistent Volumes) of any Pods scheduled on a Node which is backed by the Machine, the Pod may get stuck in `ContainerCreating` phase.",
+            "enum": [
+                "Enabled",
+                "Disabled"
+            ],
+            "type": "string"
+        },
+        "userDataSecret": {
+            "description": "UserDataSecret contains a local reference to a secret that contains the UserData to apply to the instance",
+            "properties": {
+                "name": {
+                    "description": "name is unique within a namespace to reference a secret resource.",
+                    "type": "string"
+                },
+                "namespace": {
+                    "description": "namespace defines the space within which the secret name must be unique.",
+                    "type": "string"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "vmSize": {
+            "description": "VMSize is the size of the VM to create.",
+            "type": "string"
+        },
+        "vnet": {
+            "description": "Vnet to set virtual network name",
+            "type": "string"
+        },
+        "zone": {
+            "description": "Availability Zone for the virtual machine. If nil, the virtual machine should be deployed to no zone",
+            "type": "string"
+        }
+    },
+    "type": "object",
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-04/schema#"
+}

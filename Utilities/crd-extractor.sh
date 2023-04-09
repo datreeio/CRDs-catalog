@@ -56,8 +56,11 @@ do
     singularNameValue=$(grep singular: "$TMP_CRD_DIR/"$resourceKind".yaml" -m 1)
     singularName=${singularNameValue##* }
     
+    # Get group
+    resourceGroup=${resourceKind#*.}
+
     # Save name and group for later directory organization
-    CRD_GROUPS["$singularName"]="${resourceKind#*.}"
+    CRD_GROUPS["$singularName"]="$resourceGroup"
     
     let NUM_OF_CRDS++
 done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)

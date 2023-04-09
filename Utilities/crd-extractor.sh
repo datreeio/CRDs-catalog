@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Check if python3 is installed
 if ! command -v python3 &> /dev/null; then
@@ -16,7 +16,6 @@ fi
 # Check if the pyyaml module is installed
 if ! echo 'import yaml' | python3 &> /dev/null; then
     printf "the python3 module 'yaml' is required, and is not installed on your machine.\n"
-    #printf "would you like to install it? y/n"
 
     while true; do
         read -p "Do you wish to install this program? (y/n) " yn
@@ -33,12 +32,33 @@ fi
 TMP_CRD_DIR=$HOME/.datree/crds
 mkdir -p $TMP_CRD_DIR
 
+# Create final schemas directory
+SCHEMAS_DIR=$HOME/.datree/crdSchemas
+mkdir -p $SCHEMAS_DIR
+cd $SCHEMAS_DIR
+
+# Create array to store CRD kinds and groups
+ORGANIZE_BY_GROUP=true
+declare -A CRD_GROUPS 2>/dev/null
+if [ $? -ne 0 ]; then
+    # Array creation failed, signal to skip organization by group
+    ORGANIZE_BY_GROUP=false
+fi
+
 # Extract CRDs from cluster
 NUM_OF_CRDS=0
 while read -r crd 
 do
     resourceKind=${crd%% *}
     kubectl get crds "$resourceKind" -o yaml > "$TMP_CRD_DIR/"$resourceKind".yaml" 2>&1 
+    
+    # Get singular name from crd
+    singularNameValue=$(grep singular: "$TMP_CRD_DIR/"$resourceKind".yaml" -m 1)
+    singularName=${singularNameValue##* }
+    
+    # Save name and group for later directory organization
+    CRD_GROUPS["$singularName"]="${resourceKind#*.}"
+    
     let NUM_OF_CRDS++
 done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 
@@ -51,11 +71,6 @@ fi
 # Download converter script
 curl https://raw.githubusercontent.com/yannh/kubeconform/master/scripts/openapi2jsonschema.py --output $TMP_CRD_DIR/openapi2jsonschema.py 2>/dev/null
 
-# Create final schemas directory
-SCHEMAS_DIR=$HOME/.datree/crdSchemas
-mkdir -p $SCHEMAS_DIR
-cd $SCHEMAS_DIR
-
 # Convert crds to jsonSchema
 python3 $TMP_CRD_DIR/openapi2jsonschema.py $TMP_CRD_DIR/*.yaml
 conversionResult=$?
@@ -65,6 +80,18 @@ rm -rf $SCHEMAS_DIR/master-standalone
 mkdir -p $SCHEMAS_DIR/master-standalone
 cp $SCHEMAS_DIR/*.json $SCHEMAS_DIR/master-standalone
 find $SCHEMAS_DIR/master-standalone -name '*json' -exec bash -c ' mv -f $0 ${0/\_/-stable-}' {} \;
+
+# Organize schemas by group
+if [ $ORGANIZE_BY_GROUP == true ]; then
+    for schema in $SCHEMAS_DIR/*.json
+    do
+    crdFileName=$(basename $schema .json)
+    crdKind=${crdFileName%%_*}
+    crdGroup=${CRD_GROUPS[$crdKind]}
+    mkdir -p $crdGroup
+    mv $schema ./$crdGroup
+    done
+fi
 
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'

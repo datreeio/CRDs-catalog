@@ -16,17 +16,39 @@
       "description": "HelmReleaseSpec defines the desired state of a Helm release.",
       "properties": {
         "chart": {
-          "description": "Chart defines the template of the v1beta1.HelmChart that should be created for this HelmRelease.",
+          "description": "Chart defines the template of the v1beta2.HelmChart that should be created for this HelmRelease.",
           "properties": {
+            "metadata": {
+              "description": "ObjectMeta holds the template for metadata like labels and annotations.",
+              "properties": {
+                "annotations": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/",
+                  "type": "object"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "spec": {
-              "description": "Spec holds the template for the v1beta1.HelmChartSpec for this HelmRelease.",
+              "description": "Spec holds the template for the v1beta2.HelmChartSpec for this HelmRelease.",
               "properties": {
                 "chart": {
                   "description": "The name or path the Helm chart is available at in the SourceRef.",
                   "type": "string"
                 },
                 "interval": {
-                  "description": "Interval at which to check the v1beta1.Source for updates. Defaults to 'HelmReleaseSpec.Interval'.",
+                  "description": "Interval at which to check the v1beta2.Source for updates. Defaults to 'HelmReleaseSpec.Interval'.",
+                  "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
                   "type": "string"
                 },
                 "reconcileStrategy": {
@@ -39,7 +61,7 @@
                   "type": "string"
                 },
                 "sourceRef": {
-                  "description": "The name and namespace of the v1beta1.Source the chart is available at.",
+                  "description": "The name and namespace of the v1beta2.Source the chart is available at.",
                   "properties": {
                     "apiVersion": {
                       "description": "APIVersion of the referent.",
@@ -84,9 +106,41 @@
                   },
                   "type": "array"
                 },
+                "verify": {
+                  "description": "Verify contains the secret name containing the trusted public keys used to verify the signature and specifies which provider to use to check whether OCI image is authentic. This field is only supported for OCI sources. Chart dependencies, which are not bundled in the umbrella chart artifact, are not verified.",
+                  "properties": {
+                    "provider": {
+                      "default": "cosign",
+                      "description": "Provider specifies the technology used to sign the OCI Helm chart.",
+                      "enum": [
+                        "cosign"
+                      ],
+                      "type": "string"
+                    },
+                    "secretRef": {
+                      "description": "SecretRef specifies the Kubernetes Secret containing the trusted public keys.",
+                      "properties": {
+                        "name": {
+                          "description": "Name of the referent.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "version": {
                   "default": "*",
-                  "description": "Version semver expression, ignored for charts from v1beta1.GitRepository and v1beta1.Bucket sources. Defaults to latest when omitted.",
+                  "description": "Version semver expression, ignored for charts from v1beta2.GitRepository and v1beta2.Bucket sources. Defaults to latest when omitted.",
                   "type": "string"
                 }
               },
@@ -105,16 +159,16 @@
           "additionalProperties": false
         },
         "dependsOn": {
-          "description": "DependsOn may contain a dependency.CrossNamespaceDependencyReference slice with references to HelmRelease resources that must be ready before this HelmRelease can be reconciled.",
+          "description": "DependsOn may contain a meta.NamespacedObjectReference slice with references to HelmRelease resources that must be ready before this HelmRelease can be reconciled.",
           "items": {
-            "description": "CrossNamespaceDependencyReference holds the reference to a dependency.",
+            "description": "NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any namespace.",
             "properties": {
               "name": {
-                "description": "Name holds the name reference of a dependency.",
+                "description": "Name of the referent.",
                 "type": "string"
               },
               "namespace": {
-                "description": "Namespace holds the namespace reference of a dependency.",
+                "description": "Namespace of the referent, when not specified it acts as LocalObjectReference.",
                 "type": "string"
               }
             },
@@ -187,6 +241,7 @@
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation (like Jobs for hooks) during the performance of a Helm install action. Defaults to 'HelmReleaseSpec.Timeout'.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
               "type": "string"
             }
           },
@@ -195,16 +250,21 @@
         },
         "interval": {
           "description": "Interval at which to reconcile the Helm release.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
           "type": "string"
         },
         "kubeConfig": {
-          "description": "KubeConfig for reconciling the HelmRelease on a remote cluster. When specified, KubeConfig takes precedence over ServiceAccountName.",
+          "description": "KubeConfig for reconciling the HelmRelease on a remote cluster. When used in combination with HelmReleaseSpec.ServiceAccountName, forces the controller to act on behalf of that Service Account at the target cluster. If the --default-service-account flag is set, its value will be used as a controller level fallback for when HelmReleaseSpec.ServiceAccountName is empty.",
           "properties": {
             "secretRef": {
-              "description": "SecretRef holds the name to a secret that contains a 'value' key with the kubeconfig file as the value. It must be in the same namespace as the HelmRelease. It is recommended that the kubeconfig is self-contained, and the secret is regularly updated if credentials such as a cloud-access-token expire. Cloud specific `cmd-path` auth helpers will not function without adding binaries and credentials to the Pod that is responsible for reconciling the HelmRelease.",
+              "description": "SecretRef holds the name of a secret that contains a key with the kubeconfig file as the value. If no key is set, the key will default to 'value'. It is recommended that the kubeconfig is self-contained, and the secret is regularly updated if credentials such as a cloud-access-token expire. Cloud specific `cmd-path` auth helpers will not function without adding binaries and credentials to the Pod that is responsible for reconciling Kubernetes resources.",
               "properties": {
+                "key": {
+                  "description": "Key in the Secret, when not specified an implementation-specific default key is used.",
+                  "type": "string"
+                },
                 "name": {
-                  "description": "Name of the referent",
+                  "description": "Name of the Secret.",
                   "type": "string"
                 }
               },
@@ -215,12 +275,19 @@
               "additionalProperties": false
             }
           },
+          "required": [
+            "secretRef"
+          ],
           "type": "object",
           "additionalProperties": false
         },
         "maxHistory": {
           "description": "MaxHistory is the number of revisions saved by Helm for this HelmRelease. Use '0' for an unlimited number of revisions; defaults to '10'.",
           "type": "integer"
+        },
+        "persistentClient": {
+          "description": "PersistentClient tells the controller to use a persistent Kubernetes client for this release. When enabled, the client will be reused for the duration of the reconciliation, instead of being created and destroyed for each (step of a) Helm action. \n This can improve performance, but may cause issues with some Helm charts that for example do create Custom Resource Definitions during installation outside Helm's CRD lifecycle hooks, which are then not observed to be available by e.g. post-install hooks. \n If not set, it defaults to true.",
+          "type": "boolean"
         },
         "postRenderers": {
           "description": "PostRenderers holds an array of Helm PostRenderers, which will be applied in order of their definition.",
@@ -254,6 +321,59 @@
                       },
                       "required": [
                         "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "patches": {
+                    "description": "Strategic merge and JSON patches, defined as inline YAML objects, capable of targeting objects based on kind, label and annotation selectors.",
+                    "items": {
+                      "description": "Patch contains an inline StrategicMerge or JSON6902 patch, and the target the patch should be applied to.",
+                      "properties": {
+                        "patch": {
+                          "description": "Patch contains an inline StrategicMerge patch or an inline JSON6902 patch with an array of operation objects.",
+                          "type": "string"
+                        },
+                        "target": {
+                          "description": "Target points to the resources that the patch document should be applied to.",
+                          "properties": {
+                            "annotationSelector": {
+                              "description": "AnnotationSelector is a string that follows the label selection expression https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api It matches with the resource annotations.",
+                              "type": "string"
+                            },
+                            "group": {
+                              "description": "Group is the API group to select resources from. Together with Version and Kind it is capable of unambiguously identifying and/or selecting resources. https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "description": "Kind of the API Group to select resources from. Together with Group and Version it is capable of unambiguously identifying and/or selecting resources. https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md",
+                              "type": "string"
+                            },
+                            "labelSelector": {
+                              "description": "LabelSelector is a string that follows the label selection expression https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api It matches with the resource labels.",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "Name to match resources with.",
+                              "type": "string"
+                            },
+                            "namespace": {
+                              "description": "Namespace to select resources from.",
+                              "type": "string"
+                            },
+                            "version": {
+                              "description": "Version of the API Group to select resources from. Together with Group and Kind it is capable of unambiguously identifying and/or selecting resources. https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "patch"
                       ],
                       "type": "object",
                       "additionalProperties": false
@@ -401,6 +521,7 @@
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation (like Jobs for hooks) during the performance of a Helm rollback action. Defaults to 'HelmReleaseSpec.Timeout'.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
               "type": "string"
             }
           },
@@ -440,6 +561,7 @@
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation during the performance of a Helm test action. Defaults to 'HelmReleaseSpec.Timeout'.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
               "type": "string"
             }
           },
@@ -448,6 +570,7 @@
         },
         "timeout": {
           "description": "Timeout is the time to wait for any individual Kubernetes operation (like Jobs for hooks) during the performance of a Helm action. Defaults to '5m0s'.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
           "type": "string"
         },
         "uninstall": {
@@ -457,12 +580,17 @@
               "description": "DisableHooks prevents hooks from running during the Helm rollback action.",
               "type": "boolean"
             },
+            "disableWait": {
+              "description": "DisableWait disables waiting for all the resources to be deleted after a Helm uninstall is performed.",
+              "type": "boolean"
+            },
             "keepHistory": {
               "description": "KeepHistory tells Helm to remove all associated resources and mark the release as deleted, but retain the release history.",
               "type": "boolean"
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation (like Jobs for hooks) during the performance of a Helm uninstall action. Defaults to 'HelmReleaseSpec.Timeout'.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
               "type": "string"
             }
           },
@@ -538,6 +666,7 @@
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation (like Jobs for hooks) during the performance of a Helm upgrade action. Defaults to 'HelmReleaseSpec.Timeout'.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
               "type": "string"
             }
           },
@@ -573,10 +702,14 @@
               },
               "targetPath": {
                 "description": "TargetPath is the YAML dot notation path the value should be merged at. When set, the ValuesKey is expected to be a single flat value. Defaults to 'None', which results in the values getting merged at the root.",
+                "maxLength": 250,
+                "pattern": "^([a-zA-Z0-9_\\-.\\\\\\/]|\\[[0-9]{1,5}\\])+$",
                 "type": "string"
               },
               "valuesKey": {
-                "description": "ValuesKey is the data key where the values.yaml or a specific value can be found at. Defaults to 'values.yaml'.",
+                "description": "ValuesKey is the data key where the values.yaml or a specific value can be found at. Defaults to 'values.yaml'. When set, must be a valid Data Key, consisting of alphanumeric characters, '-', '_' or '.'.",
+                "maxLength": 253,
+                "pattern": "^[\\-._a-zA-Z0-9]+$",
                 "type": "string"
               }
             },
@@ -606,7 +739,7 @@
         "conditions": {
           "description": "Conditions holds the conditions for the HelmRelease.",
           "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }",
+            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
             "properties": {
               "lastTransitionTime": {
                 "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
@@ -686,7 +819,7 @@
           "type": "string"
         },
         "lastHandledReconcileAt": {
-          "description": "LastHandledReconcileAt holds the value of the most recent reconcile request value, so a change can be detected.",
+          "description": "LastHandledReconcileAt holds the value of the most recent reconcile request value, so a change of the annotation value can be detected.",
           "type": "string"
         },
         "lastReleaseRevision": {

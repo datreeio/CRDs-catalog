@@ -49,6 +49,7 @@
         },
         "interval": {
           "description": "Interval is the interval at which to check the Source for updates.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
           "type": "string"
         },
         "reconcileStrategy": {
@@ -103,6 +104,38 @@
           },
           "type": "array"
         },
+        "verify": {
+          "description": "Verify contains the secret name containing the trusted public keys used to verify the signature and specifies which provider to use to check whether OCI image is authentic. This field is only supported when using HelmRepository source with spec.type 'oci'. Chart dependencies, which are not bundled in the umbrella chart artifact, are not verified.",
+          "properties": {
+            "provider": {
+              "default": "cosign",
+              "description": "Provider specifies the technology used to sign the OCI Artifact.",
+              "enum": [
+                "cosign"
+              ],
+              "type": "string"
+            },
+            "secretRef": {
+              "description": "SecretRef specifies the Kubernetes Secret containing the trusted public keys.",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "provider"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "version": {
           "default": "*",
           "description": "Version is the chart version semver expression, ignored for charts from GitRepository and Bucket sources. Defaults to latest when omitted.",
@@ -126,14 +159,22 @@
         "artifact": {
           "description": "Artifact represents the output of the last successful reconciliation.",
           "properties": {
-            "checksum": {
-              "description": "Checksum is the SHA256 checksum of the Artifact file.",
+            "digest": {
+              "description": "Digest is the digest of the file in the form of '<algorithm>:<checksum>'.",
+              "pattern": "^[a-z0-9]+(?:[.+_-][a-z0-9]+)*:[a-zA-Z0-9=_-]+$",
               "type": "string"
             },
             "lastUpdateTime": {
               "description": "LastUpdateTime is the timestamp corresponding to the last update of the Artifact.",
               "format": "date-time",
               "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Metadata holds upstream information such as OCI annotations.",
+              "type": "object"
             },
             "path": {
               "description": "Path is the relative file path of the Artifact. It can be used to locate the file in the root of the Artifact storage on the local file system of the controller managing the Source.",
@@ -154,7 +195,9 @@
             }
           },
           "required": [
+            "lastUpdateTime",
             "path",
+            "revision",
             "url"
           ],
           "type": "object",
@@ -163,7 +206,7 @@
         "conditions": {
           "description": "Conditions holds the conditions for the HelmChart.",
           "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{     // Represents the observations of a foo's current state.     // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type     // +patchStrategy=merge     // +listType=map     // +listMapKey=type     Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n     // other fields }",
+            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
             "properties": {
               "lastTransitionTime": {
                 "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",

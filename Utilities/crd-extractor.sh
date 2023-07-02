@@ -47,22 +47,18 @@ fi
 
 # Extract CRDs from cluster
 NUM_OF_CRDS=0
-while read -r crd 
+while read -r crd
 do
-    resourceKind=${crd%% *}
-    kubectl get crds "$resourceKind" -o yaml > "$TMP_CRD_DIR/"$resourceKind".yaml" 2>&1 
-    
-    # Get singular name from crd
-    singularNameValue=$(grep singular: "$TMP_CRD_DIR/"$resourceKind".yaml" -m 1)
-    singularName=${singularNameValue##* }
-    
-    # Get group
-    resourceGroup=${resourceKind#*.}
+    filename=${crd%% *}
+    kubectl get crds "$filename" -o yaml > "$TMP_CRD_DIR/$filename.yaml" 2>&1
+
+    resourceKind=$(grep "kind:" "$TMP_CRD_DIR/$filename.yaml" | awk 'NR==2{print $2}' | tr '[:upper:]' '[:lower:]')
+    resourceGroup=$(grep "group:" "$TMP_CRD_DIR/$filename.yaml" | awk 'NR==1{print $2}')
 
     # Save name and group for later directory organization
-    CRD_GROUPS["$singularName"]="$resourceGroup"
-    
-    let NUM_OF_CRDS++
+    CRD_GROUPS["$resourceKind"]="$resourceGroup"
+
+    let ++NUM_OF_CRDS
 done < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2)
 
 # If no CRDs exist in the cluster, exit
@@ -102,7 +98,7 @@ NC='\033[0m' # No Color
 
 if [ $conversionResult == 0 ]; then
     printf "${GREEN}Successfully converted $NUM_OF_CRDS CRDs to JSON schema${NC}\n"
-    
+
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
     printf "\n- ${CYAN}datree:${NC}\n\$ datree test /path/to/file\n"
     printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"

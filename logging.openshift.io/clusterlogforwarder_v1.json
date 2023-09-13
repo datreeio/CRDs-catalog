@@ -1,0 +1,634 @@
+{
+  "description": "ClusterLogForwarder is an API to configure forwarding logs. \n You configure forwarding by specifying a list of `pipelines`, which forward from a set of named inputs to a set of named outputs. \n There are built-in input names for common log categories, and you can define custom inputs to do additional filtering. \n There is a built-in output name for the default openshift log store, but you can define your own outputs with a URL and other connection information to forward logs to other stores or processors, inside or outside the cluster. \n For more details see the documentation on the API fields.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Specification of the desired behavior of ClusterLogForwarder",
+      "properties": {
+        "inputs": {
+          "description": "Inputs are named filters for log messages to be forwarded. \n There are three built-in inputs named `application`, `infrastructure` and `audit`. You don't need to define inputs here if those are sufficient for your needs. See `inputRefs` for more.",
+          "items": {
+            "description": "InputSpec defines a selector of log messages.",
+            "properties": {
+              "application": {
+                "description": "Application, if present, enables named set of `application` logs that can specify a set of match criteria",
+                "properties": {
+                  "namespaces": {
+                    "description": "Namespaces from which to collect application logs. Only messages from these namespaces are collected. If absent or empty, logs are collected from all namespaces.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "selector": {
+                    "description": "Selector for logs from pods with matching labels. Only messages from pods with these labels are collected. If absent or empty, logs are collected regardless of labels.",
+                    "properties": {
+                      "matchLabels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                        "type": "object"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "audit": {
+                "description": "Audit, if present, enables `audit` logs.",
+                "type": "object"
+              },
+              "infrastructure": {
+                "description": "Infrastructure, if present, enables `infrastructure` logs.",
+                "type": "object"
+              },
+              "name": {
+                "description": "Name used to refer to the input of a `pipeline`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "outputDefaults": {
+          "description": "DEPRECATED OutputDefaults specify forwarder config explicitly for the default managed log store named 'default'.  If there is a need to spec the managed logstore, define an outputSpec like the following where the managed fields (e.g. URL, Secret.Name) will be replaced with the required values: spec: - outputs: - name: default type: elasticsearch elasticsearch: structuredTypeKey: kubernetes.labels.myvalue",
+          "properties": {
+            "elasticsearch": {
+              "description": "Elasticsearch OutputSpec default values \n Values specified here will be used as default values for Elasticsearch Output spec",
+              "properties": {
+                "enableStructuredContainerLogs": {
+                  "description": "EnableStructuredContainerLogs enables multi-container structured logs to allow forwarding logs from containers within a pod to separate indices.  Annotating the pod with key 'containerType.logging.openshift.io/<container-name>' and value '<structure-type-name>' will forward those container logs to an alternate index from that defined by the other 'structured' keys here",
+                  "type": "boolean"
+                },
+                "structuredTypeKey": {
+                  "description": "StructuredTypeKey specifies the metadata key to be used as name of elasticsearch index It takes precedence over StructuredTypeName",
+                  "type": "string"
+                },
+                "structuredTypeName": {
+                  "description": "StructuredTypeName specifies the name of elasticsearch schema",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "outputs": {
+          "description": "Outputs are named destinations for log messages. \n There is a built-in output named `default` which forwards to the default openshift log store. You can define outputs to forward to other stores or log processors, inside or outside the cluster.",
+          "items": {
+            "description": "Output defines a destination for log messages.",
+            "properties": {
+              "cloudwatch": {
+                "description": "Cloudwatch provides configuration for the output type `cloudwatch` \n Note: the cloudwatch output recognizes the following keys in the Secret: \n `aws_secret_access_key`: AWS secret access key. `aws_access_key_id`: AWS secret access key ID. \n Or for sts-enabled clusters `credentials` or `role_arn` key specifying a properly formatted role arn",
+                "properties": {
+                  "groupBy": {
+                    "description": "GroupBy defines the strategy for grouping logstreams",
+                    "enum": [
+                      "logType",
+                      "namespaceName",
+                      "namespaceUUID"
+                    ],
+                    "type": "string"
+                  },
+                  "groupPrefix": {
+                    "description": "GroupPrefix Add this prefix to all group names. Useful to avoid group name clashes if an AWS account is used for multiple clusters and used verbatim (e.g. \"\" means no prefix) The default prefix is cluster-name/log-type",
+                    "type": "string"
+                  },
+                  "region": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "elasticsearch": {
+                "properties": {
+                  "enableStructuredContainerLogs": {
+                    "description": "EnableStructuredContainerLogs enables multi-container structured logs to allow forwarding logs from containers within a pod to separate indices.  Annotating the pod with key 'containerType.logging.openshift.io/<container-name>' and value '<structure-type-name>' will forward those container logs to an alternate index from that defined by the other 'structured' keys here",
+                    "type": "boolean"
+                  },
+                  "structuredTypeKey": {
+                    "description": "StructuredTypeKey specifies the metadata key to be used as name of elasticsearch index It takes precedence over StructuredTypeName",
+                    "type": "string"
+                  },
+                  "structuredTypeName": {
+                    "description": "StructuredTypeName specifies the name of elasticsearch schema",
+                    "type": "string"
+                  },
+                  "version": {
+                    "description": "Version specifies the version of Elasticsearch to be used. Must be one of: - 6 - Default for internal ES store - 7 - 8 - Latest for external ES store",
+                    "minimum": 6,
+                    "type": "integer"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "fluentdForward": {
+                "description": "FluentdForward does not provide additional fields, but note that the fluentforward output allows this additional keys in the Secret: \n `shared_key`: (string) Key to enable fluent-forward shared-key authentication.",
+                "type": "object"
+              },
+              "googleCloudLogging": {
+                "description": "GoogleCloudLogging provides configuration for sending logs to Google Cloud Logging",
+                "properties": {
+                  "billingAccountId": {
+                    "type": "string"
+                  },
+                  "folderId": {
+                    "type": "string"
+                  },
+                  "logId": {
+                    "description": "LogID is the log ID to which to publish logs. This identifies log stream.",
+                    "type": "string"
+                  },
+                  "organizationId": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "http": {
+                "description": "Http provided configuration for sending json encoded logs to a generic http endpoint.",
+                "properties": {
+                  "headers": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Headers specify optional headers to be sent with the request",
+                    "type": "object"
+                  },
+                  "method": {
+                    "description": "Method specifies the Http method to be used for sending logs. If not set, 'POST' is used.",
+                    "enum": [
+                      "GET",
+                      "HEAD",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "OPTIONS",
+                      "TRACE",
+                      "PATCH"
+                    ],
+                    "type": "string"
+                  },
+                  "timeout": {
+                    "description": "Timeout specifies the Http request timeout in seconds. If not set, 10secs is used.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "kafka": {
+                "description": "Kafka provides optional extra properties for `type: kafka`",
+                "properties": {
+                  "brokers": {
+                    "description": "Brokers specifies the list of broker endpoints of a Kafka cluster. The list represents only the initial set used by the collector's Kafka client for the first connection only. The collector's Kafka client fetches constantly an updated list from Kafka. These updates are not reconciled back to the collector configuration. If none provided the target URL from the OutputSpec is used as fallback.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "topic": {
+                    "description": "Topic specifies the target topic to send logs to.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "loki": {
+                "description": "Loki provides optional extra properties for `type: loki`",
+                "properties": {
+                  "labelKeys": {
+                    "description": "LabelKeys is a list of log record keys that will be used as Loki labels with the corresponding log record value. \n If LabelKeys is not set, the default keys are `[log_type, kubernetes.namespace_name, kubernetes.pod_name, kubernetes_host]` \n Note: Loki label names must match the regular expression \"[a-zA-Z_:][a-zA-Z0-9_:]*\" Log record keys may contain characters like \".\" and \"/\" that are not allowed in Loki labels. Log record keys are translated to Loki labels by replacing any illegal characters with '_'. For example the default log record keys translate to these Loki labels: `log_type`, `kubernetes_namespace_name`, `kubernetes_pod_name`, `kubernetes_host` \n Note: the set of labels should be small, Loki imposes limits on the size and number of labels allowed. See https://grafana.com/docs/loki/latest/configuration/#limits_config for more. Loki queries can also query based on any log record field (not just labels) using query filters.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "tenantKey": {
+                    "description": "TenantKey is a meta-data key field to use as the TenantID, For example: 'TenantKey: kubernetes.namespace_name` will use the kubernetes namespace as the tenant ID.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "name": {
+                "description": "Name used to refer to the output from a `pipeline`.",
+                "type": "string"
+              },
+              "secret": {
+                "description": "Secret for authentication. \n Names a secret in the same namespace as the ClusterLogForwarder. Sensitive authentication information is stored in a separate Secret object. A Secret is like a ConfigMap, where the keys are strings and the values are base64-encoded binary data, for example TLS certificates. \n Common keys are described here. Some output types support additional keys, documented with the output-specific configuration field. All secret keys are optional, enable the security features you want by setting the relevant keys. \n Transport Layer Security (TLS) \n Using a TLS URL (`https://...` or `tls://...`) without any secret enables basic TLS: client authenticates server using system default certificate authority. \n Additional TLS features are enabled by referencing a Secret with the following optional fields in its spec.data. All data fields are base64 encoded. \n * `tls.crt`: A client certificate, for mutual authentication. Requires `tls.key`. * `tls.key`: Private key to unlock the client certificate. Requires `tls.crt` * `passphrase`: Passphrase to decode an encoded TLS private key. Requires tls.key. * `ca-bundle.crt`: Custom CA to validate certificates. \n Username and Password \n * `username`: Authentication user name. Requires `password`. * `password`: Authentication password. Requires `username`. \n Simple Authentication Security Layer (SASL) \n * `sasl.enable`: (boolean) Explicitly enable or disable SASL. If missing, SASL is automatically enabled if any `sasl.*` keys are set. * `sasl.mechanisms`: (array of string) List of allowed SASL mechanism names. If missing or empty, the system defaults are used. * `sasl.allow-insecure`: (boolean) Allow mechanisms that send clear-text passwords. Default false.",
+                "properties": {
+                  "name": {
+                    "description": "Name of a secret in the namespace configured for log forwarder secrets.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "splunk": {
+                "description": "Splunk Deliver log data to Splunk\u2019s HTTP Event Collector Provides optional extra properties for `type: splunk_hec` ('splunk_hec_logs' after Vector 0.23",
+                "properties": {
+                  "fields": {
+                    "description": "Fields to be added to Splunk index. https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC Should be a valid JSON object",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "syslog": {
+                "description": "Syslog provides optional extra properties for output type `syslog`",
+                "properties": {
+                  "addLogSource": {
+                    "description": "AddLogSource adds log's source information to the log message If the logs are collected from a process; namespace_name, pod_name, container_name is added to the log In addition, it picks the originating process name and id(known as the `pid`) from the record and injects them into the header field.\"",
+                    "type": "boolean"
+                  },
+                  "appName": {
+                    "description": "AppName is APP-NAME part of the syslog-msg header \n AppName needs to be specified if using rfc5424",
+                    "type": "string"
+                  },
+                  "facility": {
+                    "description": "Facility to set on outgoing syslog records. \n Facility values are defined in https://tools.ietf.org/html/rfc5424#section-6.2.1. The value can be a decimal integer. Facility keywords are not standardized, this API recognizes at least the following case-insensitive keywords (defined by https://en.wikipedia.org/wiki/Syslog#Facility_Levels): \n kernel user mail daemon auth syslog lpr news uucp cron authpriv ftp ntp security console solaris-cron local0 local1 local2 local3 local4 local5 local6 local7",
+                    "type": "string"
+                  },
+                  "msgID": {
+                    "description": "MsgID is MSGID part of the syslog-msg header \n MsgID needs to be specified if using rfc5424",
+                    "type": "string"
+                  },
+                  "payloadKey": {
+                    "description": "PayloadKey specifies record field to use as payload.",
+                    "type": "string"
+                  },
+                  "procID": {
+                    "description": "ProcID is PROCID part of the syslog-msg header \n ProcID needs to be specified if using rfc5424",
+                    "type": "string"
+                  },
+                  "rfc": {
+                    "default": "RFC5424",
+                    "description": "Rfc specifies the rfc to be used for sending syslog \n Rfc values can be one of: - RFC3164 (https://tools.ietf.org/html/rfc3164) - RFC5424 (https://tools.ietf.org/html/rfc5424) \n If unspecified, RFC5424 will be assumed.",
+                    "enum": [
+                      "RFC3164",
+                      "RFC5424"
+                    ],
+                    "type": "string"
+                  },
+                  "severity": {
+                    "description": "Severity to set on outgoing syslog records. \n Severity values are defined in https://tools.ietf.org/html/rfc5424#section-6.2.1 The value can be a decimal integer or one of these case-insensitive keywords: \n Emergency Alert Critical Error Warning Notice Informational Debug",
+                    "type": "string"
+                  },
+                  "tag": {
+                    "description": "Tag specifies a record field to use as tag.",
+                    "type": "string"
+                  },
+                  "trimPrefix": {
+                    "description": "TrimPrefix is a prefix to trim from the tag.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "tls": {
+                "description": "TLS contains settings for controlling options on TLS client connections.",
+                "properties": {
+                  "insecureSkipVerify": {
+                    "description": "If InsecureSkipVerify is true, then the TLS client will be configured to ignore errors with certificates. \n This option is *not* recommended for production configurations.",
+                    "type": "boolean"
+                  },
+                  "securityProfile": {
+                    "description": "TLSSecurityProfile is the security profile to apply to the output connection",
+                    "properties": {
+                      "custom": {
+                        "description": "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic. An example custom profile looks like this: \n ciphers: - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 minTLSVersion: TLSv1.1",
+                        "nullable": true,
+                        "properties": {
+                          "ciphers": {
+                            "description": "ciphers is used to specify the cipher algorithms that are negotiated during the TLS handshake.  Operators may remove entries their operands do not support.  For example, to use DES-CBC3-SHA  (yaml): \n ciphers: - DES-CBC3-SHA",
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "minTLSVersion": {
+                            "description": "minTLSVersion is used to specify the minimal version of the TLS protocol that is negotiated during the TLS handshake. For example, to use TLS versions 1.1, 1.2 and 1.3 (yaml): \n minTLSVersion: TLSv1.1 \n NOTE: currently the highest minTLSVersion allowed is VersionTLS12",
+                            "enum": [
+                              "VersionTLS10",
+                              "VersionTLS11",
+                              "VersionTLS12",
+                              "VersionTLS13"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "intermediate": {
+                        "description": "intermediate is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29 \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 minTLSVersion: TLSv1.2",
+                        "nullable": true,
+                        "type": "object"
+                      },
+                      "modern": {
+                        "description": "modern is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 minTLSVersion: TLSv1.3 \n NOTE: Currently unsupported.",
+                        "nullable": true,
+                        "type": "object"
+                      },
+                      "old": {
+                        "description": "old is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 - DHE-RSA-CHACHA20-POLY1305 - ECDHE-ECDSA-AES128-SHA256 - ECDHE-RSA-AES128-SHA256 - ECDHE-ECDSA-AES128-SHA - ECDHE-RSA-AES128-SHA - ECDHE-ECDSA-AES256-SHA384 - ECDHE-RSA-AES256-SHA384 - ECDHE-ECDSA-AES256-SHA - ECDHE-RSA-AES256-SHA - DHE-RSA-AES128-SHA256 - DHE-RSA-AES256-SHA256 - AES128-GCM-SHA256 - AES256-GCM-SHA384 - AES128-SHA256 - AES256-SHA256 - AES128-SHA - AES256-SHA - DES-CBC3-SHA minTLSVersion: TLSv1.0",
+                        "nullable": true,
+                        "type": "object"
+                      },
+                      "type": {
+                        "description": "type is one of Old, Intermediate, Modern or Custom. Custom provides the ability to specify individual TLS security profile parameters. Old, Intermediate and Modern are TLS security profiles based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Recommended_configurations \n The profiles are intent based, so they may change over time as new ciphers are developed and existing ciphers are found to be insecure.  Depending on precisely which ciphers are available to a process, the list may be reduced. \n Note that the Modern profile is currently not supported because it is not yet well adopted by common software libraries.",
+                        "enum": [
+                          "Old",
+                          "Intermediate",
+                          "Modern",
+                          "Custom"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": {
+                "description": "Type of output plugin.",
+                "enum": [
+                  "syslog",
+                  "fluentdForward",
+                  "elasticsearch",
+                  "kafka",
+                  "cloudwatch",
+                  "loki",
+                  "googleCloudLogging",
+                  "splunk",
+                  "http"
+                ],
+                "type": "string"
+              },
+              "url": {
+                "description": "URL to send log records to. \n An absolute URL, with a scheme. Valid schemes depend on `type`. Special schemes `tcp`, `tls`, `udp` and `udps` are used for types that have no scheme of their own. For example, to send syslog records using secure UDP: \n { type: syslog, url: udps://syslog.example.com:1234 } \n Basic TLS is enabled if the URL scheme requires it (for example 'https' or 'tls'). The 'username@password' part of `url` is ignored. Any additional authentication material is in the `secret`. See the `secret` field for more details.",
+                "pattern": "^$|[a-zA-z]+:\\/\\/.*",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "pipelines": {
+          "description": "Pipelines forward the messages selected by a set of inputs to a set of outputs.",
+          "items": {
+            "description": "PipelinesSpec link a set of inputs to a set of outputs.",
+            "properties": {
+              "detectMultilineErrors": {
+                "description": "DetectMultilineErrors enables multiline error detection of container logs",
+                "type": "boolean"
+              },
+              "inputRefs": {
+                "description": "InputRefs lists the names (`input.name`) of inputs to this pipeline. \n The following built-in input names are always available: \n `application` selects all logs from application pods. \n `infrastructure` selects logs from openshift and kubernetes pods and some node logs. \n `audit` selects node logs related to security audits.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Labels applied to log records passing through this pipeline. These labels appear in the `openshift.labels` map in the log record.",
+                "type": "object"
+              },
+              "name": {
+                "description": "Name is optional, but must be unique in the `pipelines` list if provided.",
+                "type": "string"
+              },
+              "outputRefs": {
+                "description": "OutputRefs lists the names (`output.name`) of outputs from this pipeline. \n The following built-in names are always available: \n 'default' Output to the default log store provided by ClusterLogging.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "parse": {
+                "description": "Parse enables parsing of log entries into structured logs \n Logs are parsed according to parse value, only `json` is supported as of now.",
+                "enum": [
+                  "json"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "inputRefs",
+              "outputRefs"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status of the ClusterLogForwarder",
+      "properties": {
+        "conditions": {
+          "description": "Conditions of the log forwarder.",
+          "items": {
+            "description": "Condition represents an observation of an object's state. Conditions are an extension mechanism intended to be used when the details of an observation are not a priori known or would not apply to all instances of a given Kind. \n Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations. Once defined, the meaning of a Condition can not be changed arbitrarily - it becomes part of the API, and has the same backwards- and forwards-compatibility concerns of any other part of the API.",
+            "properties": {
+              "lastTransitionTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "reason": {
+                "description": "ConditionReason is intended to be a one-word, CamelCase representation of the category of cause of the current status. It is intended to be used in concise output, such as one-line kubectl get output, and in summarizing occurrences of causes.",
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "type": {
+                "description": "ConditionType is the type of the condition and is typically a CamelCased word or short phrase. \n Condition types should indicate state in the \"abnormal-true\" polarity. For example, if the condition indicates when a policy is invalid, the \"is valid\" case is probably the norm, so the condition should be called \"Invalid\".",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "description": "Conditions is a set of Condition instances.",
+            "items": {
+              "description": "Condition represents an observation of an object's state. Conditions are an extension mechanism intended to be used when the details of an observation are not a priori known or would not apply to all instances of a given Kind. \n Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations. Once defined, the meaning of a Condition can not be changed arbitrarily - it becomes part of the API, and has the same backwards- and forwards-compatibility concerns of any other part of the API.",
+              "properties": {
+                "lastTransitionTime": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "ConditionReason is intended to be a one-word, CamelCase representation of the category of cause of the current status. It is intended to be used in concise output, such as one-line kubectl get output, and in summarizing occurrences of causes.",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "ConditionType is the type of the condition and is typically a CamelCased word or short phrase. \n Condition types should indicate state in the \"abnormal-true\" polarity. For example, if the condition indicates when a policy is invalid, the \"is valid\" case is probably the norm, so the condition should be called \"Invalid\".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "type": "array"
+          },
+          "description": "Inputs maps input name to condition of the input.",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "description": "Conditions is a set of Condition instances.",
+            "items": {
+              "description": "Condition represents an observation of an object's state. Conditions are an extension mechanism intended to be used when the details of an observation are not a priori known or would not apply to all instances of a given Kind. \n Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations. Once defined, the meaning of a Condition can not be changed arbitrarily - it becomes part of the API, and has the same backwards- and forwards-compatibility concerns of any other part of the API.",
+              "properties": {
+                "lastTransitionTime": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "ConditionReason is intended to be a one-word, CamelCase representation of the category of cause of the current status. It is intended to be used in concise output, such as one-line kubectl get output, and in summarizing occurrences of causes.",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "ConditionType is the type of the condition and is typically a CamelCased word or short phrase. \n Condition types should indicate state in the \"abnormal-true\" polarity. For example, if the condition indicates when a policy is invalid, the \"is valid\" case is probably the norm, so the condition should be called \"Invalid\".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "type": "array"
+          },
+          "description": "Outputs maps output name to condition of the output.",
+          "type": "object"
+        },
+        "pipelines": {
+          "additionalProperties": {
+            "description": "Conditions is a set of Condition instances.",
+            "items": {
+              "description": "Condition represents an observation of an object's state. Conditions are an extension mechanism intended to be used when the details of an observation are not a priori known or would not apply to all instances of a given Kind. \n Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations. Once defined, the meaning of a Condition can not be changed arbitrarily - it becomes part of the API, and has the same backwards- and forwards-compatibility concerns of any other part of the API.",
+              "properties": {
+                "lastTransitionTime": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "ConditionReason is intended to be a one-word, CamelCase representation of the category of cause of the current status. It is intended to be used in concise output, such as one-line kubectl get output, and in summarizing occurrences of causes.",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "ConditionType is the type of the condition and is typically a CamelCased word or short phrase. \n Condition types should indicate state in the \"abnormal-true\" polarity. For example, if the condition indicates when a policy is invalid, the \"is valid\" case is probably the norm, so the condition should be called \"Invalid\".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "type": "array"
+          },
+          "description": "Pipelines maps pipeline name to condition of the pipeline.",
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

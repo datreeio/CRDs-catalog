@@ -820,6 +820,14 @@
                   "pattern": "^https?://.*",
                   "type": "string"
                 },
+                "ssoProtocol": {
+                  "description": "sso protocol, valid options are ldap and oidc.",
+                  "enum": [
+                    "ldap",
+                    "oidc"
+                  ],
+                  "type": "string"
+                },
                 "tls": {
                   "description": "ClientTLSConfig specifies the TLS configuration for the Confluent component (dependencies, listeners).",
                   "properties": {
@@ -874,6 +882,10 @@
                       "description": "directoryPathInContainer defines the directory path in the container where the MDS token key pair are mounted.",
                       "minLength": 1,
                       "type": "string"
+                    },
+                    "encryptedTokenKey": {
+                      "description": "EncryptedTokenKey boolean value indicating whether the tokenKeypair(private used for signing) is encrypted using a passphrase. If true, cfk operator will look for a file named mdsTokenKeyPassphrase.txt containing key value pair mdsTokenKeyPassphrase=<passphrase>. Relevant only for mds server. Ignored if set for a client configuration.",
+                      "type": "boolean"
                     },
                     "secretRef": {
                       "description": "secretRef references the name of the secret that contains the MDS token key pair.",
@@ -1019,20 +1031,20 @@
           "additionalProperties": false
         },
         "externalAccess": {
-          "description": "externalAccess specifies the configurations for the endpoints and services to make the ksqlDB accessible from outside the cluster.",
+          "description": "externalAccess specifies the configurations for the endpoints and services to make the ksqlDB accessible from outside the cluster. When `spec.listeners` is configured, configuring `spec.externalAccess` is not allowed. Please configure `spec.listeners.external.externalAccess` instead\".",
           "properties": {
             "loadBalancer": {
               "description": "loadBalancer specifies the configuration to create a Kubernetes load balancer service.",
               "properties": {
                 "advertisedURL": {
-                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix><podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster.",
+                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix><podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
                   "properties": {
                     "enabled": {
-                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker.",
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
                       "type": "boolean"
                     },
                     "prefix": {
-                      "description": "prefix specifies the broker prefix for MDS advertised endpoint if using loadBalancer external access. If not configured, it uses `b` as default prefix, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`.",
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
                       "minLength": 1,
                       "type": "string"
                     }
@@ -1179,11 +1191,11 @@
                   "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to `<httpSchema>://<host>:<nodePortOffset + podId + 1>, where`podId` starts from `0` to `replicaCount - 1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster.",
                   "properties": {
                     "enabled": {
-                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker.",
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
                       "type": "boolean"
                     },
                     "prefix": {
-                      "description": "prefix specifies the broker prefix for MDS advertised endpoint if using loadBalancer external access. If not configured, it uses `b` as default prefix, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`.",
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
                       "minLength": 1,
                       "type": "string"
                     }
@@ -1316,6 +1328,25 @@
             "route": {
               "description": "route specifies the configuration to create a route service in OpenShift.",
               "properties": {
+                "advertisedURL": {
+                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix>-http-external<podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
+                  "properties": {
+                    "enabled": {
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
+                      "type": "boolean"
+                    },
+                    "prefix": {
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "annotations": {
                   "additionalProperties": {
                     "type": "string"
@@ -1481,6 +1512,502 @@
               "minLength": 1,
               "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
               "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "listeners": {
+          "description": "listeners specify the listeners configurations.",
+          "properties": {
+            "external": {
+              "description": "external specifies the Confluent component external listener.",
+              "properties": {
+                "externalAccess": {
+                  "description": "externalAccess defines the external access configuration for the Confluent component.",
+                  "properties": {
+                    "loadBalancer": {
+                      "description": "loadBalancer specifies the configuration to create a Kubernetes load balancer service.",
+                      "properties": {
+                        "advertisedURL": {
+                          "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix><podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
+                          "properties": {
+                            "enabled": {
+                              "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
+                              "type": "boolean"
+                            },
+                            "prefix": {
+                              "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "annotations": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "annotations is a map of string key and value pairs. It specifies Kubernetes annotations for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "domain": {
+                          "description": "domain is the domain name of the component cluster.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "externalTrafficPolicy": {
+                          "description": "externalTrafficPolicy specifies the external traffic policy for the service. Valid options are `Local` and `Cluster`.",
+                          "enum": [
+                            "Local",
+                            "Cluster"
+                          ],
+                          "type": "string"
+                        },
+                        "labels": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "labels is a map of string key and value pairs. It specifies Kubernetes labels for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "loadBalancerSourceRanges": {
+                          "description": "loadBalancerSourceRanges specify the source ranges.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "port": {
+                          "description": "port specifies the external port for the client consumption. If not configured, the same internal/external port is configured for the component. Information about the port can be retrieved through the status API.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "prefix": {
+                          "description": "prefix specify the prefix for the given domain. The default value is the name of the cluster.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "servicePorts": {
+                          "description": "servicePorts specify the user-provided service port(s).",
+                          "items": {
+                            "description": "ServicePort contains information on service's port.",
+                            "properties": {
+                              "appProtocol": {
+                                "description": "The application protocol for this port. This field follows standard Kubernetes label syntax. Un-prefixed names are reserved for IANA standard service names (as per RFC-6335 and http://www.iana.org/assignments/service-names). Non-standard protocols should use prefixed names such as mycompany.com/my-custom-protocol.",
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. When considering the endpoints for a Service, this must match the 'name' field in the EndpointPort. Optional if only one ServicePort is defined on this service.",
+                                "type": "string"
+                              },
+                              "nodePort": {
+                                "description": "The port on each node on which this service is exposed when type is NodePort or LoadBalancer.  Usually assigned by the system. If a value is specified, in-range, and not in use it will be used, otherwise the operation will fail.  If not specified, a port will be allocated if this Service requires one.  If this field is specified when creating a Service which does not need it, creation will fail. This field will be wiped when updating a Service to no longer need it (e.g. changing type from NodePort to ClusterIP). More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "port": {
+                                "description": "The port that will be exposed by this service.",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "protocol": {
+                                "default": "TCP",
+                                "description": "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP.",
+                                "type": "string"
+                              },
+                              "targetPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service",
+                                "x-kubernetes-int-or-string": true
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        },
+                        "sessionAffinity": {
+                          "description": "sessionAffinity defines the Kubernetes session affinity. The valid options are `ClientIP` and `None`. `ClientIP` enables the client IP-based session affinity. The default value is `None`. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies.",
+                          "enum": [
+                            "ClientIP",
+                            "None"
+                          ],
+                          "type": "string"
+                        },
+                        "sessionAffinityConfig": {
+                          "description": "SessionAffinityConfig contains the configurations of the session affinity.",
+                          "properties": {
+                            "clientIP": {
+                              "description": "clientIP contains the configurations of Client IP based session affinity.",
+                              "properties": {
+                                "timeoutSeconds": {
+                                  "description": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be >0 && <=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours).",
+                                  "format": "int32",
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "domain"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "nodePort": {
+                      "description": "nodePort specifies the configuration to create a Kubernetes node port service.",
+                      "properties": {
+                        "advertisedURL": {
+                          "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to `<httpSchema>://<host>:<nodePortOffset + podId + 1>, where`podId` starts from `0` to `replicaCount - 1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster.",
+                          "properties": {
+                            "enabled": {
+                              "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
+                              "type": "boolean"
+                            },
+                            "prefix": {
+                              "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "annotations": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "annotations is a map of string key and value pairs. It specifies Kubernetes annotations for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "externalTrafficPolicy": {
+                          "description": "externalTrafficPolicy specifies the external traffic policy for the service. Valid options are `Local` and `Cluster`.",
+                          "enum": [
+                            "Local",
+                            "Cluster"
+                          ],
+                          "type": "string"
+                        },
+                        "host": {
+                          "description": "host defines the host name of the cluster.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "labels": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "labels is a map of string key and value pairs. It specifies Kubernetes labels for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "nodePortOffset": {
+                          "description": "nodePortOffset specifies the starting offset of the node ports. The port numbers go in ascending order with respect to the replicas count. NodePort service creation fails if the node port is not in the range supported by the Kubernetes API server. The default Kubernetes Node Port range is `30000` - `32762`.",
+                          "format": "int32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "servicePorts": {
+                          "description": "servicePorts specify user-provided service port(s). For Kafka with the nodePort type, this setting is only applied to Kafka bootstrap service.",
+                          "items": {
+                            "description": "ServicePort contains information on service's port.",
+                            "properties": {
+                              "appProtocol": {
+                                "description": "The application protocol for this port. This field follows standard Kubernetes label syntax. Un-prefixed names are reserved for IANA standard service names (as per RFC-6335 and http://www.iana.org/assignments/service-names). Non-standard protocols should use prefixed names such as mycompany.com/my-custom-protocol.",
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. When considering the endpoints for a Service, this must match the 'name' field in the EndpointPort. Optional if only one ServicePort is defined on this service.",
+                                "type": "string"
+                              },
+                              "nodePort": {
+                                "description": "The port on each node on which this service is exposed when type is NodePort or LoadBalancer.  Usually assigned by the system. If a value is specified, in-range, and not in use it will be used, otherwise the operation will fail.  If not specified, a port will be allocated if this Service requires one.  If this field is specified when creating a Service which does not need it, creation will fail. This field will be wiped when updating a Service to no longer need it (e.g. changing type from NodePort to ClusterIP). More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "port": {
+                                "description": "The port that will be exposed by this service.",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "protocol": {
+                                "default": "TCP",
+                                "description": "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP.",
+                                "type": "string"
+                              },
+                              "targetPort": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "description": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service",
+                                "x-kubernetes-int-or-string": true
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        },
+                        "sessionAffinity": {
+                          "description": "sessionAffinity defines the Kubernetes session affinity. The valid options are `ClientIP` and `None`. `ClientIP` enables the client IP-based session affinity. The default value is `None`. More info: https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies.",
+                          "enum": [
+                            "ClientIP",
+                            "None"
+                          ],
+                          "type": "string"
+                        },
+                        "sessionAffinityConfig": {
+                          "description": "SessionAffinityConfig contains the configurations of the session affinity.",
+                          "properties": {
+                            "clientIP": {
+                              "description": "clientIP contains the configurations of Client IP based session affinity.",
+                              "properties": {
+                                "timeoutSeconds": {
+                                  "description": "timeoutSeconds specifies the seconds of ClientIP type session sticky time. The value must be >0 && <=86400(for 1 day) if ServiceAffinity == \"ClientIP\". Default value is 10800(for 3 hours).",
+                                  "format": "int32",
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "host",
+                        "nodePortOffset"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "route": {
+                      "description": "route specifies the configuration to create a route service in OpenShift.",
+                      "properties": {
+                        "advertisedURL": {
+                          "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix>-http-external<podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
+                          "properties": {
+                            "enabled": {
+                              "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
+                              "type": "boolean"
+                            },
+                            "prefix": {
+                              "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enabled"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "annotations": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "annotations is a map of string key and value pairs. It specifies Kubernetes annotations for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "domain": {
+                          "description": "domain specifies the domain name of the Confluent component cluster.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "labels": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "labels is a map of string key and value pairs. It specifies Kubernetes labels for this service.",
+                          "type": "object",
+                          "x-kubernetes-map-type": "granular"
+                        },
+                        "prefix": {
+                          "description": "prefix specifies the component prefix when configured for the domain. The default value is the name of the cluster.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "wildcardPolicy": {
+                          "description": "wildcardPolicy allows you to define a route that covers all hosts within a domain. Valid options are `Subdomain` and `None`. The default value is `None`.",
+                          "enum": [
+                            "Subdomain",
+                            "None"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "domain"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": {
+                      "description": "type specifies the Kubernetes external service for the component. Valid options are `loadBalancer`, `nodePort`, and `route`.",
+                      "enum": [
+                        "loadBalancer",
+                        "nodePort",
+                        "route"
+                      ],
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "tls": {
+                  "description": "tls specifies the TLS configuration for the listener.",
+                  "properties": {
+                    "directoryPathInContainer": {
+                      "description": "directoryPathInContainer specifies the directory path in the container where `keystore.jks`, `truststore.jks`, and `jksPassword.txt` keys are mounted. `truststore.jks` is not configured and can be ignored when the `ignoreTrustStoreConfig` field is set to `true`.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "description": "enabled specifies to enable the TLS configuration for the Confluent component.",
+                      "type": "boolean"
+                    },
+                    "ignoreTrustStoreConfig": {
+                      "description": "ignoreTrustStoreConfig indicates whether to ignore the truststore configuration for the Confluent component.",
+                      "type": "boolean"
+                    },
+                    "jksPassword": {
+                      "description": "jksPassword references the secret containing the JKS password.",
+                      "properties": {
+                        "secretRef": {
+                          "description": "secretRef references the name of the secret containing the JKS password. More info: https://docs.confluent.io/operator/current/co-network-encryption.html#configure-user-provided-tls-certificates",
+                          "maxLength": 30,
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "secretRef"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "secretRef": {
+                      "description": "secretRef references the secret containing the certificates. More info: https://docs.confluent.io/operator/current/co-network-encryption.html#configure-user-provided-tls-certificates",
+                      "maxLength": 30,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "internal": {
+              "description": "internal specifies the Confluent component's internal listener. This internal listener is for intra-communication between the pods.",
+              "properties": {
+                "port": {
+                  "description": "port binds the given port to the internal listener. If not configured, it will be defaulted to the component-specific internal port. Port numbers lower than `9093` are reserved by CFK.",
+                  "format": "int32",
+                  "minimum": 9093,
+                  "type": "integer"
+                },
+                "tls": {
+                  "description": "tls specifies the TLS configuration for the listener.",
+                  "properties": {
+                    "directoryPathInContainer": {
+                      "description": "directoryPathInContainer specifies the directory path in the container where `keystore.jks`, `truststore.jks`, and `jksPassword.txt` keys are mounted. `truststore.jks` is not configured and can be ignored when the `ignoreTrustStoreConfig` field is set to `true`.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "description": "enabled specifies to enable the TLS configuration for the Confluent component.",
+                      "type": "boolean"
+                    },
+                    "ignoreTrustStoreConfig": {
+                      "description": "ignoreTrustStoreConfig indicates whether to ignore the truststore configuration for the Confluent component.",
+                      "type": "boolean"
+                    },
+                    "jksPassword": {
+                      "description": "jksPassword references the secret containing the JKS password.",
+                      "properties": {
+                        "secretRef": {
+                          "description": "secretRef references the name of the secret containing the JKS password. More info: https://docs.confluent.io/operator/current/co-network-encryption.html#configure-user-provided-tls-certificates",
+                          "maxLength": 30,
+                          "minLength": 1,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "secretRef"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "secretRef": {
+                      "description": "secretRef references the secret containing the certificates. More info: https://docs.confluent.io/operator/current/co-network-encryption.html#configure-user-provided-tls-certificates",
+                      "maxLength": 30,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "type": "object",
@@ -4451,7 +4978,7 @@
           "additionalProperties": false
         },
         "tls": {
-          "description": "tls specifies the TLS configurations for the ksqlDB cluster.",
+          "description": "tls specifies the global TLS configurations for the ksqlDB cluster.",
           "properties": {
             "autoGeneratedCerts": {
               "description": "autoGeneratedCerts specifies that the certificates are auto-generated based on the CA key pair provided.",
@@ -4596,6 +5123,45 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "listeners": {
+          "additionalProperties": {
+            "description": "ListenerStatus describes general information about the listeners.",
+            "properties": {
+              "advertisedExternalEndpoints": {
+                "description": "advertisedExternalEndpoints specifies other advertised endpoints used, especially for Kafka.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "authenticationType": {
+                "description": "authenticationType shows the authentication type configured by the listener.",
+                "type": "string"
+              },
+              "externalAccessType": {
+                "description": "externalAccessType shows the external access type used for the listener.",
+                "type": "string"
+              },
+              "externalEndpoint": {
+                "description": "externalEndpoint specifies the external endpoint to connect to the Confluent component cluster.",
+                "type": "string"
+              },
+              "internalEndpoint": {
+                "description": "internalEndpoint specifies the internal endpoint to connect to the Confluent component cluster.",
+                "type": "string"
+              },
+              "tls": {
+                "description": "tls shows whether TLS is configured for the listener.",
+                "type": "boolean"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "description": "listeners is a map of listener type and the status of KsqlDB Listeners.",
+          "type": "object",
+          "x-kubernetes-map-type": "granular"
         },
         "observedGeneration": {
           "description": "observedGeneration is the most recent generation observed for this Confluent component.",

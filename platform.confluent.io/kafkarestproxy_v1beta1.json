@@ -688,6 +688,14 @@
                   "pattern": "^https?://.*",
                   "type": "string"
                 },
+                "ssoProtocol": {
+                  "description": "sso protocol, valid options are ldap and oidc.",
+                  "enum": [
+                    "ldap",
+                    "oidc"
+                  ],
+                  "type": "string"
+                },
                 "tls": {
                   "description": "ClientTLSConfig specifies the TLS configuration for the Confluent component (dependencies, listeners).",
                   "properties": {
@@ -742,6 +750,10 @@
                       "description": "directoryPathInContainer defines the directory path in the container where the MDS token key pair are mounted.",
                       "minLength": 1,
                       "type": "string"
+                    },
+                    "encryptedTokenKey": {
+                      "description": "EncryptedTokenKey boolean value indicating whether the tokenKeypair(private used for signing) is encrypted using a passphrase. If true, cfk operator will look for a file named mdsTokenKeyPassphrase.txt containing key value pair mdsTokenKeyPassphrase=<passphrase>. Relevant only for mds server. Ignored if set for a client configuration.",
+                      "type": "boolean"
                     },
                     "secretRef": {
                       "description": "secretRef references the name of the secret that contains the MDS token key pair.",
@@ -893,14 +905,14 @@
               "description": "loadBalancer specifies the configuration to create a Kubernetes load balancer service.",
               "properties": {
                 "advertisedURL": {
-                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix><podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster.",
+                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix><podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
                   "properties": {
                     "enabled": {
-                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker.",
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
                       "type": "boolean"
                     },
                     "prefix": {
-                      "description": "prefix specifies the broker prefix for MDS advertised endpoint if using loadBalancer external access. If not configured, it uses `b` as default prefix, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`.",
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
                       "minLength": 1,
                       "type": "string"
                     }
@@ -1047,11 +1059,11 @@
                   "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to `<httpSchema>://<host>:<nodePortOffset + podId + 1>, where`podId` starts from `0` to `replicaCount - 1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster.",
                   "properties": {
                     "enabled": {
-                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker.",
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
                       "type": "boolean"
                     },
                     "prefix": {
-                      "description": "prefix specifies the broker prefix for MDS advertised endpoint if using loadBalancer external access. If not configured, it uses `b` as default prefix, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`.",
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
                       "minLength": 1,
                       "type": "string"
                     }
@@ -1184,6 +1196,25 @@
             "route": {
               "description": "route specifies the configuration to create a route service in OpenShift.",
               "properties": {
+                "advertisedURL": {
+                  "description": "advertisedURL specifies the configuration for advertised listener per pod. It is only supported for MDS currently. If it is enabled, instead of using internal endpoint, the MDS advertised listener for each broker will be set to: `<httpSchema>://<advertisedUrl.prefix>-http-external<podId>.<domain>` where podId starts from `0` to `replicaCount -1`. This is only recommended if you cannot add internal SANs to the TLS certificates for MDS and the external DNS must be resolved inside the Kubernetes cluster. This configuration will not take effect if MDS enabled dual listener setup.",
+                  "properties": {
+                    "enabled": {
+                      "description": "enabled indicates whether to set the MDS advertised listener url with external endpoint for each broker. Has no effect with Zookeeper, which will always create a listener per pod.",
+                      "type": "boolean"
+                    },
+                    "prefix": {
+                      "description": "prefix specifies the broker prefix for MDS/Zookeeper advertised endpoint. If not configured, it uses `b` as default prefix for MDS, such as `b#.domain` where `#` will start from `0` to `replicaCount -1`. It uses 'zookeeper' as default prefix for Zookeeper in the same way.",
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "annotations": {
                   "additionalProperties": {
                     "type": "string"

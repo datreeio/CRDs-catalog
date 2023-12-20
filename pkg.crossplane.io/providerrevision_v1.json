@@ -13,10 +13,17 @@
       "type": "object"
     },
     "spec": {
-      "description": "PackageRevisionSpec specifies the desired state of a PackageRevision.",
+      "description": "ProviderRevisionSpec specifies configuration for a ProviderRevision.",
       "properties": {
+        "commonLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
+          "type": "object"
+        },
         "controllerConfigRef": {
-          "description": "ControllerConfigRef references a ControllerConfig resource that will be used to configure the packaged controller Deployment.",
+          "description": "ControllerConfigRef references a ControllerConfig resource that will be used to configure the packaged controller Deployment. Deprecated: Use RuntimeConfigReference instead.",
           "properties": {
             "name": {
               "description": "Name of the ControllerConfig.",
@@ -58,6 +65,7 @@
               }
             },
             "type": "object",
+            "x-kubernetes-map-type": "atomic",
             "additionalProperties": false
           },
           "type": "array"
@@ -67,13 +75,44 @@
           "format": "int64",
           "type": "integer"
         },
+        "runtimeConfigRef": {
+          "default": {
+            "name": "default"
+          },
+          "description": "RuntimeConfigRef references a RuntimeConfig resource that will be used to configure the package runtime.",
+          "properties": {
+            "apiVersion": {
+              "default": "pkg.crossplane.io/v1beta1",
+              "description": "API version of the referent.",
+              "type": "string"
+            },
+            "kind": {
+              "default": "DeploymentRuntimeConfig",
+              "description": "Kind of the referent.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of the RuntimeConfig.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "skipDependencyResolution": {
           "default": false,
           "description": "SkipDependencyResolution indicates to the package manager whether to skip resolving dependencies for a package. Setting this value to true may have unintended consequences. Default is false.",
           "type": "boolean"
         },
-        "webhookTLSSecretName": {
-          "description": "WebhookTLSSecretName is the name of the TLS Secret that will be used by the provider to serve a TLS-enabled webhook server. The certificate will be injected to webhook configurations as well as CRD conversion webhook strategy if needed. If it's not given, provider will not have a certificate mounted to its filesystem, webhook configurations won't be deployed and if there is a CRD with webhook conversion strategy, the installation will fail.",
+        "tlsClientSecretName": {
+          "description": "TLSClientSecretName is the name of the TLS Secret that stores client certificates of the Provider.",
+          "type": "string"
+        },
+        "tlsServerSecretName": {
+          "description": "TLSServerSecretName is the name of the TLS Secret that stores server certificates of the Provider.",
           "type": "string"
         }
       },
@@ -124,21 +163,11 @@
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
-        },
-        "controllerRef": {
-          "description": "ControllerRef references the controller (e.g. Deployment), if any, that is responsible for reconciling the objects this package revision installed.",
-          "properties": {
-            "name": {
-              "description": "Name of the controller.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name"
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
           ],
-          "type": "object",
-          "additionalProperties": false
+          "x-kubernetes-list-type": "map"
         },
         "foundDependencies": {
           "description": "Dependency information.",
@@ -191,7 +220,7 @@
             "description": "PolicyRule holds information that describes a policy rule, but does not contain information about who the rule applies to or which namespace the rule applies to.",
             "properties": {
               "apiGroups": {
-                "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.",
+                "description": "APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. \"\" represents the core API group and \"*\" represents all API groups.",
                 "items": {
                   "type": "string"
                 },

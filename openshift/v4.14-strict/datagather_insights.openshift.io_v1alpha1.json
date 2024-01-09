@@ -1,0 +1,381 @@
+{
+    "description": "DataGather provides data gather configuration options and status for the particular Insights data gathering. \n Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+    "properties": {
+        "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+        },
+        "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+        },
+        "metadata": {
+            "type": "object"
+        },
+        "spec": {
+            "description": "spec holds user settable values for configuration",
+            "properties": {
+                "dataPolicy": {
+                    "description": "dataPolicy allows user to enable additional global obfuscation of the IP addresses and base domain in the Insights archive data. Valid values are \"ClearText\" and \"ObfuscateNetworking\". When set to ClearText the data is not obfuscated. When set to ObfuscateNetworking the IP addresses and the cluster domain name are obfuscated. When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time. The current default is ClearText.",
+                    "enum": [
+                        "",
+                        "ClearText",
+                        "ObfuscateNetworking"
+                    ],
+                    "type": "string"
+                },
+                "gatherers": {
+                    "description": "gatherers is a list of gatherers configurations. The particular gatherers IDs can be found at https://github.com/openshift/insights-operator/blob/master/docs/gathered-data.md. Run the following command to get the names of last active gatherers: \"oc get insightsoperators.operator.openshift.io cluster -o json | jq '.status.gatherStatus.gatherers[].name'\"",
+                    "items": {
+                        "description": "gathererConfig allows to configure specific gatherers",
+                        "properties": {
+                            "name": {
+                                "description": "name is the name of specific gatherer",
+                                "type": "string"
+                            },
+                            "state": {
+                                "description": "state allows you to configure specific gatherer. Valid values are \"Enabled\", \"Disabled\" and omitted. When omitted, this means no opinion and the platform is left to choose a reasonable default. The current default is Enabled.",
+                                "enum": [
+                                    "",
+                                    "Enabled",
+                                    "Disabled"
+                                ],
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object",
+            "additionalProperties": false
+        },
+        "status": {
+            "description": "status holds observed values from the cluster. They may not be overridden.",
+            "properties": {
+                "conditions": {
+                    "description": "conditions provide details on the status of the gatherer job.",
+                    "items": {
+                        "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
+                        "properties": {
+                            "lastTransitionTime": {
+                                "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                                "format": "date-time",
+                                "type": "string"
+                            },
+                            "message": {
+                                "description": "message is a human readable message indicating details about the transition. This may be an empty string.",
+                                "type": "string"
+                            },
+                            "observedGeneration": {
+                                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+                                "format": "int64",
+                                "type": "integer",
+                                "minimum": -9223372036854776000,
+                                "maximum": 9223372036854776000
+                            },
+                            "reason": {
+                                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.",
+                                "type": "string"
+                            },
+                            "status": {
+                                "description": "status of the condition, one of True, False, Unknown.",
+                                "type": "string"
+                            },
+                            "type": {
+                                "description": "type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "lastTransitionTime",
+                            "message",
+                            "reason",
+                            "status",
+                            "type"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-map-keys": [
+                        "type"
+                    ],
+                    "x-kubernetes-list-type": "map"
+                },
+                "dataGatherState": {
+                    "description": "dataGatherState reflects the current state of the data gathering process.",
+                    "enum": [
+                        "Running",
+                        "Completed",
+                        "Failed",
+                        "Pending"
+                    ],
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                        {
+                            "message": "dataGatherState cannot transition from Running to Pending",
+                            "rule": "!(oldSelf == 'Running' && self == 'Pending')"
+                        },
+                        {
+                            "message": "dataGatherState cannot transition from Completed to Pending",
+                            "rule": "!(oldSelf == 'Completed' && self == 'Pending')"
+                        },
+                        {
+                            "message": "dataGatherState cannot transition from Failed to Pending",
+                            "rule": "!(oldSelf == 'Failed' && self == 'Pending')"
+                        },
+                        {
+                            "message": "dataGatherState cannot transition from Completed to Running",
+                            "rule": "!(oldSelf == 'Completed' && self == 'Running')"
+                        },
+                        {
+                            "message": "dataGatherState cannot transition from Failed to Running",
+                            "rule": "!(oldSelf == 'Failed' && self == 'Running')"
+                        }
+                    ]
+                },
+                "finishTime": {
+                    "description": "finishTime is the time when Insights data gathering finished.",
+                    "format": "date-time",
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                        {
+                            "message": "finishTime is immutable once set",
+                            "rule": "self == oldSelf"
+                        }
+                    ]
+                },
+                "gatherers": {
+                    "description": "gatherers is a list of active gatherers (and their statuses) in the last gathering.",
+                    "items": {
+                        "description": "gathererStatus represents information about a particular data gatherer.",
+                        "properties": {
+                            "conditions": {
+                                "description": "conditions provide details on the status of each gatherer.",
+                                "items": {
+                                    "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
+                                    "properties": {
+                                        "lastTransitionTime": {
+                                            "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                                            "format": "date-time",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "message is a human readable message indicating details about the transition. This may be an empty string.",
+                                            "type": "string"
+                                        },
+                                        "observedGeneration": {
+                                            "description": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+                                            "format": "int64",
+                                            "type": "integer",
+                                            "minimum": -9223372036854776000,
+                                            "maximum": 9223372036854776000
+                                        },
+                                        "reason": {
+                                            "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.",
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "description": "status of the condition, one of True, False, Unknown.",
+                                            "type": "string"
+                                        },
+                                        "type": {
+                                            "description": "type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "lastTransitionTime",
+                                        "message",
+                                        "reason",
+                                        "status",
+                                        "type"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                },
+                                "minItems": 1,
+                                "type": "array",
+                                "x-kubernetes-list-map-keys": [
+                                    "type"
+                                ],
+                                "x-kubernetes-list-type": "map"
+                            },
+                            "lastGatherDuration": {
+                                "description": "lastGatherDuration represents the time spent gathering.",
+                                "pattern": "^([1-9][0-9]*(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
+                                "type": "string"
+                            },
+                            "name": {
+                                "description": "name is the name of the gatherer.",
+                                "maxLength": 256,
+                                "minLength": 5,
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "conditions",
+                            "lastGatherDuration",
+                            "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-map-keys": [
+                        "name"
+                    ],
+                    "x-kubernetes-list-type": "map"
+                },
+                "insightsReport": {
+                    "description": "insightsReport provides general Insights analysis results. When omitted, this means no data gathering has taken place yet or the corresponding Insights analysis (identified by \"insightsRequestID\") is not available.",
+                    "properties": {
+                        "downloadedAt": {
+                            "description": "downloadedAt is the time when the last Insights report was downloaded. An empty value means that there has not been any Insights report downloaded yet and it usually appears in disconnected clusters (or clusters when the Insights data gathering is disabled).",
+                            "format": "date-time",
+                            "type": "string"
+                        },
+                        "healthChecks": {
+                            "description": "healthChecks provides basic information about active Insights health checks in a cluster.",
+                            "items": {
+                                "description": "healthCheck represents an Insights health check attributes.",
+                                "properties": {
+                                    "advisorURI": {
+                                        "description": "advisorURI provides the URL link to the Insights Advisor.",
+                                        "pattern": "^https:\\/\\/\\S+",
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "description": "description provides basic description of the healtcheck.",
+                                        "maxLength": 2048,
+                                        "minLength": 10,
+                                        "type": "string"
+                                    },
+                                    "state": {
+                                        "description": "state determines what the current state of the health check is. Health check is enabled by default and can be disabled by the user in the Insights advisor user interface.",
+                                        "enum": [
+                                            "Enabled",
+                                            "Disabled"
+                                        ],
+                                        "type": "string"
+                                    },
+                                    "totalRisk": {
+                                        "description": "totalRisk of the healthcheck. Indicator of the total risk posed by the detected issue; combination of impact and likelihood. The values can be from 1 to 4, and the higher the number, the more important the issue.",
+                                        "format": "int32",
+                                        "maximum": 4,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "advisorURI",
+                                    "description",
+                                    "state",
+                                    "totalRisk"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                            },
+                            "type": "array",
+                            "x-kubernetes-list-type": "atomic"
+                        },
+                        "uri": {
+                            "description": "uri provides the URL link from which the report was downloaded.",
+                            "pattern": "^https:\\/\\/\\S+",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                },
+                "insightsRequestID": {
+                    "description": "insightsRequestID is an Insights request ID to track the status of the Insights analysis (in console.redhat.com processing pipeline) for the corresponding Insights data archive.",
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                        {
+                            "message": "insightsRequestID is immutable once set",
+                            "rule": "self == oldSelf"
+                        }
+                    ]
+                },
+                "relatedObjects": {
+                    "description": "relatedObjects is a list of resources which are useful when debugging or inspecting the data gathering Pod",
+                    "items": {
+                        "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+                        "properties": {
+                            "group": {
+                                "description": "group is the API Group of the Resource. Enter empty string for the core group. This value should consist of only lowercase alphanumeric characters, hyphens and periods. Example: \"\", \"apps\", \"build.openshift.io\", etc.",
+                                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                                "type": "string"
+                            },
+                            "name": {
+                                "description": "name of the referent.",
+                                "type": "string"
+                            },
+                            "namespace": {
+                                "description": "namespace of the referent.",
+                                "type": "string"
+                            },
+                            "resource": {
+                                "description": "resource is the type that is being referenced. It is normally the plural form of the resource kind in lowercase. This value should consist of only lowercase alphanumeric characters and hyphens. Example: \"deployments\", \"deploymentconfigs\", \"pods\", etc.",
+                                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "group",
+                            "name",
+                            "resource"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "type": "array"
+                },
+                "startTime": {
+                    "description": "startTime is the time when Insights data gathering started.",
+                    "format": "date-time",
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                        {
+                            "message": "startTime is immutable once set",
+                            "rule": "self == oldSelf"
+                        }
+                    ]
+                }
+            },
+            "type": "object",
+            "x-kubernetes-validations": [
+                {
+                    "message": "cannot remove insightsRequestID attribute from status",
+                    "rule": "(!has(oldSelf.insightsRequestID) || has(self.insightsRequestID))"
+                },
+                {
+                    "message": "cannot remove startTime attribute from status",
+                    "rule": "(!has(oldSelf.startTime) || has(self.startTime))"
+                },
+                {
+                    "message": "cannot remove finishTime attribute from status",
+                    "rule": "(!has(oldSelf.finishTime) || has(self.finishTime))"
+                },
+                {
+                    "message": "cannot remove dataGatherState attribute from status",
+                    "rule": "(!has(oldSelf.dataGatherState) || has(self.dataGatherState))"
+                }
+            ],
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "spec"
+    ],
+    "type": "object",
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-04/schema#"
+}

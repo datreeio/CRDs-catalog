@@ -15,6 +15,13 @@
     "spec": {
       "description": "VaultAuthSpec defines the desired state of VaultAuth",
       "properties": {
+        "allowedNamespaces": {
+          "description": "AllowedNamespaces Kubernetes Namespaces which are allow-listed for use with this AuthMethod. This field allows administrators to customize which Kubernetes namespaces are authorized to use with this AuthMethod. While Vault will still enforce its own rules, this has the added configurability of restricting which VaultAuthMethods can be used by which namespaces. Accepted values: []{\"*\"} - wildcard, all namespaces. []{\"a\", \"b\"} - list of namespaces. unset - disallow all namespaces except the Operator's the VaultAuthMethod's namespace, this is the default behavior.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "appRole": {
           "description": "AppRole specific auth configuration, requires that the Method be set to `appRole`.",
           "properties": {
@@ -72,6 +79,37 @@
           },
           "required": [
             "role"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "gcp": {
+          "description": "GCP specific auth configuration, requires that Method be set to `gcp`.",
+          "properties": {
+            "clusterName": {
+              "description": "GKE cluster name. Defaults to the cluster-name returned from the operator pod's local metadata server.",
+              "type": "string"
+            },
+            "projectID": {
+              "description": "GCP project ID. Defaults to the project-id returned from the operator pod's local metadata server.",
+              "type": "string"
+            },
+            "region": {
+              "description": "GCP Region of the GKE cluster's identity provider. Defaults to the region returned from the operator pod's local metadata server.",
+              "type": "string"
+            },
+            "role": {
+              "description": "Vault role to use for authenticating",
+              "type": "string"
+            },
+            "workloadIdentityServiceAccount": {
+              "description": "WorkloadIdentityServiceAccount is the name of a Kubernetes service account (in the same Kubernetes namespace as the Vault*Secret referencing this resource) which has been configured for workload identity in GKE. Should be annotated with \"iam.gke.io/gcp-service-account\".",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "workloadIdentityServiceAccount"
           ],
           "type": "object",
           "additionalProperties": false
@@ -158,7 +196,8 @@
             "kubernetes",
             "jwt",
             "appRole",
-            "aws"
+            "aws",
+            "gcp"
           ],
           "type": "string"
         },
@@ -178,7 +217,7 @@
           "type": "object"
         },
         "storageEncryption": {
-          "description": "StorageEncryption provides the necessary configuration to encrypt the client storage cache. This should only be configured when client cache persistence with encryption is enabled. This is done by passing setting the manager's commandline argument --client-cache-persistence-model=direct-encrypted. Typically there should only ever be one VaultAuth configured with StorageEncryption in the Cluster, and it should have the label: cacheStorageEncryption=true",
+          "description": "StorageEncryption provides the necessary configuration to encrypt the client storage cache. This should only be configured when client cache persistence with encryption is enabled. This is done by passing setting the manager's commandline argument --client-cache-persistence-model=direct-encrypted. Typically, there should only ever be one VaultAuth configured with StorageEncryption in the Cluster, and it should have the label: cacheStorageEncryption=true",
           "properties": {
             "keyName": {
               "description": "KeyName to use for encrypt/decrypt operations via Vault Transit.",
@@ -197,7 +236,7 @@
           "additionalProperties": false
         },
         "vaultConnectionRef": {
-          "description": "VaultConnectionRef of the corresponding VaultConnection CustomResource. If no value is specified the Operator will default to the `default` VaultConnection, configured in its own Kubernetes namespace.",
+          "description": "VaultConnectionRef to the VaultConnection resource, can be prefixed with a namespace, eg: `namespaceA/vaultConnectionRefB`. If no namespace prefix is provided it will default to namespace of the VaultConnection CR. If no value is specified for VaultConnectionRef the Operator will default to\t`default` VaultConnection, configured in its own Kubernetes namespace.",
           "type": "string"
         }
       },

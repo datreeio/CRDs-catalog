@@ -12,6 +12,12 @@ if ! command -v kubectl &> /dev/null; then
     printf "please visit https://kubernetes.io/docs/tasks/tools/#kubectl to install it"
     exit 1
 fi
+# Check if yq is installed
+if ! command -v yq &> /dev/null; then
+    printf "yq is required for this utility, and is not installed on your machine"
+    printf "please visit https://github.com/mikefarah/yq#install to install it"
+    exit 1
+fi
 
 # Check if the pyyaml module is installed
 if ! echo 'import yaml' | python3 &> /dev/null; then
@@ -50,10 +56,10 @@ NUM_OF_CRDS=0
 while read -r crd
 do
     filename=${crd%% *}
-    kubectl get crds "$filename" -o yaml > "$TMP_CRD_DIR/$filename.yaml" 2>&1
+    kubectl get crds "$filename" -o yaml > "$TMP_CRD_DIR/$filename.yaml" 2>&1q
 
-    resourceKind=$(grep "kind:" "$TMP_CRD_DIR/$filename.yaml" | awk 'NR==2{print $2}' | tr '[:upper:]' '[:lower:]')
-    resourceGroup=$(grep "group:" "$TMP_CRD_DIR/$filename.yaml" | awk 'NR==1{print $2}')
+    resourceKind=$(yq -r '.spec.names.singular' "$TMP_CRD_DIR/$filename.yaml")
+    resourceGroup=$(yq -r '.spec.group' "$TMP_CRD_DIR/$filename.yaml")
 
     # Save name and group for later directory organization
     CRD_GROUPS["$resourceKind"]="$resourceGroup"

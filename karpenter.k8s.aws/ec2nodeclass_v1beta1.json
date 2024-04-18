@@ -73,10 +73,6 @@
             {
               "message": "'id' is mutually exclusive, cannot be set with a combination of other fields in amiSelectorTerms",
               "rule": "!self.all(x, has(x.id) && (has(x.tags) || has(x.name) || has(x.owner)))"
-            },
-            {
-              "message": "'owner' cannot be set with 'tags'",
-              "rule": "!self.all(x, has(x.owner) && has(x.tags))"
             }
           ]
         },
@@ -185,6 +181,16 @@
           "description": "DetailedMonitoring controls if detailed monitoring is enabled for instances that are launched",
           "type": "boolean"
         },
+        "instanceProfile": {
+          "description": "InstanceProfile is the AWS entity that instances use. This field is mutually exclusive from role. The instance profile should already have a role assigned to it that Karpenter has PassRole permission on for instance launch using this instanceProfile to succeed.",
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "instanceProfile cannot be empty",
+              "rule": "self != ''"
+            }
+          ]
+        },
         "metadataOptions": {
           "default": {
             "httpEndpoint": "enabled",
@@ -234,7 +240,7 @@
           "additionalProperties": false
         },
         "role": {
-          "description": "Role is the AWS identity that nodes use. This field is immutable. Marking this field as immutable avoids concerns around terminating managed instance profiles from running instances. This field may be made mutable in the future, assuming the correct garbage collection and drift handling is implemented for the old instance profiles on an update.",
+          "description": "Role is the AWS identity that nodes use. This field is immutable. This field is mutually exclusive from instanceProfile. Marking this field as immutable avoids concerns around terminating managed instance profiles from running instances. This field may be made mutable in the future, assuming the correct garbage collection and drift handling is implemented for the old instance profiles on an update.",
           "type": "string",
           "x-kubernetes-validations": [
             {
@@ -381,7 +387,6 @@
       },
       "required": [
         "amiFamily",
-        "role",
         "securityGroupSelectorTerms",
         "subnetSelectorTerms"
       ],
@@ -390,6 +395,14 @@
         {
           "message": "amiSelectorTerms is required when amiFamily == 'Custom'",
           "rule": "self.amiFamily == 'Custom' ? self.amiSelectorTerms.size() != 0 : true"
+        },
+        {
+          "message": "must specify exactly one of ['role', 'instanceProfile']",
+          "rule": "(has(self.role) && !has(self.instanceProfile)) || (!has(self.role) && has(self.instanceProfile))"
+        },
+        {
+          "message": "changing from 'instanceProfile' to 'role' is not supported. You must delete and recreate this node class if you want to change this.",
+          "rule": "(has(oldSelf.role) && has(self.role)) || (has(oldSelf.instanceProfile) && has(self.instanceProfile))"
         }
       ],
       "additionalProperties": false

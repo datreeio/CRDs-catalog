@@ -1,0 +1,332 @@
+{
+  "description": "KubernetesAuthEngineRole can be used to define a KubernetesAuthEngineRole for the kube-auth authentication method",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "KubernetesAuthEngineRoleSpec defines the desired state of KubernetesAuthEngineRole",
+      "properties": {
+        "aliasNameSource": {
+          "default": "serviceaccount_uid",
+          "description": "AliasNameSource Configures how identity aliases are generated. Valid choices are: serviceaccount_uid, serviceaccount_name When serviceaccount_uid is specified, the machine generated UID from the service account will be used as the identity alias name. When serviceaccount_name is specified, the service account's namespace and name will be used as the identity alias name e.g vault/vault-auth. While it is strongly advised that you use serviceaccount_uid, you may also use serviceaccount_name in cases where you want to set the alias ahead of time, and the risks are mitigated or otherwise acceptable given your use case. It is very important to limit who is able to delete/create service accounts within a given cluster. See the Create an Entity Alias document which further expands on the potential security implications mentioned above.",
+          "enum": [
+            "serviceaccount_uid",
+            "serviceaccount_name"
+          ],
+          "type": "string"
+        },
+        "audience": {
+          "description": "Audience Audience claim to verify in the JWT.",
+          "type": "string"
+        },
+        "authentication": {
+          "description": "Authentication is the kube auth configuration to be used to execute this request",
+          "properties": {
+            "namespace": {
+              "description": "Namespace is the Vault namespace to be used in all the operations withing this connection/authentication. Only available in Vault Enterprise.",
+              "type": "string"
+            },
+            "path": {
+              "default": "kubernetes",
+              "description": "Path is the path of the role used for this kube auth authentication. The operator will try to authenticate at {[namespace/]}auth/{spec.path}",
+              "pattern": "^(?:/?[\\w;:@&=\\$-\\.\\+]*)+/?",
+              "type": "string"
+            },
+            "role": {
+              "description": "Role the role to be used during authentication",
+              "type": "string"
+            },
+            "serviceAccount": {
+              "default": {
+                "name": "default"
+              },
+              "description": "ServiceAccount is the service account used for the kube auth authentication",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "connection": {
+          "description": "Connection represents the information needed to connect to Vault. This operator uses the standard Vault environment variables to connect to Vault. If you need to override those settings and for example connect to a different Vault instance, you can do with this section of the CR.",
+          "properties": {
+            "address": {
+              "description": "Address Address of the Vault server expressed as a URL and port, for example: https://127.0.0.1:8200/",
+              "type": "string"
+            },
+            "maxRetries": {
+              "description": "MaxRetries Maximum number of retries when certain error codes are encountered. The default is 2, for three total attempts. Set this to 0 or less to disable retrying. Error codes that are retried are 412 (client consistency requirement not satisfied) and all 5xx except for 501 (not implemented).",
+              "type": "integer"
+            },
+            "tLSConfig": {
+              "properties": {
+                "cacert": {
+                  "description": "Cacert Path to a PEM-encoded CA certificate file on the local disk. This file is used to verify the Vault server's SSL certificate. This environment variable takes precedence over a cert passed via the secret.",
+                  "type": "string"
+                },
+                "skipVerify": {
+                  "description": "SkipVerify Do not verify Vault's presented certificate before communicating with it. Setting this variable is not recommended and voids Vault's security model.",
+                  "type": "boolean"
+                },
+                "tlsSecret": {
+                  "description": "TLSSecret namespace-local secret containing the tls material for the connection. the expected keys for the secret are: ca bundle -> \"ca.crt\", certificate -> \"tls.crt\", key -> \"tls.key\"",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-map-type": "atomic",
+                  "additionalProperties": false
+                },
+                "tlsServerName": {
+                  "description": "TLSServerName Name to use as the SNI host when connecting via TLS.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "timeOut": {
+              "description": "Timeout Timeout variable. The default value is 60s.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "name": {
+          "description": "The name of the obejct created in Vault. If this is specified it takes precedence over {metatada.name}",
+          "pattern": "'[a-z0-9]([-a-z0-9]*[a-z0-9])?'",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path at which to make the configuration. The final path in Vault will be {[spec.authentication.namespace]}/auth/{spec.path}/role/{metadata.name}. The authentication role must have the following capabilities = [ \"create\", \"read\", \"update\", \"delete\"] on that path.",
+          "pattern": "^(?:/?[\\w;:@&=\\$-\\.\\+]*)+/?",
+          "type": "string"
+        },
+        "policies": {
+          "description": "Policies is a list of policy names to be bound to this role. kubebuilder:validation:UniqueItems=true",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "targetNamespaces": {
+          "description": "TargetNamespaces specifies how to retrieve the namespaces bound to this Vault role.",
+          "properties": {
+            "targetNamespaceSelector": {
+              "description": "TargetNamespaceSelector is a selector of namespaces from which service accounts will receove this role. Either TargetNamespaceSelector or TargetNamespaces can be specified",
+              "properties": {
+                "matchExpressions": {
+                  "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                  "items": {
+                    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+                    "properties": {
+                      "key": {
+                        "description": "key is the label key that the selector applies to.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "operator"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            },
+            "targetNamespaces": {
+              "description": "TargetNamespaces is a list of namespace from which service accounts will receive this role. Either TargetNamespaceSelector or TargetNamespaces can be specified. kubebuilder:validation:UniqueItems=true",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "targetServiceAccounts": {
+          "default": [
+            "default"
+          ],
+          "description": "TargetServiceAccounts is a list of service account names that will receive this role kubebuilder:validation:UniqueItems=true",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "tokenBoundCIDRs": {
+          "description": "TokenBoundCIDRs List of CIDR blocks; if set, specifies blocks of IP addresses which can authenticate successfully, and ties the resulting token to these blocks as well. kubebuilder:validation:UniqueItems=true",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "tokenExplicitMaxTTL": {
+          "default": 0,
+          "description": "TokenExplicitMaxTTL If set, will encode an explicit max TTL onto the token. This is a hard cap even if token_ttl and token_max_ttl would otherwise allow a renewal.",
+          "type": "integer"
+        },
+        "tokenMaxTTL": {
+          "default": 0,
+          "description": "TokenMaxTTL The maximum lifetime for generated tokens. This current value of this will be referenced at renewal time.",
+          "type": "integer"
+        },
+        "tokenNoDefaultPolicy": {
+          "default": false,
+          "description": "TokenNoDefaultPolicy If set, the default policy will not be set on generated tokens; otherwise it will be added to the policies set in token_policies",
+          "type": "boolean"
+        },
+        "tokenNumUses": {
+          "default": 0,
+          "description": "TokenNumUses The maximum number of times a generated token may be used (within its lifetime); 0 means unlimited. If you require the token to have the ability to create child tokens, you will need to set this value to 0.",
+          "type": "integer"
+        },
+        "tokenPeriod": {
+          "default": 0,
+          "description": "TokenPeriod The period, if any, to set on the token.",
+          "type": "integer"
+        },
+        "tokenTTL": {
+          "default": 0,
+          "description": "TokenTTL The incremental lifetime for generated tokens. This current value of this will be referenced at renewal time.",
+          "type": "integer"
+        },
+        "tokenType": {
+          "default": "default",
+          "description": "TokenType The type of token that should be generated. Can be service, batch, or default to use the mount's tuned default (which unless changed will be service tokens). For token store roles, there are two additional possibilities: default-service and default-batch which specify the type to return unless the client requests a different type at generation time.",
+          "enum": [
+            "service",
+            "batch",
+            "default",
+            "default-service",
+            "default-batch"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "policies",
+        "targetServiceAccounts"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "KubernetesAuthEngineRoleStatus defines the observed state of KubernetesAuthEngineRole",
+      "properties": {
+        "conditions": {
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition. This may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase. --- Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be useful (see .node.status.conditions), the ability to deconflict is important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

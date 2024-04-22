@@ -4,18 +4,10 @@ This repository aggregates hundreds of popular Kubernetes CRDs (`CustomResourceD
 
 Running Kubernetes schema validation checks helps apply the **"shift-left approach"** on machines **without** giving them access to your cluster (e.g. locally or on CI).
 
-## How to use the schemas in the catalog
-### Datree
-```
-datree test [MANIFEST]
-```
+## How to use the schemas in the catalogs
 ### Kubeconform
 ```
-kubeconform -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' [MANIFEST]
-```
-### kubeval
-```
-Only supported with the CRD Extractor
+kubeconform -schema-location default -schema-location 'https://gitlab.greencap.io/devops/crds-catalog/-/raw/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' [MANIFEST]
 ```
 
 👉 If you encounter custom resources that are not part of the catalog, or you want to validate the schemas in an air-gapped environment, use the [CRD Extractor](#crd-extractor). 
@@ -50,12 +42,6 @@ To use the CRD Extractor:
 ```
 
 ![image](https://user-images.githubusercontent.com/19731161/185790837-2abadcd5-9b26-451b-b3cd-7e0c46c68b58.png)
-
----
-
-## Shifting left CRD validation - Video by Datree
-
-<a href="https://www.youtube.com/watch?v=YUoH8WNrrwM" title="video text"><img src="https://img.youtube.com/vi/YUoH8WNrrwM/maxresdefault.jpg" width="640" height="360"></a>
 
 ---
 

@@ -7,7 +7,7 @@ Running Kubernetes schema validation checks helps apply the **"shift-left approa
 ## How to use the schemas in the catalogs
 ### Kubeconform
 ```
-kubeconform -schema-location default -schema-location 'https://gitlab.greencap.io/devops/crds-catalog/-/raw/cm3/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' [MANIFEST]
+kubeconform -schema-location default -schema-location "https://gitlab-admin:${CI_JOB_TOKEN}@gitlab.greencap.io/devops/crds-catalog/-/raw/cm3/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" [MANIFEST]
 ```
 
 ---

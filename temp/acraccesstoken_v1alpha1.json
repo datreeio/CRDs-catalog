@@ -1,0 +1,155 @@
+{
+  "description": "ACRAccessToken returns a Azure Container Registry token\nthat can be used for pushing/pulling images.\nNote: by default it will return an ACR Refresh Token with full access\n(depending on the identity).\nThis can be scoped down to the repository level using .spec.scope.\nIn case scope is defined it will return an ACR Access Token.\n\n\nSee docs: https://github.com/Azure/acr/blob/main/docs/AAD-OAuth.md",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "ACRAccessTokenSpec defines how to generate the access token\ne.g. how to authenticate and which registry to use.\nsee: https://github.com/Azure/acr/blob/main/docs/AAD-OAuth.md#overview",
+      "properties": {
+        "auth": {
+          "properties": {
+            "managedIdentity": {
+              "description": "ManagedIdentity uses Azure Managed Identity to authenticate with Azure.",
+              "properties": {
+                "identityId": {
+                  "description": "If multiple Managed Identity is assigned to the pod, you can select the one to be used",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "servicePrincipal": {
+              "description": "ServicePrincipal uses Azure Service Principal credentials to authenticate with Azure.",
+              "properties": {
+                "secretRef": {
+                  "description": "Configuration used to authenticate with Azure using static\ncredentials stored in a Kind=Secret.",
+                  "properties": {
+                    "clientId": {
+                      "description": "The Azure clientId of the service principle used for authentication.",
+                      "properties": {
+                        "key": {
+                          "description": "The key of the entry in the Secret resource's `data` field to be used. Some instances of this field may be\ndefaulted, in others it may be required.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name of the Secret resource being referred to.",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace of the resource being referred to. Ignored if referent is not cluster-scoped. cluster-scoped defaults\nto the namespace of the referent.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "clientSecret": {
+                      "description": "The Azure ClientSecret of the service principle used for authentication.",
+                      "properties": {
+                        "key": {
+                          "description": "The key of the entry in the Secret resource's `data` field to be used. Some instances of this field may be\ndefaulted, in others it may be required.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "The name of the Secret resource being referred to.",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace of the resource being referred to. Ignored if referent is not cluster-scoped. cluster-scoped defaults\nto the namespace of the referent.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "secretRef"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "workloadIdentity": {
+              "description": "WorkloadIdentity uses Azure Workload Identity to authenticate with Azure.",
+              "properties": {
+                "serviceAccountRef": {
+                  "description": "ServiceAccountRef specified the service account\nthat should be used when authenticating with WorkloadIdentity.",
+                  "properties": {
+                    "audiences": {
+                      "description": "Audience specifies the `aud` claim for the service account token\nIf the service account uses a well-known annotation for e.g. IRSA or GCP Workload Identity\nthen this audiences will be appended to the list",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "name": {
+                      "description": "The name of the ServiceAccount resource being referred to.",
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "Namespace of the resource being referred to. Ignored if referent is not cluster-scoped. cluster-scoped defaults\nto the namespace of the referent.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "environmentType": {
+          "default": "PublicCloud",
+          "description": "EnvironmentType specifies the Azure cloud environment endpoints to use for\nconnecting and authenticating with Azure. By default it points to the public cloud AAD endpoint.\nThe following endpoints are available, also see here: https://github.com/Azure/go-autorest/blob/main/autorest/azure/environments.go#L152\nPublicCloud, USGovernmentCloud, ChinaCloud, GermanCloud",
+          "enum": [
+            "PublicCloud",
+            "USGovernmentCloud",
+            "ChinaCloud",
+            "GermanCloud"
+          ],
+          "type": "string"
+        },
+        "registry": {
+          "description": "the domain name of the ACR registry\ne.g. foobarexample.azurecr.io",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Define the scope for the access token, e.g. pull/push access for a repository.\nif not provided it will return a refresh token that has full scope.\nNote: you need to pin it down to the repository level, there is no wildcard available.\n\n\nexamples:\nrepository:my-repository:pull,push\nrepository:my-repository:pull\n\n\nsee docs for details: https://docs.docker.com/registry/spec/auth/scope/",
+          "type": "string"
+        },
+        "tenantId": {
+          "description": "TenantID configures the Azure Tenant to send requests to. Required for ServicePrincipal auth type.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "auth",
+        "registry"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

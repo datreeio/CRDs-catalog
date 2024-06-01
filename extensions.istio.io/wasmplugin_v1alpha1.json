@@ -3,7 +3,16 @@
     "spec": {
       "description": "Extend the functionality provided by the Istio proxy through WebAssembly filters. See more details at: https://istio.io/docs/reference/config/proxy_extensions/wasm-plugin.html",
       "properties": {
+        "failStrategy": {
+          "description": "Specifies the failure behavior for the plugin due to fatal errors.",
+          "enum": [
+            "FAIL_CLOSE",
+            "FAIL_OPEN"
+          ],
+          "type": "string"
+        },
         "imagePullPolicy": {
+          "description": "The pull behaviour to be applied when fetching Wasm module by either OCI image or `http/https`.",
           "enum": [
             "UNSPECIFIED_POLICY",
             "IfNotPresent",
@@ -13,6 +22,8 @@
         },
         "imagePullSecret": {
           "description": "Credentials to use for OCI image pulling.",
+          "maxLength": 253,
+          "minLength": 1,
           "type": "string"
         },
         "match": {
@@ -34,13 +45,22 @@
                 "items": {
                   "properties": {
                     "number": {
+                      "maximum": 65535,
+                      "minimum": 1,
                       "type": "integer"
                     }
                   },
+                  "required": [
+                    "number"
+                  ],
                   "type": "object",
                   "additionalProperties": false
                 },
-                "type": "array"
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "number"
+                ],
+                "x-kubernetes-list-type": "map"
               }
             },
             "type": "object",
@@ -64,6 +84,9 @@
           "x-kubernetes-preserve-unknown-fields": true
         },
         "pluginName": {
+          "description": "The plugin name to be used in the Envoy configuration (used to be called `rootID`).",
+          "maxLength": 256,
+          "minLength": 1,
           "type": "string"
         },
         "priority": {
@@ -72,11 +95,13 @@
           "type": "integer"
         },
         "selector": {
+          "description": "Criteria used to select the specific set of pods/VMs on which this plugin configuration should be applied.",
           "properties": {
             "matchLabels": {
               "additionalProperties": {
                 "type": "string"
               },
+              "description": "One or more labels that indicate a specific set of pods/VMs on which a policy should be applied.",
               "type": "object"
             }
           },
@@ -85,11 +110,51 @@
         },
         "sha256": {
           "description": "SHA256 checksum that will be used to verify Wasm module or OCI container.",
+          "pattern": "(^$|^[a-f0-9]{64}$)",
+          "type": "string"
+        },
+        "targetRef": {
+          "description": "Optional.",
+          "properties": {
+            "group": {
+              "description": "group is the group of the target resource.",
+              "type": "string"
+            },
+            "kind": {
+              "description": "kind is kind of the target resource.",
+              "type": "string"
+            },
+            "name": {
+              "description": "name is the name of the target resource.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "namespace is the namespace of the referent.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "type": {
+          "description": "Specifies the type of Wasm Extension to be used.",
+          "enum": [
+            "UNSPECIFIED_PLUGIN_TYPE",
+            "HTTP",
+            "NETWORK"
+          ],
           "type": "string"
         },
         "url": {
           "description": "URL of a Wasm module or OCI container.",
-          "type": "string"
+          "minLength": 1,
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "url must have schema one of [http, https, file, oci]",
+              "rule": "isURL(self) ? (url(self).getScheme() in ['', 'http', 'https', 'oci', 'file']) : (isURL('http://' + self) && url('http://' +self).getScheme() in ['', 'http', 'https', 'oci', 'file'])"
+            }
+          ]
         },
         "verificationKey": {
           "type": "string"
@@ -102,13 +167,18 @@
               "items": {
                 "properties": {
                   "name": {
+                    "description": "Name of the environment variable.",
+                    "maxLength": 256,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "value": {
                     "description": "Value for the environment variable.",
+                    "maxLength": 2048,
                     "type": "string"
                   },
                   "valueFrom": {
+                    "description": "Source for the environment variable's value.",
                     "enum": [
                       "INLINE",
                       "HOST"
@@ -116,16 +186,33 @@
                     "type": "string"
                   }
                 },
+                "required": [
+                  "name"
+                ],
                 "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "value may only be set when valueFrom is INLINE",
+                    "rule": "(has(self.valueFrom) ? self.valueFrom : '') != 'HOST' || !has(self.value)"
+                  }
+                ],
                 "additionalProperties": false
               },
-              "type": "array"
+              "maxItems": 256,
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "name"
+              ],
+              "x-kubernetes-list-type": "map"
             }
           },
           "type": "object",
           "additionalProperties": false
         }
       },
+      "required": [
+        "url"
+      ],
       "type": "object",
       "additionalProperties": false
     },
@@ -134,5 +221,8 @@
       "x-kubernetes-preserve-unknown-fields": true
     }
   },
+  "required": [
+    "spec"
+  ],
   "type": "object"
 }

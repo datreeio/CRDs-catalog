@@ -58,8 +58,20 @@
               "description": "Cluster holds various configurable Envoy cluster values that can be set in the config file.",
               "properties": {
                 "dnsLookupFamily": {
-                  "description": "DNSLookupFamily defines how external names are looked up When configured as V4, the DNS resolver will only perform a lookup for addresses in the IPv4 family. If V6 is configured, the DNS resolver will only perform a lookup for addresses in the IPv6 family. If AUTO is configured, the DNS resolver will first perform a lookup for addresses in the IPv6 family and fallback to a lookup for addresses in the IPv4 family. Note: This only applies to externalName clusters. \n See https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-enum-config-cluster-v3-cluster-dnslookupfamily for more information. \n Values: `auto` (default), `v4`, `v6`. \n Other values will produce an error.",
+                  "description": "DNSLookupFamily defines how external names are looked up When configured as V4, the DNS resolver will only perform a lookup for addresses in the IPv4 family. If V6 is configured, the DNS resolver will only perform a lookup for addresses in the IPv6 family. If AUTO is configured, the DNS resolver will first perform a lookup for addresses in the IPv6 family and fallback to a lookup for addresses in the IPv4 family. If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families, and return all resolved addresses. When this is used, Happy Eyeballs will be enabled for upstream connections. Refer to Happy Eyeballs Support for more information. Note: This only applies to externalName clusters. \n See https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-enum-config-cluster-v3-cluster-dnslookupfamily for more information. \n Values: `auto` (default), `v4`, `v6`, `all`. \n Other values will produce an error.",
                   "type": "string"
+                },
+                "maxRequestsPerConnection": {
+                  "description": "Defines the maximum requests for upstream connections. If not specified, there is no limit. see https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#envoy-v3-api-msg-config-core-v3-httpprotocoloptions for more information.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "per-connection-buffer-limit-bytes": {
+                  "description": "Defines the soft limit on size of the cluster\u2019s new connection read and write buffers in bytes. If unspecified, an implementation defined default is applied (1MiB). see https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#envoy-v3-api-field-config-cluster-v3-cluster-per-connection-buffer-limit-bytes for more information.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
                 }
               },
               "type": "object",
@@ -144,15 +156,68 @@
                   "description": "DisableMergeSlashes disables Envoy's non-standard merge_slashes path transformation option which strips duplicate slashes from request URL paths. \n Contour's default is false.",
                   "type": "boolean"
                 },
+                "httpMaxConcurrentStreams": {
+                  "description": "Defines the value for SETTINGS_MAX_CONCURRENT_STREAMS Envoy will advertise in the SETTINGS frame in HTTP/2 connections and the limit for concurrent streams allowed for a peer on a single HTTP/2 connection. It is recommended to not set this lower than 100 but this field can be used to bound resource usage by HTTP/2 connections and mitigate attacks like CVE-2023-44487. The default value when this is not set is unlimited.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxRequestsPerConnection": {
+                  "description": "Defines the maximum requests for downstream connections. If not specified, there is no limit. see https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/protocol.proto#envoy-v3-api-msg-config-core-v3-httpprotocoloptions for more information.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "maxRequestsPerIOCycle": {
+                  "description": "Defines the limit on number of HTTP requests that Envoy will process from a single connection in a single I/O cycle. Requests over this limit are processed in subsequent I/O cycles. Can be used as a mitigation for CVE-2023-44487 when abusive traffic is detected. Configures the http.max_requests_per_io_cycle Envoy runtime setting. The default value when this is not set is no limit.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "per-connection-buffer-limit-bytes": {
+                  "description": "Defines the soft limit on size of the listener\u2019s new connection read and write buffers in bytes. If unspecified, an implementation defined default is applied (1MiB). see https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/listener/v3/listener.proto#envoy-v3-api-field-config-listener-v3-listener-per-connection-buffer-limit-bytes for more information.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "serverHeaderTransformation": {
+                  "description": "Defines the action to be applied to the Server header on the response path. When configured as overwrite, overwrites any Server header with \"envoy\". When configured as append_if_absent, if a Server header is present, pass it through, otherwise set it to \"envoy\". When configured as pass_through, pass through the value of the Server header, and do not append a header if none is present. \n Values: `overwrite` (default), `append_if_absent`, `pass_through` \n Other values will produce an error. Contour's default is overwrite.",
+                  "type": "string"
+                },
+                "socketOptions": {
+                  "description": "SocketOptions defines configurable socket options for the listeners. Single set of options are applied to all listeners.",
+                  "properties": {
+                    "tos": {
+                      "description": "Defines the value for IPv4 TOS field (including 6 bit DSCP field) for IP packets originating from Envoy listeners. Single value is applied to all listeners. If listeners are bound to IPv6-only addresses, setting this option will cause an error.",
+                      "format": "int32",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "trafficClass": {
+                      "description": "Defines the value for IPv6 Traffic Class field (including 6 bit DSCP field) for IP packets originating from the Envoy listeners. Single value is applied to all listeners. If listeners are bound to IPv4-only addresses, setting this option will cause an error.",
+                      "format": "int32",
+                      "maximum": 255,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "tls": {
                   "description": "TLS holds various configurable Envoy TLS listener values.",
                   "properties": {
                     "cipherSuites": {
-                      "description": "CipherSuites defines the TLS ciphers to be supported by Envoy TLS listeners when negotiating TLS 1.2. Ciphers are validated against the set that Envoy supports by default. This parameter should only be used by advanced users. Note that these will be ignored when TLS 1.3 is in use. \n This field is optional; when it is undefined, a Contour-managed ciphersuite list will be used, which may be updated to keep it secure. \n Contour's default list is:   - \"[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\"   - \"[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\"   - \"ECDHE-ECDSA-AES256-GCM-SHA384\"   - \"ECDHE-RSA-AES256-GCM-SHA384\" \n Ciphers provided are validated against the following list:   - \"[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\"   - \"[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\"   - \"ECDHE-ECDSA-AES128-GCM-SHA256\"   - \"ECDHE-RSA-AES128-GCM-SHA256\"   - \"ECDHE-ECDSA-AES128-SHA\"   - \"ECDHE-RSA-AES128-SHA\"   - \"AES128-GCM-SHA256\"   - \"AES128-SHA\"   - \"ECDHE-ECDSA-AES256-GCM-SHA384\"   - \"ECDHE-RSA-AES256-GCM-SHA384\"   - \"ECDHE-ECDSA-AES256-SHA\"   - \"ECDHE-RSA-AES256-SHA\"   - \"AES256-GCM-SHA384\"   - \"AES256-SHA\" \n Contour recommends leaving this undefined unless you are sure you must. \n See: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#extensions-transport-sockets-tls-v3-tlsparameters Note: This list is a superset of what is valid for stock Envoy builds and those using BoringSSL FIPS.",
+                      "description": "CipherSuites defines the TLS ciphers to be supported by Envoy TLS listeners when negotiating TLS 1.2. Ciphers are validated against the set that Envoy supports by default. This parameter should only be used by advanced users. Note that these will be ignored when TLS 1.3 is in use. \n This field is optional; when it is undefined, a Contour-managed ciphersuite list will be used, which may be updated to keep it secure. \n Contour's default list is: - \"[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\" - \"[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\" - \"ECDHE-ECDSA-AES256-GCM-SHA384\" - \"ECDHE-RSA-AES256-GCM-SHA384\" \n Ciphers provided are validated against the following list: - \"[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\" - \"[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\" - \"ECDHE-ECDSA-AES128-GCM-SHA256\" - \"ECDHE-RSA-AES128-GCM-SHA256\" - \"ECDHE-ECDSA-AES128-SHA\" - \"ECDHE-RSA-AES128-SHA\" - \"AES128-GCM-SHA256\" - \"AES128-SHA\" - \"ECDHE-ECDSA-AES256-GCM-SHA384\" - \"ECDHE-RSA-AES256-GCM-SHA384\" - \"ECDHE-ECDSA-AES256-SHA\" - \"ECDHE-RSA-AES256-SHA\" - \"AES256-GCM-SHA384\" - \"AES256-SHA\" \n Contour recommends leaving this undefined unless you are sure you must. \n See: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#extensions-transport-sockets-tls-v3-tlsparameters Note: This list is a superset of what is valid for stock Envoy builds and those using BoringSSL FIPS.",
                       "items": {
                         "type": "string"
                       },
                       "type": "array"
+                    },
+                    "maximumProtocolVersion": {
+                      "description": "MaximumProtocolVersion is the maximum TLS version this vhost should negotiate. \n Values: `1.2`, `1.3`(default). \n Other values will produce an error.",
+                      "type": "string"
                     },
                     "minimumProtocolVersion": {
                       "description": "MinimumProtocolVersion is the minimum TLS version this vhost should negotiate. \n Values: `1.2` (default), `1.3`. \n Other values will produce an error.",
@@ -189,7 +254,7 @@
                   "type": "array"
                 },
                 "accessLogLevel": {
-                  "description": "AccessLogLevel sets the verbosity level of the access log. \n Values: `info` (default, meaning all requests are logged), `error` and `disabled`. \n Other values will produce an error.",
+                  "description": "AccessLogLevel sets the verbosity level of the access log. \n Values: `info` (default, all requests are logged), `error` (all non-success requests, i.e. 300+ response code, are logged), `critical` (all 5xx requests are logged) and `disabled`. \n Other values will produce an error.",
                   "type": "string"
                 }
               },
@@ -304,6 +369,13 @@
           "type": "object",
           "additionalProperties": false
         },
+        "featureFlags": {
+          "description": "FeatureFlags defines toggle to enable new contour features. Available toggles are: useEndpointSlices - configures contour to fetch endpoint data from k8s endpoint slices. defaults to false and reading endpoint data from the k8s endpoints.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "gateway": {
           "description": "Gateway contains parameters for the gateway-api Gateway that Contour is configured to serve traffic.",
           "properties": {
@@ -325,6 +397,84 @@
                 "name",
                 "namespace"
               ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "globalExtAuth": {
+          "description": "GlobalExternalAuthorization allows envoys external authorization filter to be enabled for all virtual hosts.",
+          "properties": {
+            "authPolicy": {
+              "description": "AuthPolicy sets a default authorization policy for client requests. This policy will be used unless overridden by individual routes.",
+              "properties": {
+                "context": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Context is a set of key/value pairs that are sent to the authentication server in the check request. If a context is provided at an enclosing scope, the entries are merged such that the inner scope overrides matching keys from the outer scope.",
+                  "type": "object"
+                },
+                "disabled": {
+                  "description": "When true, this field disables client request authentication for the scope of the policy.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "extensionRef": {
+              "description": "ExtensionServiceRef specifies the extension resource that will authorize client requests.",
+              "properties": {
+                "apiVersion": {
+                  "description": "API version of the referent. If this field is not specified, the default \"projectcontour.io/v1alpha1\" will be used",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the referent. \n More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace of the referent. If this field is not specifies, the namespace of the resource that targets the referent will be used. \n More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "failOpen": {
+              "description": "If FailOpen is true, the client request is forwarded to the upstream service even if the authorization server fails to respond. This field should not be set in most cases. It is intended for use only while migrating applications from internal authorization to Contour external authorization.",
+              "type": "boolean"
+            },
+            "responseTimeout": {
+              "description": "ResponseTimeout configures maximum time to wait for a check response from the authorization server. Timeout durations are expressed in the Go [Duration format](https://godoc.org/time#ParseDuration). Valid time units are \"ns\", \"us\" (or \"\u00b5s\"), \"ms\", \"s\", \"m\", \"h\". The string \"infinity\" is also a valid input and specifies no timeout.",
+              "pattern": "^(((\\d*(\\.\\d*)?h)|(\\d*(\\.\\d*)?m)|(\\d*(\\.\\d*)?s)|(\\d*(\\.\\d*)?ms)|(\\d*(\\.\\d*)?us)|(\\d*(\\.\\d*)?\u00b5s)|(\\d*(\\.\\d*)?ns))+|infinity|infinite)$",
+              "type": "string"
+            },
+            "withRequestBody": {
+              "description": "WithRequestBody specifies configuration for sending the client request's body to authorization server.",
+              "properties": {
+                "allowPartialMessage": {
+                  "description": "If AllowPartialMessage is true, then Envoy will buffer the body until MaxRequestBytes are reached.",
+                  "type": "boolean"
+                },
+                "maxRequestBytes": {
+                  "default": 1024,
+                  "description": "MaxRequestBytes sets the maximum size of message body ExtAuthz filter will hold in-memory.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "packAsBytes": {
+                  "description": "If PackAsBytes is true, the body sent to Authorization Server is in raw bytes.",
+                  "type": "boolean"
+                }
+              },
               "type": "object",
               "additionalProperties": false
             }
@@ -489,9 +639,157 @@
         "rateLimitService": {
           "description": "RateLimitService optionally holds properties of the Rate Limit Service to be used for global rate limiting.",
           "properties": {
+            "defaultGlobalRateLimitPolicy": {
+              "description": "DefaultGlobalRateLimitPolicy allows setting a default global rate limit policy for every HTTPProxy. HTTPProxy can overwrite this configuration.",
+              "properties": {
+                "descriptors": {
+                  "description": "Descriptors defines the list of descriptors that will be generated and sent to the rate limit service. Each descriptor contains 1+ key-value pair entries.",
+                  "items": {
+                    "description": "RateLimitDescriptor defines a list of key-value pair generators.",
+                    "properties": {
+                      "entries": {
+                        "description": "Entries is the list of key-value pair generators.",
+                        "items": {
+                          "description": "RateLimitDescriptorEntry is a key-value pair generator. Exactly one field on this struct must be non-nil.",
+                          "properties": {
+                            "genericKey": {
+                              "description": "GenericKey defines a descriptor entry with a static key and value.",
+                              "properties": {
+                                "key": {
+                                  "description": "Key defines the key of the descriptor entry. If not set, the key is set to \"generic_key\".",
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "description": "Value defines the value of the descriptor entry.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "remoteAddress": {
+                              "description": "RemoteAddress defines a descriptor entry with a key of \"remote_address\" and a value equal to the client's IP address (from x-forwarded-for).",
+                              "type": "object"
+                            },
+                            "requestHeader": {
+                              "description": "RequestHeader defines a descriptor entry that's populated only if a given header is present on the request. The descriptor key is static, and the descriptor value is equal to the value of the header.",
+                              "properties": {
+                                "descriptorKey": {
+                                  "description": "DescriptorKey defines the key to use on the descriptor entry.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "headerName": {
+                                  "description": "HeaderName defines the name of the header to look for on the request.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "requestHeaderValueMatch": {
+                              "description": "RequestHeaderValueMatch defines a descriptor entry that's populated if the request's headers match a set of 1+ match criteria. The descriptor key is \"header_match\", and the descriptor value is static.",
+                              "properties": {
+                                "expectMatch": {
+                                  "default": true,
+                                  "description": "ExpectMatch defines whether the request must positively match the match criteria in order to generate a descriptor entry (i.e. true), or not match the match criteria in order to generate a descriptor entry (i.e. false). The default is true.",
+                                  "type": "boolean"
+                                },
+                                "headers": {
+                                  "description": "Headers is a list of 1+ match criteria to apply against the request to determine whether to populate the descriptor entry or not.",
+                                  "items": {
+                                    "description": "HeaderMatchCondition specifies how to conditionally match against HTTP headers. The Name field is required, only one of Present, NotPresent, Contains, NotContains, Exact, NotExact and Regex can be set. For negative matching rules only (e.g. NotContains or NotExact) you can set TreatMissingAsEmpty. IgnoreCase has no effect for Regex.",
+                                    "properties": {
+                                      "contains": {
+                                        "description": "Contains specifies a substring that must be present in the header value.",
+                                        "type": "string"
+                                      },
+                                      "exact": {
+                                        "description": "Exact specifies a string that the header value must be equal to.",
+                                        "type": "string"
+                                      },
+                                      "ignoreCase": {
+                                        "description": "IgnoreCase specifies that string matching should be case insensitive. Note that this has no effect on the Regex parameter.",
+                                        "type": "boolean"
+                                      },
+                                      "name": {
+                                        "description": "Name is the name of the header to match against. Name is required. Header names are case insensitive.",
+                                        "type": "string"
+                                      },
+                                      "notcontains": {
+                                        "description": "NotContains specifies a substring that must not be present in the header value.",
+                                        "type": "string"
+                                      },
+                                      "notexact": {
+                                        "description": "NoExact specifies a string that the header value must not be equal to. The condition is true if the header has any other value.",
+                                        "type": "string"
+                                      },
+                                      "notpresent": {
+                                        "description": "NotPresent specifies that condition is true when the named header is not present. Note that setting NotPresent to false does not make the condition true if the named header is present.",
+                                        "type": "boolean"
+                                      },
+                                      "present": {
+                                        "description": "Present specifies that condition is true when the named header is present, regardless of its value. Note that setting Present to false does not make the condition true if the named header is absent.",
+                                        "type": "boolean"
+                                      },
+                                      "regex": {
+                                        "description": "Regex specifies a regular expression pattern that must match the header value.",
+                                        "type": "string"
+                                      },
+                                      "treatMissingAsEmpty": {
+                                        "description": "TreatMissingAsEmpty specifies if the header match rule specified header does not exist, this header value will be treated as empty. Defaults to false. Unlike the underlying Envoy implementation this is **only** supported for negative matches (e.g. NotContains, NotExact).",
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "name"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "minItems": 1,
+                                  "type": "array"
+                                },
+                                "value": {
+                                  "description": "Value defines the value of the descriptor entry.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "disabled": {
+                  "description": "Disabled configures the HTTPProxy to not use the default global rate limit policy defined by the Contour configuration.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "domain": {
               "description": "Domain is passed to the Rate Limit Service.",
               "type": "string"
+            },
+            "enableResourceExhaustedCode": {
+              "description": "EnableResourceExhaustedCode enables translating error code 429 to grpc code RESOURCE_EXHAUSTED. When disabled it's translated to UNAVAILABLE",
+              "type": "boolean"
             },
             "enableXRateLimitHeaders": {
               "description": "EnableXRateLimitHeaders defines whether to include the X-RateLimit headers X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset (as defined by the IETF Internet-Draft linked below), on responses to clients when the Rate Limit Service is consulted for a request. \n ref. https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html",
@@ -517,6 +815,76 @@
             "failOpen": {
               "description": "FailOpen defines whether to allow requests to proceed when the Rate Limit Service fails to respond with a valid rate limit decision within the timeout defined on the extension service.",
               "type": "boolean"
+            }
+          },
+          "required": [
+            "extensionService"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "tracing": {
+          "description": "Tracing defines properties for exporting trace data to OpenTelemetry.",
+          "properties": {
+            "customTags": {
+              "description": "CustomTags defines a list of custom tags with unique tag name.",
+              "items": {
+                "description": "CustomTag defines custom tags with unique tag name to create tags for the active span.",
+                "properties": {
+                  "literal": {
+                    "description": "Literal is a static custom tag value. Precisely one of Literal, RequestHeaderName must be set.",
+                    "type": "string"
+                  },
+                  "requestHeaderName": {
+                    "description": "RequestHeaderName indicates which request header the label value is obtained from. Precisely one of Literal, RequestHeaderName must be set.",
+                    "type": "string"
+                  },
+                  "tagName": {
+                    "description": "TagName is the unique name of the custom tag.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tagName"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "extensionService": {
+              "description": "ExtensionService identifies the extension service defining the otel-collector.",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "namespace": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "namespace"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "includePodDetail": {
+              "description": "IncludePodDetail defines a flag. If it is true, contour will add the pod name and namespace to the span of the trace. the default is true. Note: The Envoy pods MUST have the HOSTNAME and CONTOUR_NAMESPACE environment variables set for this to work properly.",
+              "type": "boolean"
+            },
+            "maxPathTagLength": {
+              "description": "MaxPathTagLength defines maximum length of the request path to extract and include in the HttpUrl tag. contour's default is 256.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "overallSampling": {
+              "description": "OverallSampling defines the sampling rate of trace data. contour's default is 100.",
+              "type": "string"
+            },
+            "serviceName": {
+              "description": "ServiceName defines the name for the service. contour's default is contour.",
+              "type": "string"
             }
           },
           "required": [
@@ -578,7 +946,7 @@
         "conditions": {
           "description": "Conditions contains the current status of the Contour resource. \n Contour will update a single condition, `Valid`, that is in normal-true polarity. \n Contour will not modify any other Conditions set in this block, in case some other controller wants to add a Condition.",
           "items": {
-            "description": "DetailedCondition is an extension of the normal Kubernetes conditions, with two extra fields to hold sub-conditions, which provide more detailed reasons for the state (True or False) of the condition. \n `errors` holds information about sub-conditions which are fatal to that condition and render its state False. \n `warnings` holds information about sub-conditions which are not fatal to that condition and do not force the state to be False. \n Remember that Conditions have a type, a status, and a reason. \n The type is the type of the condition, the most important one in this CRD set is `Valid`. `Valid` is a positive-polarity condition: when it is `status: true` there are no problems. \n In more detail, `status: true` means that the object is has been ingested into Contour with no errors. `warnings` may still be present, and will be indicated in the Reason field. There must be zero entries in the `errors` slice in this case. \n `Valid`, `status: false` means that the object has had one or more fatal errors during processing into Contour.  The details of the errors will be present under the `errors` field. There must be at least one error in the `errors` slice if `status` is `false`. \n For DetailedConditions of types other than `Valid`, the Condition must be in the negative polarity. When they have `status` `true`, there is an error. There must be at least one entry in the `errors` Subcondition slice. When they have `status` `false`, there are no serious errors, and there must be zero entries in the `errors` slice. In either case, there may be entries in the `warnings` slice. \n Regardless of the polarity, the `reason` and `message` fields must be updated with either the detail of the reason (if there is one and only one entry in total across both the `errors` and `warnings` slices), or `MultipleReasons` if there is more than one entry.",
+            "description": "DetailedCondition is an extension of the normal Kubernetes conditions, with two extra fields to hold sub-conditions, which provide more detailed reasons for the state (True or False) of the condition. \n `errors` holds information about sub-conditions which are fatal to that condition and render its state False. \n `warnings` holds information about sub-conditions which are not fatal to that condition and do not force the state to be False. \n Remember that Conditions have a type, a status, and a reason. \n The type is the type of the condition, the most important one in this CRD set is `Valid`. `Valid` is a positive-polarity condition: when it is `status: true` there are no problems. \n In more detail, `status: true` means that the object is has been ingested into Contour with no errors. `warnings` may still be present, and will be indicated in the Reason field. There must be zero entries in the `errors` slice in this case. \n `Valid`, `status: false` means that the object has had one or more fatal errors during processing into Contour. The details of the errors will be present under the `errors` field. There must be at least one error in the `errors` slice if `status` is `false`. \n For DetailedConditions of types other than `Valid`, the Condition must be in the negative polarity. When they have `status` `true`, there is an error. There must be at least one entry in the `errors` Subcondition slice. When they have `status` `false`, there are no serious errors, and there must be zero entries in the `errors` slice. In either case, there may be entries in the `warnings` slice. \n Regardless of the polarity, the `reason` and `message` fields must be updated with either the detail of the reason (if there is one and only one entry in total across both the `errors` and `warnings` slices), or `MultipleReasons` if there is more than one entry.",
             "properties": {
               "errors": {
                 "description": "Errors contains a slice of relevant error subconditions for this object. \n Subconditions are expected to appear when relevant (when there is a error), and disappear when not relevant. An empty slice here indicates no errors.",

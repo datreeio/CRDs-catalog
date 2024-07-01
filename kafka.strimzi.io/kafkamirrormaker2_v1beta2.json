@@ -1,7 +1,18 @@
 {
   "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
     "spec": {
-      "description": "The specification of the Kafka MirrorMaker 2.0 cluster.",
+      "description": "The specification of the Kafka MirrorMaker 2 cluster.",
       "properties": {
         "clientRackInitImage": {
           "description": "The image of the init container used for initializing the `client.rack`.",
@@ -63,9 +74,9 @@
                       }
                     },
                     "required": [
-                      "certificate",
                       "key",
-                      "secretName"
+                      "secretName",
+                      "certificate"
                     ],
                     "type": "object",
                     "additionalProperties": false
@@ -105,6 +116,18 @@
                     "description": "Enable or disable OAuth metrics. Default value is `false`.",
                     "type": "boolean"
                   },
+                  "httpRetries": {
+                    "description": "The maximum number of retries to attempt if an initial HTTP request fails. If not set, the default is to not attempt any retries.",
+                    "type": "integer"
+                  },
+                  "httpRetryPauseMs": {
+                    "description": "The pause to take before retrying a failed HTTP request. If not set, the default is to not pause at all but to immediately repeat a request.",
+                    "type": "integer"
+                  },
+                  "includeAcceptHeader": {
+                    "description": "Whether the Accept header should be set in requests to the authorization servers. The default value is `true`.",
+                    "type": "boolean"
+                  },
                   "maxTokenExpirySeconds": {
                     "description": "Set or limit time-to-live of the access tokens to the specified number of seconds. This should be set if the authorization server returns opaque tokens.",
                     "type": "integer"
@@ -122,8 +145,8 @@
                       }
                     },
                     "required": [
-                      "password",
-                      "secretName"
+                      "secretName",
+                      "password"
                     ],
                     "type": "object",
                     "additionalProperties": false
@@ -169,8 +192,8 @@
                         }
                       },
                       "required": [
-                        "certificate",
-                        "secretName"
+                        "secretName",
+                        "certificate"
                       ],
                       "type": "object",
                       "additionalProperties": false
@@ -208,12 +231,12 @@
                 "type": "string"
               },
               "config": {
-                "description": "The MirrorMaker 2.0 cluster config. Properties with the following prefixes cannot be set: ssl., sasl., security., listeners, plugin.path, rest., bootstrap.servers, consumer.interceptor.classes, producer.interceptor.classes (with the exception of: ssl.endpoint.identification.algorithm, ssl.cipher.suites, ssl.protocol, ssl.enabled.protocols).",
+                "description": "The MirrorMaker 2 cluster config. Properties with the following prefixes cannot be set: ssl., sasl., security., listeners, plugin.path, rest., bootstrap.servers, consumer.interceptor.classes, producer.interceptor.classes (with the exception of: ssl.endpoint.identification.algorithm, ssl.cipher.suites, ssl.protocol, ssl.enabled.protocols).",
                 "type": "object",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "tls": {
-                "description": "TLS configuration for connecting MirrorMaker 2.0 connectors to a cluster.",
+                "description": "TLS configuration for connecting MirrorMaker 2 connectors to a cluster.",
                 "properties": {
                   "trustedCertificates": {
                     "description": "Trusted certificates for TLS connection.",
@@ -229,8 +252,8 @@
                         }
                       },
                       "required": [
-                        "certificate",
-                        "secretName"
+                        "secretName",
+                        "certificate"
                       ],
                       "type": "object",
                       "additionalProperties": false
@@ -252,7 +275,7 @@
           "type": "array"
         },
         "connectCluster": {
-          "description": "The cluster alias used for Kafka Connect. The alias must match a cluster in the list at `spec.clusters`.",
+          "description": "The cluster alias used for Kafka Connect. The value must match the alias of the *target* Kafka cluster as specified in the `spec.clusters` configuration. The target Kafka cluster is used by the underlying Kafka Connect framework for its internal topics.",
           "type": "string"
         },
         "externalConfiguration": {
@@ -405,7 +428,7 @@
           "additionalProperties": false
         },
         "image": {
-          "description": "The docker image for the pods.",
+          "description": "The container image used for Kafka Connect pods. If no image name is explicitly specified, it is determined based on the `spec.version` configuration. The image names are specifically mapped to corresponding versions in the Cluster Operator configuration.",
           "type": "string"
         },
         "jmxOptions": {
@@ -436,9 +459,11 @@
           "description": "JVM Options for pods.",
           "properties": {
             "-XX": {
+              "additionalProperties": {
+                "type": "string"
+              },
               "description": "A map of -XX options to the JVM.",
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "type": "object"
             },
             "-Xms": {
               "description": "-Xms option to to the JVM.",
@@ -512,9 +537,11 @@
           "description": "Logging configuration for Kafka Connect.",
           "properties": {
             "loggers": {
+              "additionalProperties": {
+                "type": "string"
+              },
               "description": "A Map from logger name to logger level.",
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "type": "object"
             },
             "type": {
               "description": "Logging type, must be either 'inline' or 'external'.",
@@ -565,7 +592,7 @@
               "type": "string"
             },
             "valueFrom": {
-              "description": "ConfigMap entry where the Prometheus JMX Exporter configuration is stored. For details of the structure of this configuration, see the {JMXExporter}.",
+              "description": "ConfigMap entry where the Prometheus JMX Exporter configuration is stored. ",
               "properties": {
                 "configMapKeyRef": {
                   "description": "Reference to the key in the ConfigMap containing the configuration.",
@@ -596,11 +623,11 @@
           "additionalProperties": false
         },
         "mirrors": {
-          "description": "Configuration of the MirrorMaker 2.0 connectors.",
+          "description": "Configuration of the MirrorMaker 2 connectors.",
           "items": {
             "properties": {
               "checkpointConnector": {
-                "description": "The specification of the Kafka MirrorMaker 2.0 checkpoint connector.",
+                "description": "The specification of the Kafka MirrorMaker 2 checkpoint connector.",
                 "properties": {
                   "autoRestart": {
                     "description": "Automatic restart of connector and tasks configuration.",
@@ -608,6 +635,10 @@
                       "enabled": {
                         "description": "Whether automatic restart for failed connectors and tasks should be enabled or disabled.",
                         "type": "boolean"
+                      },
+                      "maxRestarts": {
+                        "description": "The maximum number of connector restarts that the operator will try. If the connector remains in a failed state after reaching this limit, it must be restarted manually by the user. Defaults to an unlimited number of restarts.",
+                        "type": "integer"
                       }
                     },
                     "type": "object",
@@ -621,6 +652,15 @@
                   "pause": {
                     "description": "Whether the connector should be paused. Defaults to false.",
                     "type": "boolean"
+                  },
+                  "state": {
+                    "description": "The state the connector should be in. Defaults to running.",
+                    "enum": [
+                      "paused",
+                      "stopped",
+                      "running"
+                    ],
+                    "type": "string"
                   },
                   "tasksMax": {
                     "description": "The maximum number of tasks for the Kafka Connector.",
@@ -644,7 +684,7 @@
                 "type": "string"
               },
               "heartbeatConnector": {
-                "description": "The specification of the Kafka MirrorMaker 2.0 heartbeat connector.",
+                "description": "The specification of the Kafka MirrorMaker 2 heartbeat connector.",
                 "properties": {
                   "autoRestart": {
                     "description": "Automatic restart of connector and tasks configuration.",
@@ -652,6 +692,10 @@
                       "enabled": {
                         "description": "Whether automatic restart for failed connectors and tasks should be enabled or disabled.",
                         "type": "boolean"
+                      },
+                      "maxRestarts": {
+                        "description": "The maximum number of connector restarts that the operator will try. If the connector remains in a failed state after reaching this limit, it must be restarted manually by the user. Defaults to an unlimited number of restarts.",
+                        "type": "integer"
                       }
                     },
                     "type": "object",
@@ -665,6 +709,15 @@
                   "pause": {
                     "description": "Whether the connector should be paused. Defaults to false.",
                     "type": "boolean"
+                  },
+                  "state": {
+                    "description": "The state the connector should be in. Defaults to running.",
+                    "enum": [
+                      "paused",
+                      "stopped",
+                      "running"
+                    ],
+                    "type": "string"
                   },
                   "tasksMax": {
                     "description": "The maximum number of tasks for the Kafka Connector.",
@@ -676,11 +729,11 @@
                 "additionalProperties": false
               },
               "sourceCluster": {
-                "description": "The alias of the source cluster used by the Kafka MirrorMaker 2.0 connectors. The alias must match a cluster in the list at `spec.clusters`.",
+                "description": "The alias of the source cluster used by the Kafka MirrorMaker 2 connectors. The alias must match a cluster in the list at `spec.clusters`.",
                 "type": "string"
               },
               "sourceConnector": {
-                "description": "The specification of the Kafka MirrorMaker 2.0 source connector.",
+                "description": "The specification of the Kafka MirrorMaker 2 source connector.",
                 "properties": {
                   "autoRestart": {
                     "description": "Automatic restart of connector and tasks configuration.",
@@ -688,6 +741,10 @@
                       "enabled": {
                         "description": "Whether automatic restart for failed connectors and tasks should be enabled or disabled.",
                         "type": "boolean"
+                      },
+                      "maxRestarts": {
+                        "description": "The maximum number of connector restarts that the operator will try. If the connector remains in a failed state after reaching this limit, it must be restarted manually by the user. Defaults to an unlimited number of restarts.",
+                        "type": "integer"
                       }
                     },
                     "type": "object",
@@ -702,6 +759,15 @@
                     "description": "Whether the connector should be paused. Defaults to false.",
                     "type": "boolean"
                   },
+                  "state": {
+                    "description": "The state the connector should be in. Defaults to running.",
+                    "enum": [
+                      "paused",
+                      "stopped",
+                      "running"
+                    ],
+                    "type": "string"
+                  },
                   "tasksMax": {
                     "description": "The maximum number of tasks for the Kafka Connector.",
                     "minimum": 1,
@@ -712,7 +778,7 @@
                 "additionalProperties": false
               },
               "targetCluster": {
-                "description": "The alias of the target cluster used by the Kafka MirrorMaker 2.0 connectors. The alias must match a cluster in the list at `spec.clusters`.",
+                "description": "The alias of the target cluster used by the Kafka MirrorMaker 2 connectors. The alias must match a cluster in the list at `spec.clusters`.",
                 "type": "string"
               },
               "topicsBlacklistPattern": {
@@ -741,7 +807,7 @@
           "description": "Configuration of the node label which will be used as the `client.rack` consumer configuration.",
           "properties": {
             "topologyKey": {
-              "description": "A key that matches labels assigned to the Kubernetes cluster nodes. The value of the label is used to set a broker's `broker.rack` config, and the `client.rack` config for Kafka Connect or MirrorMaker 2.0.",
+              "description": "A key that matches labels assigned to the Kubernetes cluster nodes. The value of the label is used to set a broker's `broker.rack` config, and the `client.rack` config for Kafka Connect or MirrorMaker 2.",
               "example": "topology.kubernetes.io/zone",
               "type": "string"
             }
@@ -785,32 +851,66 @@
           "additionalProperties": false
         },
         "replicas": {
-          "description": "The number of pods in the Kafka Connect group.",
+          "description": "The number of pods in the Kafka Connect group. Defaults to `3`.",
           "type": "integer"
         },
         "resources": {
           "description": "The maximum limits for CPU and memory resources and the requested initial resources.",
           "properties": {
+            "claims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
             "limits": {
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                "x-kubernetes-int-or-string": true
+              },
+              "type": "object"
             },
             "requests": {
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                "x-kubernetes-int-or-string": true
+              },
+              "type": "object"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
         "template": {
-          "description": "Template for Kafka Connect and Kafka Mirror Maker 2 resources. The template allows users to specify how the `Deployment`, `Pods` and `Service` are generated.",
+          "description": "Template for Kafka Connect and Kafka Mirror Maker 2 resources. The template allows users to specify how the `Pods`, `Service`, and other services are generated.",
           "properties": {
             "apiService": {
               "description": "Template for Kafka Connect API `Service`.",
               "properties": {
                 "ipFamilies": {
-                  "description": "Specifies the IP Families used by the service. Available options are `IPv4` and `IPv6. If unspecified, Kubernetes will choose the default value based on the `ipFamilyPolicy` setting. Available on Kubernetes 1.20 and newer.",
+                  "description": "Specifies the IP Families used by the service. Available options are `IPv4` and `IPv6`. If unspecified, Kubernetes will choose the default value based on the `ipFamilyPolicy` setting.",
                   "items": {
                     "enum": [
                       "IPv4",
@@ -821,7 +921,7 @@
                   "type": "array"
                 },
                 "ipFamilyPolicy": {
-                  "description": "Specifies the IP Family Policy used by the service. Available options are `SingleStack`, `PreferDualStack` and `RequireDualStack`. `SingleStack` is for a single IP family. `PreferDualStack` is for two IP families on dual-stack configured clusters or a single IP family on single-stack clusters. `RequireDualStack` fails unless there are two IP families on dual-stack configured clusters. If unspecified, Kubernetes will choose the default value based on the service type. Available on Kubernetes 1.20 and newer.",
+                  "description": "Specifies the IP Family Policy used by the service. Available options are `SingleStack`, `PreferDualStack` and `RequireDualStack`. `SingleStack` is for a single IP family. `PreferDualStack` is for two IP families on dual-stack configured clusters or a single IP family on single-stack clusters. `RequireDualStack` fails unless there are two IP families on dual-stack configured clusters. If unspecified, Kubernetes will choose the default value based on the service type.",
                   "enum": [
                     "SingleStack",
                     "PreferDualStack",
@@ -833,14 +933,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -857,14 +961,18 @@
                   "description": "Metadata to apply to the `PodDisruptionBudgetTemplate` resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -1157,12 +1265,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -1188,8 +1310,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -1244,12 +1368,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -1275,8 +1413,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -1332,12 +1472,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -1363,8 +1517,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -1419,12 +1575,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -1450,8 +1620,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -1520,21 +1692,25 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
                   "additionalProperties": false
                 },
                 "priorityClassName": {
-                  "description": "The name of the priority class used to assign priority to the pods. For more information about priority classes, see {K8sPriorityClass}.",
+                  "description": "The name of the priority class used to assign priority to the pods. ",
                   "type": "string"
                 },
                 "schedulerName": {
@@ -1695,8 +1871,10 @@
                             "type": "array"
                           },
                           "matchLabels": {
-                            "type": "object",
-                            "x-kubernetes-preserve-unknown-fields": true
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
                           }
                         },
                         "type": "object",
@@ -1743,14 +1921,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -1767,14 +1949,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -1918,14 +2104,66 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "headlessService": {
+              "description": "Template for Kafka Connect headless `Service`.",
+              "properties": {
+                "ipFamilies": {
+                  "description": "Specifies the IP Families used by the service. Available options are `IPv4` and `IPv6`. If unspecified, Kubernetes will choose the default value based on the `ipFamilyPolicy` setting.",
+                  "items": {
+                    "enum": [
+                      "IPv4",
+                      "IPv6"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "ipFamilyPolicy": {
+                  "description": "Specifies the IP Family Policy used by the service. Available options are `SingleStack`, `PreferDualStack` and `RequireDualStack`. `SingleStack` is for a single IP family. `PreferDualStack` is for two IP families on dual-stack configured clusters or a single IP family on single-stack clusters. `RequireDualStack` fails unless there are two IP families on dual-stack configured clusters. If unspecified, Kubernetes will choose the default value based on the service type.",
+                  "enum": [
+                    "SingleStack",
+                    "PreferDualStack",
+                    "RequireDualStack"
+                  ],
+                  "type": "string"
+                },
+                "metadata": {
+                  "description": "Metadata applied to the resource.",
+                  "properties": {
+                    "annotations": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -2061,14 +2299,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -2238,12 +2480,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -2269,8 +2525,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -2325,12 +2583,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -2356,8 +2628,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -2413,12 +2687,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -2444,8 +2732,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -2500,12 +2790,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -2531,8 +2835,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -2601,21 +2907,25 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
                   "additionalProperties": false
                 },
                 "priorityClassName": {
-                  "description": "The name of the priority class used to assign priority to the pods. For more information about priority classes, see {K8sPriorityClass}.",
+                  "description": "The name of the priority class used to assign priority to the pods. ",
                   "type": "string"
                 },
                 "schedulerName": {
@@ -2776,8 +3086,10 @@
                             "type": "array"
                           },
                           "matchLabels": {
-                            "type": "object",
-                            "x-kubernetes-preserve-unknown-fields": true
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
                           }
                         },
                         "type": "object",
@@ -2829,14 +3141,46 @@
                   "description": "Metadata to apply to the `PodDisruptionBudgetTemplate` resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "podSet": {
+              "description": "Template for Kafka Connect `StrimziPodSet` resource.",
+              "properties": {
+                "metadata": {
+                  "description": "Metadata applied to the resource.",
+                  "properties": {
+                    "annotations": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -2853,14 +3197,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -2878,7 +3226,7 @@
           "description": "The configuration of tracing in Kafka Connect.",
           "properties": {
             "type": {
-              "description": "Type of the tracing used. Currently the only supported types are `jaeger` for OpenTracing (Jaeger) tracing and `opentelemetry` for OpenTelemetry tracing. The OpenTracing (Jaeger) tracing is deprecated.",
+              "description": "Type of the tracing used. Currently the only supported type is `opentelemetry` for OpenTelemetry tracing. As of Strimzi 0.37.0, `jaeger` type is not supported anymore and this option is ignored.",
               "enum": [
                 "jaeger",
                 "opentelemetry"
@@ -2893,7 +3241,7 @@
           "additionalProperties": false
         },
         "version": {
-          "description": "The Kafka Connect version. Defaults to {DefaultKafkaVersion}. Consult the user documentation to understand the process required to upgrade or downgrade the version.",
+          "description": "The Kafka Connect version. Defaults to the latest version. Consult the user documentation to understand the process required to upgrade or downgrade the version.",
           "type": "string"
         }
       },
@@ -2904,10 +3252,10 @@
       "additionalProperties": false
     },
     "status": {
-      "description": "The status of the Kafka MirrorMaker 2.0 cluster.",
+      "description": "The status of the Kafka MirrorMaker 2 cluster.",
       "properties": {
         "autoRestartStatuses": {
-          "description": "List of MirrorMaker 2.0 connector auto restart statuses.",
+          "description": "List of MirrorMaker 2 connector auto restart statuses.",
           "items": {
             "properties": {
               "connectorName": {
@@ -2981,7 +3329,7 @@
           "type": "array"
         },
         "connectors": {
-          "description": "List of MirrorMaker 2.0 connector statuses, as reported by the Kafka Connect REST API.",
+          "description": "List of MirrorMaker 2 connector statuses, as reported by the Kafka Connect REST API.",
           "items": {
             "type": "object",
             "x-kubernetes-preserve-unknown-fields": true

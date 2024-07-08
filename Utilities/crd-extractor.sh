@@ -56,7 +56,7 @@ NUM_OF_CRDS=0
 while read -r crd
 do
     filename=${crd%% *}
-    kubectl get crds "$filename" -o yaml > "$TMP_CRD_DIR/$filename.yaml" 2>&1q
+    kubectl get crds "$filename" -o yaml > "$TMP_CRD_DIR/$filename.yaml" 2>&1
 
     resourceKind=$(yq -r '.spec.names.singular' "$TMP_CRD_DIR/$filename.yaml")
     resourceGroup=$(yq -r '.spec.group' "$TMP_CRD_DIR/$filename.yaml")

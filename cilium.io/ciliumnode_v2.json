@@ -96,6 +96,10 @@
           "type": "object",
           "additionalProperties": false
         },
+        "bootid": {
+          "description": "BootID is a unique node identifier generated on boot",
+          "type": "string"
+        },
         "encryption": {
           "description": "Encryption is the encryption configuration of the node.",
           "properties": {
@@ -236,6 +240,25 @@
         "ipam": {
           "description": "IPAM is the address management specification. This section can be populated by a user or it can be automatically populated by an IPAM operator.",
           "properties": {
+            "ipv6-pool": {
+              "additionalProperties": {
+                "description": "AllocationIP is an IP which is available for allocation, or already has been allocated",
+                "properties": {
+                  "owner": {
+                    "description": "Owner is the owner of the IP. This field is set if the IP has been allocated. It will be set to the pod name or another identifier representing the usage of the IP \n The owner field is left blank for an entry in Spec.IPAM.Pool and filled out as the IP is used and also added to Status.IPAM.Used.",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "description": "Resource is set for both available and allocated IPs, it represents what resource the IP is associated with, e.g. in combination with AWS ENI, this will refer to the ID of the ENI",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "description": "IPv6Pool is the list of IPv6 addresses available to the node for allocation. When an IPv6 address is used, it will remain on this list but will be added to Status.IPAM.IPv6Used",
+              "type": "object"
+            },
             "max-above-watermark": {
               "description": "MaxAboveWatermark is the maximum number of addresses to allocate beyond the addresses needed to reach the PreAllocate watermark. Going above the watermark can help reduce the number of API calls to allocate IPs, e.g. when a new ENI is allocated, as many secondary IPs as possible are allocated. Limiting the amount can help reduce waste of IPs.",
               "minimum": 0,
@@ -248,16 +271,6 @@
             },
             "min-allocate": {
               "description": "MinAllocate is the minimum number of IPs that must be allocated when the node is first bootstrapped. It defines the minimum base socket of addresses that must be available. After reaching this watermark, the PreAllocate and MaxAboveWatermark logic takes over to continue allocating IPs.",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "pod-cidr-allocation-threshold": {
-              "description": "PodCIDRAllocationThreshold defines the minimum number of free IPs which must be available to this node via its pod CIDR pool. If the total number of IP addresses in the pod CIDR pool is less than this value, the pod CIDRs currently in-use by this node will be marked as depleted and cilium-operator will allocate a new pod CIDR to this node. This value effectively defines the buffer of IP addresses available immediately without requiring cilium-operator to get involved.",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "pod-cidr-release-threshold": {
-              "description": "PodCIDRReleaseThreshold defines the maximum number of free IPs which may be available to this node via its pod CIDR pool. While the total number of free IP addresses in the pod CIDR pool is larger than this value, cilium-agent will attempt to release currently unused pod CIDRs.",
               "minimum": 0,
               "type": "integer"
             },
@@ -284,7 +297,7 @@
                 "type": "object",
                 "additionalProperties": false
               },
-              "description": "Pool is the list of IPs available to the node for allocation. When an IP is used, the IP will remain on this list but will be added to Status.IPAM.Used",
+              "description": "Pool is the list of IPv4 addresses available to the node for allocation. When an IPv4 address is used, it will remain on this list but will be added to Status.IPAM.Used",
               "type": "object"
             },
             "pools": {
@@ -444,6 +457,13 @@
                       "ipv6-cidr": {
                         "description": "IPv6CIDRBlock is the VPC IPv6 CIDR",
                         "type": "string"
+                      },
+                      "secondary-cidrs": {
+                        "description": "SecondaryCIDRs is the list of Secondary CIDRs associated with the VPC",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
                       },
                       "vpc-id": {
                         "description": "VPCID is the vpc to which the ENI belongs",
@@ -670,6 +690,25 @@
         "ipam": {
           "description": "IPAM is the IPAM status of the node.",
           "properties": {
+            "ipv6-used": {
+              "additionalProperties": {
+                "description": "AllocationIP is an IP which is available for allocation, or already has been allocated",
+                "properties": {
+                  "owner": {
+                    "description": "Owner is the owner of the IP. This field is set if the IP has been allocated. It will be set to the pod name or another identifier representing the usage of the IP \n The owner field is left blank for an entry in Spec.IPAM.Pool and filled out as the IP is used and also added to Status.IPAM.Used.",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "description": "Resource is set for both available and allocated IPs, it represents what resource the IP is associated with, e.g. in combination with AWS ENI, this will refer to the ID of the ENI",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "description": "IPv6Used lists all IPv6 addresses out of Spec.IPAM.IPv6Pool which have been allocated and are in use.",
+              "type": "object"
+            },
             "operator-status": {
               "description": "Operator is the Operator status of the node",
               "properties": {
@@ -702,7 +741,7 @@
             },
             "release-ips": {
               "additionalProperties": {
-                "description": "IPReleaseStatus  defines the valid states in IP release handshake",
+                "description": "IPReleaseStatus defines the valid states in IP release handshake",
                 "enum": [
                   "marked-for-release",
                   "ready-for-release",
@@ -711,7 +750,21 @@
                 ],
                 "type": "string"
               },
-              "description": "ReleaseIPs tracks the state for every IP considered for release. value can be one of the following string : * marked-for-release : Set by operator as possible candidate for IP * ready-for-release  : Acknowledged as safe to release by agent * do-not-release     : IP already in use / not owned by the node. Set by agent * released           : IP successfully released. Set by operator",
+              "description": "ReleaseIPs tracks the state for every IPv4 address considered for release. The value can be one of the following strings: * marked-for-release : Set by operator as possible candidate for IP * ready-for-release  : Acknowledged as safe to release by agent * do-not-release     : IP already in use / not owned by the node. Set by agent * released           : IP successfully released. Set by operator",
+              "type": "object"
+            },
+            "release-ipv6s": {
+              "additionalProperties": {
+                "description": "IPReleaseStatus defines the valid states in IP release handshake",
+                "enum": [
+                  "marked-for-release",
+                  "ready-for-release",
+                  "do-not-release",
+                  "released"
+                ],
+                "type": "string"
+              },
+              "description": "ReleaseIPv6s tracks the state for every IPv6 address considered for release. The value can be one of the following strings: * marked-for-release : Set by operator as possible candidate for IP * ready-for-release  : Acknowledged as safe to release by agent * do-not-release     : IP already in use / not owned by the node. Set by agent * released           : IP successfully released. Set by operator",
               "type": "object"
             },
             "used": {
@@ -730,7 +783,7 @@
                 "type": "object",
                 "additionalProperties": false
               },
-              "description": "Used lists all IPs out of Spec.IPAM.Pool which have been allocated and are in use.",
+              "description": "Used lists all IPv4 addresses out of Spec.IPAM.Pool which have been allocated and are in use.",
               "type": "object"
             }
           },

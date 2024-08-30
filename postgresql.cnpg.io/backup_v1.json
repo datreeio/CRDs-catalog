@@ -2,18 +2,18 @@
   "description": "Backup is the Schema for the backups API",
   "properties": {
     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
       "type": "string"
     },
     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
       "type": "string"
     },
     "metadata": {
       "type": "object"
     },
     "spec": {
-      "description": "Specification of the desired behavior of the backup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+      "description": "Specification of the desired behavior of the backup.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
       "properties": {
         "cluster": {
           "description": "The cluster to backup",
@@ -29,8 +29,59 @@
           "type": "object",
           "additionalProperties": false
         },
+        "method": {
+          "default": "barmanObjectStore",
+          "description": "The backup method to be used, possible options are `barmanObjectStore`,\n`volumeSnapshot` or `plugin`. Defaults to: `barmanObjectStore`.",
+          "enum": [
+            "barmanObjectStore",
+            "volumeSnapshot",
+            "plugin"
+          ],
+          "type": "string"
+        },
+        "online": {
+          "description": "Whether the default type of backup with volume snapshots is\nonline/hot (`true`, default) or offline/cold (`false`)\nOverrides the default setting specified in the cluster field '.spec.backup.volumeSnapshot.online'",
+          "type": "boolean"
+        },
+        "onlineConfiguration": {
+          "description": "Configuration parameters to control the online/hot backup with volume snapshots\nOverrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza",
+          "properties": {
+            "immediateCheckpoint": {
+              "description": "Control whether the I/O workload for the backup initial checkpoint will\nbe limited, according to the `checkpoint_completion_target` setting on\nthe PostgreSQL server. If set to true, an immediate checkpoint will be\nused, meaning PostgreSQL will complete the checkpoint as soon as\npossible. `false` by default.",
+              "type": "boolean"
+            },
+            "waitForArchive": {
+              "default": true,
+              "description": "If false, the function will return immediately after the backup is completed,\nwithout waiting for WAL to be archived.\nThis behavior is only useful with backup software that independently monitors WAL archiving.\nOtherwise, WAL required to make the backup consistent might be missing and make the backup useless.\nBy default, or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is\nenabled.\nOn a standby, this means that it will wait only when archive_mode = always.\nIf write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger\nan immediate segment switch.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "pluginConfiguration": {
+          "description": "Configuration parameters passed to the plugin managing this backup",
+          "properties": {
+            "name": {
+              "description": "Name is the name of the plugin managing this backup",
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Parameters are the configuration parameters passed to the backup\nplugin for this backup",
+              "type": "object"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "target": {
-          "description": "The policy to decide which instance should perform this backup. If empty, it defaults to `cluster.spec.backup.target`. Available options are empty string, `primary` and `prefer-standby`. `primary` to have backups run always on primary instances, `prefer-standby` to have backups run preferably on the most updated standby, if available.",
+          "description": "The policy to decide which instance should perform this backup. If empty,\nit defaults to `cluster.spec.backup.target`.\nAvailable options are empty string, `primary` and `prefer-standby`.\n`primary` to have backups run always on primary instances,\n`prefer-standby` to have backups run preferably on the most updated\nstandby, if available.",
           "enum": [
             "primary",
             "prefer-standby"
@@ -38,11 +89,14 @@
           "type": "string"
         }
       },
+      "required": [
+        "cluster"
+      ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Most recently observed status of the backup. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+      "description": "Most recently observed status of the backup. This data may not be up to\ndate. Populated by the system. Read-only.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
       "properties": {
         "azureCredentials": {
           "description": "The credentials to use to upload data to Azure Blob Storage",
@@ -90,7 +144,7 @@
               "additionalProperties": false
             },
             "storageKey": {
-              "description": "The storage account key to be used in conjunction with the storage account name",
+              "description": "The storage account key to be used in conjunction\nwith the storage account name",
               "properties": {
                 "key": {
                   "description": "The key to select",
@@ -109,7 +163,7 @@
               "additionalProperties": false
             },
             "storageSasToken": {
-              "description": "A shared-access-signature to be used in conjunction with the storage account name",
+              "description": "A shared-access-signature to be used in conjunction with\nthe storage account name",
               "properties": {
                 "key": {
                   "description": "The key to select",
@@ -135,6 +189,11 @@
           "description": "The ID of the Barman backup",
           "type": "string"
         },
+        "backupLabelFile": {
+          "description": "Backup label file content as returned by Postgres in case of online (hot) backups",
+          "format": "byte",
+          "type": "string"
+        },
         "backupName": {
           "description": "The Name of the Barman backup",
           "type": "string"
@@ -156,7 +215,7 @@
           "type": "string"
         },
         "destinationPath": {
-          "description": "The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data. This may not be populated in case of errors.",
+          "description": "The path where to store the backup (i.e. s3://bucket/path/to/folder)\nthis path, with different destination folders, will be used for WALs\nand for data. This may not be populated in case of errors.",
           "type": "string"
         },
         "encryption": {
@@ -172,7 +231,7 @@
           "type": "string"
         },
         "endpointCA": {
-          "description": "EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive.",
+          "description": "EndpointCA store the CA bundle of the barman endpoint.\nUseful when using self-signed certificates to avoid\nerrors with certificate issuer and barman-cloud-wal-archive.",
           "properties": {
             "key": {
               "description": "The key to select",
@@ -191,7 +250,7 @@
           "additionalProperties": false
         },
         "endpointURL": {
-          "description": "Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery",
+          "description": "Endpoint to be used to upload data to the cloud,\noverriding the automatic endpoint discovery",
           "type": "string"
         },
         "error": {
@@ -221,7 +280,7 @@
               "additionalProperties": false
             },
             "gkeEnvironment": {
-              "description": "If set to true, will presume that it's running inside a GKE environment, default to false.",
+              "description": "If set to true, will presume that it's running inside a GKE environment,\ndefault to false.",
               "type": "boolean"
             }
           },
@@ -242,6 +301,14 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "method": {
+          "description": "The backup method being used",
+          "type": "string"
+        },
+        "online": {
+          "description": "Whether the backup was online/hot (`true`) or offline/cold (`false`)",
+          "type": "boolean"
         },
         "phase": {
           "description": "The last backup status",
@@ -335,8 +402,42 @@
           "additionalProperties": false
         },
         "serverName": {
-          "description": "The server name on S3, the cluster name is used if this parameter is omitted",
+          "description": "The server name on S3, the cluster name is used if this\nparameter is omitted",
           "type": "string"
+        },
+        "snapshotBackupStatus": {
+          "description": "Status of the volumeSnapshot backup",
+          "properties": {
+            "elements": {
+              "description": "The elements list, populated with the gathered volume snapshots",
+              "items": {
+                "description": "BackupSnapshotElementStatus is a volume snapshot that is part of a volume snapshot method backup",
+                "properties": {
+                  "name": {
+                    "description": "Name is the snapshot resource name",
+                    "type": "string"
+                  },
+                  "tablespaceName": {
+                    "description": "TablespaceName is the name of the snapshotted tablespace. Only set\nwhen type is PG_TABLESPACE",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "startedAt": {
           "description": "When the backup was started",
@@ -347,11 +448,20 @@
           "description": "When the backup was terminated",
           "format": "date-time",
           "type": "string"
+        },
+        "tablespaceMapFile": {
+          "description": "Tablespace map file content as returned by Postgres in case of online (hot) backups",
+          "format": "byte",
+          "type": "string"
         }
       },
       "type": "object",
       "additionalProperties": false
     }
   },
+  "required": [
+    "metadata",
+    "spec"
+  ],
   "type": "object"
 }

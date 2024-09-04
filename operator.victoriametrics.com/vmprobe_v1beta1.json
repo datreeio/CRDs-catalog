@@ -58,7 +58,7 @@
           "description": "BasicAuth allow an endpoint to authenticate over basic authentication",
           "properties": {
             "password": {
-              "description": "The secret in the service scrape namespace that contains the password\nfor authentication.\nIt must be at them same namespace as CRD",
+              "description": "Password defines reference for secret with password value\nThe secret needs to be in the same namespace as scrape object",
               "properties": {
                 "key": {
                   "description": "The key of the secret to select from.  Must be a valid secret key.",
@@ -82,11 +82,11 @@
               "additionalProperties": false
             },
             "password_file": {
-              "description": "PasswordFile defines path to password file at disk",
+              "description": "PasswordFile defines path to password file at disk\nmust be pre-mounted",
               "type": "string"
             },
             "username": {
-              "description": "The secret in the service scrape namespace that contains the username\nfor authentication.\nIt must be at them same namespace as CRD",
+              "description": "Username defines reference for secret with username value\nThe secret needs to be in the same namespace as scrape object",
               "properties": {
                 "key": {
                   "description": "The key of the secret to select from.  Must be a valid secret key.",
@@ -118,7 +118,7 @@
           "type": "string"
         },
         "bearerTokenSecret": {
-          "description": "Secret to mount to read bearer token for scraping targets. The secret\nneeds to be in the same namespace as the service scrape and accessible by\nthe victoria-metrics operator.",
+          "description": "Secret to mount to read bearer token for scraping targets. The secret\nneeds to be in the same namespace as the scrape object and accessible by\nthe victoria-metrics operator.",
           "nullable": true,
           "properties": {
             "key": {
@@ -146,13 +146,94 @@
           "description": "FollowRedirects controls redirects for scraping.",
           "type": "boolean"
         },
+        "honorLabels": {
+          "description": "HonorLabels chooses the metric's labels on collisions with target labels.",
+          "type": "boolean"
+        },
+        "honorTimestamps": {
+          "description": "HonorTimestamps controls whether vmagent respects the timestamps present in scraped data.",
+          "type": "boolean"
+        },
         "interval": {
-          "description": "Interval at which targets are probed using the configured prober.\nIf not specified global scrape interval is used.",
+          "description": "Interval at which metrics should be scraped",
           "type": "string"
         },
         "jobName": {
           "description": "The job name assigned to scraped metrics by default.",
           "type": "string"
+        },
+        "max_scrape_size": {
+          "description": "MaxScrapeSize defines a maximum size of scraped data for a job",
+          "type": "string"
+        },
+        "metricRelabelConfigs": {
+          "description": "MetricRelabelConfigs to apply to samples after scrapping.",
+          "items": {
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "properties": {
+              "action": {
+                "description": "Action to perform based on regex matching. Default is 'replace'",
+                "type": "string"
+              },
+              "if": {
+                "description": "If represents metricsQL match expression (or list of expressions): '{__name__=~\"foo_.*\"}'",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Labels is used together with Match for `action: graphite`",
+                "type": "object"
+              },
+              "match": {
+                "description": "Match is used together with Labels for `action: graphite`",
+                "type": "string"
+              },
+              "modulus": {
+                "description": "Modulus to take of the hash of the source label values.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "regex": {
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "replacement": {
+                "description": "Replacement value against which a regex replace is performed if the\nregular expression matches. Regex capture groups are available. Default is '$1'",
+                "type": "string"
+              },
+              "separator": {
+                "description": "Separator placed between concatenated source label values. default is ';'.",
+                "type": "string"
+              },
+              "source_labels": {
+                "description": "UnderScoreSourceLabels - additional form of source labels source_labels\nfor compatibility with original relabel config.\nif set  both sourceLabels and source_labels, sourceLabels has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sourceLabels": {
+                "description": "The source labels select values from existing labels. Their content is concatenated\nusing the configured separator and matched against the configured regular expression\nfor the replace, keep, and drop actions.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "target_label": {
+                "description": "UnderScoreTargetLabel - additional form of target label - target_label\nfor compatibility with original relabel config.\nif set  both targetLabel and target_label, targetLabel has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "type": "string"
+              },
+              "targetLabel": {
+                "description": "Label to which the resulting value is written in a replace action.\nIt is mandatory for replace actions. Regex capture groups are available.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         },
         "module": {
           "description": "The module to use for probing specifying how to probe the target.\nExample module configuring in the blackbox exporter:\nhttps://github.com/prometheus/blackbox_exporter/blob/master/example.yml",
@@ -281,6 +362,10 @@
           "description": "Optional HTTP URL parameters",
           "type": "object"
         },
+        "path": {
+          "description": "HTTP path to scrape for metrics.",
+          "type": "string"
+        },
         "proxyURL": {
           "description": "ProxyURL eg http://proxyserver:2195 Directs scrapes to proxy through this endpoint.",
           "type": "string"
@@ -290,12 +375,20 @@
           "format": "int64",
           "type": "integer"
         },
+        "scheme": {
+          "description": "HTTP scheme to use for scraping.",
+          "enum": [
+            "http",
+            "https"
+          ],
+          "type": "string"
+        },
         "scrape_interval": {
           "description": "ScrapeInterval is the same as Interval and has priority over it.\none of scrape_interval or interval can be used",
           "type": "string"
         },
         "scrapeTimeout": {
-          "description": "Timeout for scraping metrics from the blackbox exporter.",
+          "description": "Timeout after which the scrape is ended",
           "type": "string"
         },
         "seriesLimit": {
@@ -709,10 +802,11 @@
           "description": "VMScrapeParams defines VictoriaMetrics specific scrape parameters",
           "properties": {
             "disable_compression": {
+              "description": "DisableCompression",
               "type": "boolean"
             },
             "disable_keep_alive": {
-              "description": "disable_keepalive allows disabling HTTP keep-alive when scraping targets.\nBy default, HTTP keep-alive is enabled, so TCP connections to scrape targets\ncould be re-used.\nSee https://docs.victoriametrics.com/vmagent.html#scrape_config-enhancements",
+              "description": "disable_keepalive allows disabling HTTP keep-alive when scraping targets.\nBy default, HTTP keep-alive is enabled, so TCP connections to scrape targets\ncould be re-used.\nSee https://docs.victoriametrics.com/vmagent#scrape_config-enhancements",
               "type": "boolean"
             },
             "headers": {
@@ -722,21 +816,17 @@
               },
               "type": "array"
             },
-            "metric_relabel_debug": {
-              "description": "deprecated since [v1.85](https://github.com/VictoriaMetrics/VictoriaMetrics/releases/tag/v1.85.0), will be removed in next release",
-              "type": "boolean"
-            },
             "no_stale_markers": {
               "type": "boolean"
             },
             "proxy_client_config": {
-              "description": "ProxyClientConfig configures proxy auth settings for scraping\nSee feature description https://docs.victoriametrics.com/vmagent.html#scraping-targets-via-a-proxy",
+              "description": "ProxyClientConfig configures proxy auth settings for scraping\nSee feature description https://docs.victoriametrics.com/vmagent#scraping-targets-via-a-proxy",
               "properties": {
                 "basic_auth": {
                   "description": "BasicAuth allow an endpoint to authenticate over basic authentication",
                   "properties": {
                     "password": {
-                      "description": "The secret in the service scrape namespace that contains the password\nfor authentication.\nIt must be at them same namespace as CRD",
+                      "description": "Password defines reference for secret with password value\nThe secret needs to be in the same namespace as scrape object",
                       "properties": {
                         "key": {
                           "description": "The key of the secret to select from.  Must be a valid secret key.",
@@ -760,11 +850,11 @@
                       "additionalProperties": false
                     },
                     "password_file": {
-                      "description": "PasswordFile defines path to password file at disk",
+                      "description": "PasswordFile defines path to password file at disk\nmust be pre-mounted",
                       "type": "string"
                     },
                     "username": {
-                      "description": "The secret in the service scrape namespace that contains the username\nfor authentication.\nIt must be at them same namespace as CRD",
+                      "description": "Username defines reference for secret with username value\nThe secret needs to be in the same namespace as scrape object",
                       "properties": {
                         "key": {
                           "description": "The key of the secret to select from.  Must be a valid secret key.",
@@ -983,10 +1073,6 @@
               "type": "object",
               "additionalProperties": false
             },
-            "relabel_debug": {
-              "description": "deprecated since [v1.85](https://github.com/VictoriaMetrics/VictoriaMetrics/releases/tag/v1.85.0), will be removed in next release",
-              "type": "boolean"
-            },
             "scrape_align_interval": {
               "type": "string"
             },
@@ -1034,8 +1120,19 @@
       "additionalProperties": false
     },
     "status": {
-      "description": "VMProbeStatus defines the observed state of VMProbe",
-      "type": "object"
+      "description": "ScrapeObjectStatus defines the observed state of ScrapeObjects",
+      "properties": {
+        "lastSyncError": {
+          "description": "LastSyncError contains error message for unsuccessful config generation",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status defines update status of resource",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
     }
   },
   "required": [

@@ -5,9 +5,10 @@ This repository aggregates hundreds of popular Kubernetes CRDs (`CustomResourceD
 Running Kubernetes schema validation checks helps apply the **"shift-left approach"** on machines **without** giving them access to your cluster (e.g. locally or on CI).
 
 ## How to use the schemas in the catalogs
+
 ### Kubeconform
 ```
-kubeconform -schema-location default -schema-location "https://gitlab-admin:${CI_JOB_TOKEN}@gitlab.greencap.io/devops/crds-catalog/-/raw/cm3/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" [MANIFEST]
+kubeconform -schema-location default -schema-location "https://raw.githubusercontent.com/wis-cm3/CRDs-catalog/cm3/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json" [MANIFEST]
 ```
 
 ---
@@ -34,7 +35,8 @@ The following programs are required to be installed on the machine running this 
 ### Usage
 To use the CRD Extractor:  
 1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
-2. Extract, and run the utility:
+2. Have your kube context pointing to the cluster you want to grab crds from.
+3. Extract, and run the utility:
 ```
 ./crd-extractor.sh
 ```

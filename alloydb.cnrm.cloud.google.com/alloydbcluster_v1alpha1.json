@@ -161,6 +161,10 @@
           "type": "object",
           "additionalProperties": false
         },
+        "clusterType": {
+          "description": "The type of cluster. If not set, defaults to PRIMARY. Default value: \"PRIMARY\" Possible values: [\"PRIMARY\", \"SECONDARY\"].",
+          "type": "string"
+        },
         "continuousBackupConfig": {
           "description": "The continuous backup config for this cluster.\n\nIf no policy is provided then the default policy will be used. The default policy takes one backup a day and retains backups for 14 days.",
           "properties": {
@@ -232,6 +236,10 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "deletionPolicy": {
+          "description": "Policy to determine if the cluster should be deleted forcefully.\nDeleting a cluster forcefully, deletes the cluster and all its associated instances within the cluster.\nDeleting a Secondary cluster with a secondary instance REQUIRES setting deletion_policy = \"FORCE\" otherwise an error is returned. This is needed as there is no support to delete just the secondary instance, and the only way to delete secondary instance is to delete the associated secondary cluster forcefully which also deletes the secondary instance.",
+          "type": "string"
         },
         "displayName": {
           "description": "User-settable and human-readable display name for the Cluster.",
@@ -370,6 +378,57 @@
         "location": {
           "description": "Immutable. The location where the alloydb cluster should reside.",
           "type": "string"
+        },
+        "maintenanceUpdatePolicy": {
+          "description": "MaintenanceUpdatePolicy defines the policy for system updates.",
+          "properties": {
+            "maintenanceWindows": {
+              "description": "Preferred windows to perform maintenance. Currently limited to 1.",
+              "items": {
+                "properties": {
+                  "day": {
+                    "description": "Preferred day of the week for maintenance, e.g. MONDAY, TUESDAY, etc. Possible values: [\"MONDAY\", \"TUESDAY\", \"WEDNESDAY\", \"THURSDAY\", \"FRIDAY\", \"SATURDAY\", \"SUNDAY\"].",
+                    "type": "string"
+                  },
+                  "startTime": {
+                    "description": "Preferred time to start the maintenance operation on the specified day. Maintenance will start within 1 hour of this time.",
+                    "properties": {
+                      "hours": {
+                        "description": "Hours of day in 24 hour format. Should be from 0 to 23.",
+                        "type": "integer"
+                      },
+                      "minutes": {
+                        "description": "Minutes of hour of day. Currently, only the value 0 is supported.",
+                        "type": "integer"
+                      },
+                      "nanos": {
+                        "description": "Fractions of seconds in nanoseconds. Currently, only the value 0 is supported.",
+                        "type": "integer"
+                      },
+                      "seconds": {
+                        "description": "Seconds of minutes of the time. Currently, only the value 0 is supported.",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "hours"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "day",
+                  "startTime"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "networkConfig": {
           "description": "Metadata related to network configuration.",
@@ -657,6 +716,66 @@
           "required": [
             "clusterRef",
             "pointInTime"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "secondaryConfig": {
+          "description": "Configuration of the secondary cluster for Cross Region Replication. This should be set if and only if the cluster is of type SECONDARY.",
+          "properties": {
+            "primaryClusterNameRef": {
+              "description": "Name of the primary cluster must be in the format\n'projects/{project}/locations/{location}/clusters/{cluster_id}'",
+              "oneOf": [
+                {
+                  "not": {
+                    "required": [
+                      "external"
+                    ]
+                  },
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "namespace"
+                        ]
+                      }
+                    ]
+                  },
+                  "required": [
+                    "external"
+                  ]
+                }
+              ],
+              "properties": {
+                "external": {
+                  "description": "Allowed value: The `name` field of an `AlloyDBCluster` resource.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "primaryClusterNameRef"
           ],
           "type": "object",
           "additionalProperties": false

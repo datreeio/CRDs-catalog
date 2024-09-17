@@ -357,7 +357,7 @@
           "type": "integer"
         },
         "databaseSecretName": {
-          "description": "The name of the K8s secret that holds the password to the database.",
+          "description": "The name of the secret that holds the password to the database (redis databases only). If secret does not exist, it will be created. To define the password, create an opaque secret and set the name in the spec. The password will be taken from the value of the 'password' key. Use an empty string as value within the secret to disable authentication for the database. Notes - For Active-Active databases this secret will not be automatically created, and also, memcached databases must not be set with a value, and a secret/password will not be automatically created for them. Use the memcachedSaslSecretName field to set authentication parameters for memcached databases.",
           "type": "string"
         },
         "defaultUser": {
@@ -368,16 +368,20 @@
           "description": "Database eviction policy. see more https://docs.redislabs.com/latest/rs/administering/database-operations/eviction-policy/",
           "type": "string"
         },
+        "isRof": {
+          "description": "Whether it is an RoF database or not. Applicable only for databases of type \"REDIS\". Assumed to be false if left blank.",
+          "type": "boolean"
+        },
         "memcachedSaslSecretName": {
           "description": "Credentials used for binary authentication in memcached databases. The credentials should be saved as an opaque secret and the name of that secret should be configured using this field. For username, use 'username' as the key and the actual username as the value. For password, use 'password' as the key and the actual password as the value. Note that connections are not encrypted.",
           "type": "string"
         },
         "memorySize": {
-          "description": "memory size of database. use formats like 100MB, 0.1GB. minimum value in 100MB.",
+          "description": "memory size of database. use formats like 100MB, 0.1GB. minimum value in 100MB. When redis on flash (RoF) is enabled, this value refers to RAM+Flash memory, and it must not be below 1GB.",
           "type": "string"
         },
         "modulesList": {
-          "description": "List of modules associated with database",
+          "description": "List of modules associated with database. Note - For Active-Active databases this feature is currently in preview. For this feature to take effect for Active-Active databases, set a boolean environment variable with the name \"ENABLE_ALPHA_FEATURES\" to True. This variable can be set via the redis-enterprise-operator pod spec, or through the operator-environment-config Config Map.",
           "items": {
             "description": "Redis Enterprise Module: https://redislabs.com/redis-enterprise/modules/",
             "properties": {
@@ -390,13 +394,12 @@
                 "type": "string"
               },
               "version": {
-                "description": "Module's semantic version e.g \"1.6.12\"",
+                "description": "Module's semantic version e.g \"1.6.12\" - optional only in REDB, must be set in REAADB",
                 "type": "string"
               }
             },
             "required": [
-              "name",
-              "version"
+              "name"
             ],
             "type": "object",
             "additionalProperties": false
@@ -442,11 +445,7 @@
           "additionalProperties": false
         },
         "redisVersion": {
-          "description": "Redis OSS version. For existing databases - Upgrade Redis OSS version. For new databases - the version which the database will be created with. If set to 'major' - will always upgrade to the most recent major Redis version. If set to 'latest' - will always upgrade to the most recent Redis version. Depends on 'redisUpgradePolicy' - if you want to set the value to 'latest' for some databases, you must set redisUpgradePolicy on the cluster before. Possible values are 'major' or 'latest' When using upgrade - make sure to backup the database before. This value is used only for database type 'redis'",
-          "enum": [
-            "major",
-            "latest"
-          ],
+          "description": "Redis OSS version. Version can be specified via <major.minor> prefix, or via channels - for existing databases - Upgrade Redis OSS version. For new databases - the version which the database will be created with. If set to 'major' - will always upgrade to the most recent major Redis version. If set to 'latest' - will always upgrade to the most recent Redis version. Depends on 'redisUpgradePolicy' - if you want to set the value to 'latest' for some databases, you must set redisUpgradePolicy on the cluster before. Possible values are 'major' or 'latest' When using upgrade - make sure to backup the database before. This value is used only for database type 'redis'",
           "type": "string"
         },
         "replicaSources": {
@@ -454,27 +453,27 @@
           "items": {
             "properties": {
               "clientKeySecret": {
-                "description": "Secret that defines what client key to use.  The secret needs 2 keys in it's map, \"cert\" that is the PEM encoded certificate and \"key\" that is the PEM encoded private key",
+                "description": "Secret that defines the client certificate and key used by the syncer in the target database cluster. The secret must have 2 keys in its map: \"cert\" which is the PEM encoded certificate, and \"key\" which is the PEM encoded private key.",
                 "type": "string"
               },
               "compression": {
-                "description": "GZIP Compression level (0-9) to use for replication",
+                "description": "GZIP compression level (0-6) to use for replication.",
                 "type": "integer"
               },
               "replicaSourceName": {
-                "description": "Kubernetes resource name of type ReplicaSourceType",
+                "description": "The name of the resource from which the source database URI is derived. The type of resource must match the type specified in the ReplicaSourceType field.",
                 "type": "string"
               },
               "replicaSourceType": {
-                "description": "Determines what Kuberetes resource ReplicaSourceName refers to SECRET - Get URI from secret named in ReplicaSourceName.  The secret will have a uri key that defines the complete, redis:// URI REDB - Determine URI from Kubernetes REDB resource named in ReplicaSourceName",
+                "description": "The type of resource from which the source database URI is derived. If set to 'SECRET', the source database URI is derived from the secret named in the ReplicaSourceName field. The secret must have a key named 'uri' that defines the URI of the source database in the form of 'redis://...'. The type of secret (kubernetes, vault, ...) is determined by the secret mechanism used by the underlying REC object. If set to 'REDB', the source database URI is derived from the RedisEnterpriseDatabase resource named in the ReplicaSourceName field.",
                 "type": "string"
               },
               "serverCertSecret": {
-                "description": "Secret that defines the Server's certificate.  The secret needs 1 key in it's map, \"cert\" that is the PEM encoded certificate",
+                "description": "Secret that defines the server certificate used by the proxy in the source database cluster. The secret must have 1 key in its map: \"cert\" which is the PEM encoded certificate.",
                 "type": "string"
               },
               "tlsSniName": {
-                "description": "TLS SNI Name to use",
+                "description": "TLS SNI name to use for the replication link.",
                 "type": "string"
               }
             },
@@ -488,8 +487,16 @@
           "type": "array"
         },
         "replication": {
-          "description": "In-memory database replication. When enabled, database will have replica shard for every master - leading to higher availability.",
+          "description": "In-memory database replication. When enabled, database will have replica shard for every master - leading to higher availability. Defaults to false.",
           "type": "boolean"
+        },
+        "resp3": {
+          "description": "Whether this database supports RESP3 protocol. Note - Deleting this property after explicitly setting its value shall have no effect. Please view the corresponding field in RS doc for more info.",
+          "type": "boolean"
+        },
+        "rofRamSize": {
+          "description": "The size of the RAM portion of an RoF database. Similarly to \"memorySize\" use formats like 100MB, 0.1GB. It must be at least 10% of combined memory size (RAM and Flash), as specified by \"memorySize\".",
+          "type": "string"
         },
         "rolesPermissions": {
           "description": "List of Redis Enteprise ACL and Role bindings to apply",
@@ -523,6 +530,10 @@
           "description": "Number of database server-side shards",
           "type": "integer"
         },
+        "shardingEnabled": {
+          "description": "Toggles database sharding for REAADBs (Active Active databases) and enabled by default. This field is blocked for REDB (non-Active Active databases) and sharding is toggled via the shardCount field - when shardCount is 1 this is disabled otherwise enabled.",
+          "type": "boolean"
+        },
         "shardsPlacement": {
           "description": "Control the density of shards - should they reside on as few or as many nodes as possible. Available options are \"dense\" or \"sparse\". If left unset, defaults to \"dense\".",
           "enum": [
@@ -547,6 +558,20 @@
             "memcached"
           ],
           "type": "string"
+        },
+        "upgradeSpec": {
+          "description": "Specifications for DB upgrade.",
+          "properties": {
+            "upgradeModulesToLatest": {
+              "description": "Upgrades the modules to the latest version that supportes the DB version during a DB upgrade action, to upgrade the DB version view the 'redisVersion' field. Notes - All modules must be without specifing the version. in addition, This field is currently not supported for Active-Active databases.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "upgradeModulesToLatest"
+          ],
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "type": "object",
@@ -555,9 +580,24 @@
     "status": {
       "description": "RedisEnterpriseDatabaseStatus defines the observed state of RedisEnterpriseDatabase",
       "properties": {
-        "activeActiveName": {
-          "description": "The Redis Enterprise Active Active Peering custom resource this Resource is associated with, also, the corresponding active active database name. Note: this feature is currently unsupported.",
-          "type": "string"
+        "activeActive": {
+          "description": "Connection/ association to the Active-Active database.",
+          "properties": {
+            "name": {
+              "description": "The the corresponding Active-Active database name, Redis Enterprise Active Active Database custom resource name, this Resource is associated with. In case this resource is created manually at the active active database creation this field must be filled via the user, otherwise, the operator will assign this field automatically. Note: this feature is currently unsupported.",
+              "type": "string"
+            },
+            "participatingClusterName": {
+              "description": "The corresponding participating cluster name, Redis Enterprise Remote Cluster custom resource name, in the Active-Active database, In case this resource is created manually at the active active database creation this field must be filled via the user, otherwise, the operator will assign this field automatically. Note: this feature is currently unsupported.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "participatingClusterName"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "backupInfo": {
           "description": "Information on the database's periodic backup",
@@ -591,9 +631,6 @@
               "type": "string"
             }
           },
-          "required": [
-            "backupHistory"
-          ],
           "type": "object",
           "additionalProperties": false
         },
@@ -604,10 +641,6 @@
         "databaseUID": {
           "description": "Database UID provided by redis enterprise",
           "type": "string"
-        },
-        "globalConfigurations": {
-          "description": "Flag to determine if this is the default global configurations for active active database. Note: this feature is currently unsupported.",
-          "type": "boolean"
         },
         "internalEndpoints": {
           "description": "Endpoints listed internally by the Redis Enterprise Cluster. Can be used to correlate a ReplicaSourceStatus entry.",

@@ -14,7 +14,7 @@
       "description": "RedisEnterpriseClusterSpec defines the desired state of RedisEnterpriseCluster",
       "properties": {
         "activeActive": {
-          "description": "Specification for ActiveActive setup",
+          "description": "Specification for ActiveActive setup. At most one of ingressOrRouteSpec or activeActive fields can be set at the same time.",
           "properties": {
             "apiIngressUrl": {
               "description": "RS API URL",
@@ -55,18 +55,45 @@
           },
           "type": "array"
         },
+        "backup": {
+          "description": "Cluster-wide backup configurations",
+          "properties": {
+            "s3": {
+              "description": "Configurations for backups to s3 and s3-compatible storage",
+              "properties": {
+                "caCertificateSecretName": {
+                  "description": "Secret name that holds the S3 CA certificate, which contains the TLS certificate mapped to the key in the secret 'cert'",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "Specifies the URL for S3 export and import",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "bootstrapperImageSpec": {
           "description": "Specification for Bootstrapper container image",
           "properties": {
+            "digestHash": {
+              "description": "The digest hash of the container image to pull. When specified, the container image is pulled according to the digest hash instead of the image tag. The versionTag field must also be specified with the image tag matching this digest hash. Note: This field is only supported for OLM deployments.",
+              "type": "string"
+            },
             "imagePullPolicy": {
-              "description": "PullPolicy describes a policy for if/when to pull a container image",
+              "description": "The image pull policy to be applied to the container image. One of Always, Never, IfNotPresent.",
               "type": "string"
             },
             "repository": {
-              "description": "Repository",
+              "description": "The repository (name) of the container image to be deployed.",
               "type": "string"
             },
             "versionTag": {
+              "description": "The tag of the container image to be deployed.",
               "type": "string"
             }
           },
@@ -76,6 +103,23 @@
         "bootstrapperResources": {
           "description": "Compute resource requirements for bootstrapper containers",
           "properties": {
+            "claims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
             "limits": {
               "additionalProperties": {
                 "anyOf": [
@@ -116,23 +160,27 @@
           "description": "RS Cluster Certificates. Used to modify the certificates used by the cluster. See the \"RSClusterCertificates\" struct described above to see the supported certificates.",
           "properties": {
             "apiCertificateSecretName": {
-              "description": "Secret Name/Path to use for Cluster's API Certificate. If left blank, will use certificate provided by the cluster.",
+              "description": "Secret name to use for cluster's API certificate. If left blank, a cluster-provided certificate will be used.",
               "type": "string"
             },
             "cmCertificateSecretName": {
-              "description": "Secret Name/Path to use for Cluster's CM Certificate. If left blank, will use certificate provided by the cluster.",
+              "description": "Secret name to use for cluster's CM (Cluster Manager) certificate. If left blank, a cluster-provided certificate will be used.",
+              "type": "string"
+            },
+            "ldapClientCertificateSecretName": {
+              "description": "Secret name to use for cluster's LDAP client certificate. If left blank, LDAP client certificate authentication will be disabled.",
               "type": "string"
             },
             "metricsExporterCertificateSecretName": {
-              "description": "Secret Name/Path to use for Cluster's Metrics Exporter Certificate. If left blank, will use certificate provided by the cluster.",
+              "description": "Secret name to use for cluster's Metrics Exporter certificate. If left blank, a cluster-provided certificate will be used.",
               "type": "string"
             },
             "proxyCertificateSecretName": {
-              "description": "Secret Name/Path to use for Cluster's Proxy Certificate. If left blank, will use certificate provided by the cluster.",
+              "description": "Secret name to use for cluster's Proxy certificate. If left blank, a cluster-provided certificate will be used.",
               "type": "string"
             },
             "syncerCertificateSecretName": {
-              "description": "Secret Name/Path to use for Cluster's Syncer Certificate. If left blank, will use certificate provided by the cluster.",
+              "description": "Secret name to use for cluster's Syncer certificate. If left blank, a cluster-provided certificate will be used.",
               "type": "string"
             }
           },
@@ -160,11 +208,15 @@
           "type": "boolean"
         },
         "containerTimezone": {
-          "description": "Container timezone configuration. While the default timezone on all containers is UTC, this setting can be used to set the timezone on services rigger/bootstrapper/RS containers. Currently the only supported value is to propagate the host timezone to all containers.",
+          "description": "Container timezone configuration. While the default timezone on all containers is UTC, this setting can be used to set the timezone on services rigger/bootstrapper/RS containers. You can either propagate the hosts timezone to RS pods or set it manually via timezoneName.",
           "properties": {
             "propagateHost": {
-              "description": "Identifies that container timezone should be in sync with the host.",
+              "description": "Identifies that container timezone should be in sync with the host, this option mounts a hostPath volume onto RS pods that could be restricted in some systems.",
               "type": "object"
+            },
+            "timezoneName": {
+              "description": "POSIX-style timezone name as a string to be passed as EnvVar to RE pods, e.g. \"Europe/London\".",
+              "type": "string"
             }
           },
           "type": "object",
@@ -178,9 +230,116 @@
           "description": "Internode encryption (INE) cluster wide policy. An optional boolean setting. Specifies if INE should be on/off for new created REDBs. May be overridden for specific REDB via similar setting, please view the similar setting for REDB for more info.",
           "type": "boolean"
         },
+        "encryptPkeys": {
+          "description": "Private key encryption Possible values: true/false",
+          "type": "boolean"
+        },
         "enforceIPv4": {
           "description": "Sets ENFORCE_IPV4 environment variable",
           "type": "boolean"
+        },
+        "extraEnvVars": {
+          "description": "ADVANCED USAGE: use carefully. Add environment variables to RS StatefulSet's containers.",
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "valueFrom": {
+                "properties": {
+                  "configMapKeyRef": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "optional": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "fieldRef": {
+                    "properties": {
+                      "apiVersion": {
+                        "type": "string"
+                      },
+                      "fieldPath": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "fieldPath"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "resourceFieldRef": {
+                    "properties": {
+                      "containerName": {
+                        "type": "string"
+                      },
+                      "divisor": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "resource": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "resource"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "secretKeyRef": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "optional": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         },
         "extraLabels": {
           "additionalProperties": {
@@ -190,6 +349,7 @@
           "type": "object"
         },
         "hostAliases": {
+          "description": "Adds hostAliases entries to the Redis Enterprise pods",
           "items": {
             "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the pod's hosts file.",
             "properties": {
@@ -209,6 +369,187 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "ingressOrRouteSpec": {
+          "description": "Access configurations for the Redis Enterprise Cluster and Databases. At most one of ingressOrRouteSpec or activeActive fields can be set at the same time.",
+          "properties": {
+            "apiFqdnUrl": {
+              "description": "RS API URL",
+              "type": "string"
+            },
+            "dbFqdnSuffix": {
+              "description": "DB ENDPOINT SUFFIX - will be used to set the db host ingress <db name><db fqdn suffix>. Creates a host name so it should be unique if more than one db is created on the cluster with the same name",
+              "type": "string"
+            },
+            "ingressAnnotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Additional annotations to set on ingress resources created by the operator",
+              "type": "object"
+            },
+            "method": {
+              "description": "Used to distinguish between different platforms implementation.",
+              "enum": [
+                "openShiftRoute",
+                "ingress",
+                "istio"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "apiFqdnUrl",
+            "dbFqdnSuffix",
+            "method"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "ldap": {
+          "description": "Cluster-level LDAP configuration, such as server addresses, protocol, authentication and query settings.",
+          "properties": {
+            "authenticationQuery": {
+              "description": "Configuration of authentication queries, mapping between the username, provided to the cluster for authentication, and the LDAP Distinguished Name.",
+              "properties": {
+                "query": {
+                  "description": "Configuration for a search query. Mutually exclusive with the 'template' field. The substring '%u' in the query filter will be replaced with the username.",
+                  "properties": {
+                    "base": {
+                      "description": "The Distinguished Name of the entry at which to start the search, e.g., 'ou=dev,dc=example,dc=com'.",
+                      "type": "string"
+                    },
+                    "filter": {
+                      "description": "An RFC-4515 string representation of the filter to apply in the search. For an authentication query, the substring '%u' will be replaced with the username, e.g., '(cn=%u)'. For an authorization query, the substring '%D' will be replaced with the user's Distinguished Name, e.g., '(members=%D)'.",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "description": "The search scope for an LDAP query. One of: BaseObject, SingleLevel, WholeSubtree",
+                      "enum": [
+                        "BaseObject",
+                        "SingleLevel",
+                        "WholeSubtree"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "filter",
+                    "scope"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "template": {
+                  "description": "Configuration for a template query. Mutually exclusive with the 'query' field. The substring '%u' will be replaced with the username, e.g., 'cn=%u,ou=dev,dc=example,dc=com'.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "authorizationQuery": {
+              "description": "Configuration of authorization queries, mapping between a user's Distinguished Name and its group memberships.",
+              "properties": {
+                "attribute": {
+                  "description": "Configuration for an attribute query. Mutually exclusive with the 'query' field. Holds the name of an attribute of the LDAP user entity that contains a list of the groups that the user belongs to, e.g., 'memberOf'.",
+                  "type": "string"
+                },
+                "query": {
+                  "description": "Configuration for a search query. Mutually exclusive with the 'attribute' field. The substring '%D' in the query filter will be replaced with the user's Distinguished Name.",
+                  "properties": {
+                    "base": {
+                      "description": "The Distinguished Name of the entry at which to start the search, e.g., 'ou=dev,dc=example,dc=com'.",
+                      "type": "string"
+                    },
+                    "filter": {
+                      "description": "An RFC-4515 string representation of the filter to apply in the search. For an authentication query, the substring '%u' will be replaced with the username, e.g., '(cn=%u)'. For an authorization query, the substring '%D' will be replaced with the user's Distinguished Name, e.g., '(members=%D)'.",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "description": "The search scope for an LDAP query. One of: BaseObject, SingleLevel, WholeSubtree",
+                      "enum": [
+                        "BaseObject",
+                        "SingleLevel",
+                        "WholeSubtree"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "filter",
+                    "scope"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "bindCredentialsSecretName": {
+              "description": "Name of a secret within the same namespace, holding the credentials used to communicate with the LDAP server for authentication queries. The secret must have a key named 'dn' with the Distinguished Name of the user to execute the query, and 'password' with its password. If left blank, credentials-based authentication is disabled.",
+              "type": "string"
+            },
+            "caCertificateSecretName": {
+              "description": "Name of a secret within the same namespace, holding a PEM-encoded CA certificate for validating the TLS connection to the LDAP server. The secret must have a key named 'cert' with the certificate data. This field is applicable only when the protocol is LDAPS or STARTTLS.",
+              "type": "string"
+            },
+            "cacheTTLSeconds": {
+              "description": "The maximum TTL of cached entries.",
+              "type": "integer"
+            },
+            "enabledForControlPlane": {
+              "description": "Whether to enable LDAP for control plane access. Disabled by default.",
+              "type": "boolean"
+            },
+            "enabledForDataPlane": {
+              "description": "Whether to enable LDAP for data plane access. Disabled by default.",
+              "type": "boolean"
+            },
+            "protocol": {
+              "description": "Specifies the LDAP protocol to use. One of: LDAP, LDAPS, STARTTLS.",
+              "enum": [
+                "LDAP",
+                "LDAPS",
+                "STARTTLS"
+              ],
+              "type": "string"
+            },
+            "servers": {
+              "description": "One or more LDAP servers. If multiple servers are specified, they must all share an identical organization tree structure.",
+              "items": {
+                "description": "Address of an LDAP server.",
+                "properties": {
+                  "host": {
+                    "description": "Host name of the LDAP server",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port number of the LDAP server. If unspecified, defaults to 389 for LDAP and STARTTLS protocols, and 636 for LDAPS protocol.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "host"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "authenticationQuery",
+            "authorizationQuery",
+            "protocol",
+            "servers"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "license": {
           "description": "Redis Enterprise License",
@@ -230,15 +571,46 @@
           "format": "int32",
           "type": "integer"
         },
+        "ocspConfiguration": {
+          "description": "An API object that represents the cluster's OCSP configuration. To enable OCSP, the cluster's proxy certificate should contain the OCSP responder URL.",
+          "properties": {
+            "ocspFunctionality": {
+              "description": "Whether to enable/disable OCSP mechanism for the cluster.",
+              "type": "boolean"
+            },
+            "queryFrequency": {
+              "description": "Determines the interval (in seconds) in which the control plane will poll the OCSP responder for a new status for the server certificate. Minimum value is 60. Maximum value is 86400.",
+              "type": "integer"
+            },
+            "recoveryFrequency": {
+              "description": "Determines the interval (in seconds) in which the control plane will poll the OCSP responder for a new status for the server certificate when the current staple is invalid. Minimum value is 60. Maximum value is 86400.",
+              "type": "integer"
+            },
+            "recoveryMaxTries": {
+              "description": "Determines the maximum number for the OCSP recovery attempts. After max number of tries passed, the control plane will revert back to the regular frequency. Minimum value is 1. Maximum value is 100.",
+              "type": "integer"
+            },
+            "responseTimeout": {
+              "description": "Determines the time interval (in seconds) for which the request waits for a response from the OCSP responder. Minimum value is 1. Maximum value is 60.",
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "persistentSpec": {
           "description": "Specification for Redis Enterprise Cluster persistence",
           "properties": {
+            "enablePersistentVolumeResize": {
+              "description": "Whether to enable PersistentVolumes resize. Disabled by default. Read the instruction in pvc_expansion readme carefully before using this feature.",
+              "type": "boolean"
+            },
             "enabled": {
               "description": "Whether to add persistent volume to Redis Enterprise pods",
               "type": "boolean"
             },
             "storageClassName": {
-              "description": "Storage class for persistent volume in Redis Enterprise pods Leave empty to use the default",
+              "description": "Storage class for persistent volume in Redis Enterprise pods. Leave empty to use the default. If using the default this way, make sure the Kubernetes Cluster has a default Storage Class configured. This can be done by running a `kubectl get storageclass` and see if one of the Storage Classes' names contains a `(default)` mark.",
               "type": "string"
             },
             "volumeSize": {
@@ -250,6 +622,7 @@
                   "type": "string"
                 }
               ],
+              "description": "To enable resizing after creating the cluster - please follow the instructions in the pvc_expansion readme",
               "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
               "x-kubernetes-int-or-string": true
             }
@@ -261,7 +634,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "pod annotations",
+          "description": "annotations for the service rigger and redis enterprise pods",
           "type": "object"
         },
         "podAntiAffinity": {
@@ -476,7 +849,7 @@
           "additionalProperties": false
         },
         "podSecurityPolicyName": {
-          "description": "Name of pod security policy to use on pods See https://kubernetes.io/docs/concepts/policy/pod-security-policy/",
+          "description": "DEPRECATED PodSecurityPolicy support is removed in Kubernetes v1.25 and the use of this field is invalid for use when running on Kubernetes v1.25+. Future versions of the RedisEnterpriseCluster API will remove support for this field altogether. For migration instructions, see https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/ \n Name of pod security policy to use on pods",
           "type": "string"
         },
         "podStartingPolicy": {
@@ -1530,6 +1903,22 @@
                         "format": "int32",
                         "type": "integer"
                       },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "httpGet": {
                         "properties": {
                           "host": {
@@ -1676,6 +2065,22 @@
                         "format": "int32",
                         "type": "integer"
                       },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "httpGet": {
                         "properties": {
                           "host": {
@@ -1773,6 +2178,23 @@
                   },
                   "resources": {
                     "properties": {
+                      "claims": {
+                        "items": {
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "set"
+                      },
                       "limits": {
                         "additionalProperties": {
                           "anyOf": [
@@ -1922,6 +2344,22 @@
                       "failureThreshold": {
                         "format": "int32",
                         "type": "integer"
+                      },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
                       },
                       "httpGet": {
                         "properties": {
@@ -2123,6 +2561,9 @@
               "type": "boolean"
             },
             "hostPID": {
+              "type": "boolean"
+            },
+            "hostUsers": {
               "type": "boolean"
             },
             "hostname": {
@@ -2501,6 +2942,22 @@
                         "format": "int32",
                         "type": "integer"
                       },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "httpGet": {
                         "properties": {
                           "host": {
@@ -2652,6 +3109,22 @@
                         "format": "int32",
                         "type": "integer"
                       },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "httpGet": {
                         "properties": {
                           "host": {
@@ -2749,6 +3222,23 @@
                   },
                   "resources": {
                     "properties": {
+                      "claims": {
+                        "items": {
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "set"
+                      },
                       "limits": {
                         "additionalProperties": {
                           "anyOf": [
@@ -2898,6 +3388,22 @@
                       "failureThreshold": {
                         "format": "int32",
                         "type": "integer"
+                      },
+                      "grpc": {
+                        "properties": {
+                          "port": {
+                            "format": "int32",
+                            "type": "integer"
+                          },
+                          "service": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "port"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
                       },
                       "httpGet": {
                         "properties": {
@@ -3081,6 +3587,18 @@
               "type": "object",
               "x-kubernetes-map-type": "atomic"
             },
+            "os": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "overhead": {
               "additionalProperties": {
                 "anyOf": [
@@ -3121,6 +3639,37 @@
               },
               "type": "array"
             },
+            "resourceClaims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "properties": {
+                      "resourceClaimName": {
+                        "type": "string"
+                      },
+                      "resourceClaimTemplateName": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "name"
+              ],
+              "x-kubernetes-list-type": "map"
+            },
             "restartPolicy": {
               "type": "string"
             },
@@ -3129,6 +3678,25 @@
             },
             "schedulerName": {
               "type": "string"
+            },
+            "schedulingGates": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "name"
+              ],
+              "x-kubernetes-list-type": "map"
             },
             "securityContext": {
               "properties": {
@@ -3315,9 +3883,26 @@
                     "type": "object",
                     "additionalProperties": false
                   },
+                  "matchLabelKeys": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
                   "maxSkew": {
                     "format": "int32",
                     "type": "integer"
+                  },
+                  "minDomains": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "nodeAffinityPolicy": {
+                    "type": "string"
+                  },
+                  "nodeTaintsPolicy": {
+                    "type": "string"
                   },
                   "topologyKey": {
                     "type": "string"
@@ -3684,6 +4269,9 @@
                                   },
                                   "name": {
                                     "type": "string"
+                                  },
+                                  "namespace": {
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -3695,6 +4283,23 @@
                               },
                               "resources": {
                                 "properties": {
+                                  "claims": {
+                                    "items": {
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ],
+                                      "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
+                                      "additionalProperties": false
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "set"
+                                  },
                                   "limits": {
                                     "additionalProperties": {
                                       "anyOf": [
@@ -4454,18 +5059,31 @@
           "type": "object",
           "additionalProperties": false
         },
+        "redisEnterpriseIPFamily": {
+          "description": "Reserved, future use, only for use if instructed by Redis. IPFamily dictates what IP family to choose for pods' internal and external communication.",
+          "enum": [
+            "IPv4",
+            "IPv6"
+          ],
+          "type": "string"
+        },
         "redisEnterpriseImageSpec": {
           "description": "Specification for Redis Enterprise container image",
           "properties": {
+            "digestHash": {
+              "description": "The digest hash of the container image to pull. When specified, the container image is pulled according to the digest hash instead of the image tag. The versionTag field must also be specified with the image tag matching this digest hash. Note: This field is only supported for OLM deployments.",
+              "type": "string"
+            },
             "imagePullPolicy": {
-              "description": "PullPolicy describes a policy for if/when to pull a container image",
+              "description": "The image pull policy to be applied to the container image. One of Always, Never, IfNotPresent.",
               "type": "string"
             },
             "repository": {
-              "description": "Repository",
+              "description": "The repository (name) of the container image to be deployed.",
               "type": "string"
             },
             "versionTag": {
+              "description": "The tag of the container image to be deployed.",
               "type": "string"
             }
           },
@@ -4475,6 +5093,23 @@
         "redisEnterpriseNodeResources": {
           "description": "Compute resource requirements for Redis Enterprise containers",
           "properties": {
+            "claims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
             "limits": {
               "additionalProperties": {
                 "anyOf": [
@@ -4510,6 +5145,13 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "redisEnterprisePodAnnotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "annotations for redis enterprise pod",
+          "type": "object"
         },
         "redisEnterpriseServicesConfiguration": {
           "description": "RS Cluster optional services settings",
@@ -4640,15 +5282,20 @@
         "redisEnterpriseServicesRiggerImageSpec": {
           "description": "Specification for Services Rigger container image",
           "properties": {
+            "digestHash": {
+              "description": "The digest hash of the container image to pull. When specified, the container image is pulled according to the digest hash instead of the image tag. The versionTag field must also be specified with the image tag matching this digest hash. Note: This field is only supported for OLM deployments.",
+              "type": "string"
+            },
             "imagePullPolicy": {
-              "description": "PullPolicy describes a policy for if/when to pull a container image",
+              "description": "The image pull policy to be applied to the container image. One of Always, Never, IfNotPresent.",
               "type": "string"
             },
             "repository": {
-              "description": "Repository",
+              "description": "The repository (name) of the container image to be deployed.",
               "type": "string"
             },
             "versionTag": {
+              "description": "The tag of the container image to be deployed.",
               "type": "string"
             }
           },
@@ -4658,6 +5305,23 @@
         "redisEnterpriseServicesRiggerResources": {
           "description": "Compute resource requirements for Services Rigger pod",
           "properties": {
+            "claims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
             "limits": {
               "additionalProperties": {
                 "anyOf": [
@@ -4731,6 +5395,48 @@
           },
           "type": "array"
         },
+        "redisOnFlashSpec": {
+          "description": "Stores configurations specific to redis on flash. If provided, the cluster will be capable of creating redis on flash databases.",
+          "properties": {
+            "bigStoreDriver": {
+              "enum": [
+                "rocksdb",
+                "speedb"
+              ],
+              "type": "string"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "flashDiskSize": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+              "x-kubernetes-int-or-string": true
+            },
+            "flashStorageEngine": {
+              "enum": [
+                "rocksdb"
+              ],
+              "type": "string"
+            },
+            "storageClassName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "enabled",
+            "storageClassName"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "redisUpgradePolicy": {
           "description": "Redis upgrade policy to be set on the Redis Enterprise Cluster. Possible values: major/latest This value is used by the cluster to choose the Redis version of the database when an upgrade is performed. The Redis Enterprise Cluster includes multiple versions of OSS Redis that can be used for databases.",
           "enum": [
@@ -4739,9 +5445,43 @@
           ],
           "type": "string"
         },
+        "resp3Default": {
+          "description": "Whether databases will turn on RESP3 compatibility upon database upgrade. Note - Deleting this property after explicitly setting its value shall have no effect. Please view the corresponding field in RS doc for more info.",
+          "type": "boolean"
+        },
         "serviceAccountName": {
           "description": "Name of the service account to use",
           "type": "string"
+        },
+        "services": {
+          "description": "Customization options for operator-managed service resources created for Redis Enterprise clusters and databases",
+          "properties": {
+            "apiService": {
+              "description": "Customization options for the REC API service.",
+              "properties": {
+                "type": {
+                  "description": "Type of service to create for the REC API service. Defaults to ClusterIP service, if not specified otherwise.",
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "servicesAnnotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Global additional annotations to set on service resources created by the operator. The specified annotations will not override annotations that already exist and didn't originate from the operator.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "servicesRiggerSpec": {
           "description": "Specification for service rigger",
@@ -4870,7 +5610,15 @@
               },
               "type": "array"
             },
+            "podAnnotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "annotations for the service rigger pod",
+              "type": "object"
+            },
             "serviceNaming": {
+              "description": "Used to determine how to name the services created automatically when a database is created. When bdb_name is used, the database name will be also used for the service name. When redis-port is used, the service will be named redis-<port>.",
               "enum": [
                 "bdb_name",
                 "redis-port"
@@ -5860,6 +6608,22 @@
                             "format": "int32",
                             "type": "integer"
                           },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "httpGet": {
                             "properties": {
                               "host": {
@@ -6006,6 +6770,22 @@
                             "format": "int32",
                             "type": "integer"
                           },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "httpGet": {
                             "properties": {
                               "host": {
@@ -6103,6 +6883,23 @@
                       },
                       "resources": {
                         "properties": {
+                          "claims": {
+                            "items": {
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ],
+                              "type": "object",
+                              "x-kubernetes-map-type": "atomic",
+                              "additionalProperties": false
+                            },
+                            "type": "array",
+                            "x-kubernetes-list-type": "set"
+                          },
                           "limits": {
                             "additionalProperties": {
                               "anyOf": [
@@ -6252,6 +7049,22 @@
                           "failureThreshold": {
                             "format": "int32",
                             "type": "integer"
+                          },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "httpGet": {
                             "properties": {
@@ -6453,6 +7266,9 @@
                   "type": "boolean"
                 },
                 "hostPID": {
+                  "type": "boolean"
+                },
+                "hostUsers": {
                   "type": "boolean"
                 },
                 "hostname": {
@@ -6831,6 +7647,22 @@
                             "format": "int32",
                             "type": "integer"
                           },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "httpGet": {
                             "properties": {
                               "host": {
@@ -6982,6 +7814,22 @@
                             "format": "int32",
                             "type": "integer"
                           },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "httpGet": {
                             "properties": {
                               "host": {
@@ -7079,6 +7927,23 @@
                       },
                       "resources": {
                         "properties": {
+                          "claims": {
+                            "items": {
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ],
+                              "type": "object",
+                              "x-kubernetes-map-type": "atomic",
+                              "additionalProperties": false
+                            },
+                            "type": "array",
+                            "x-kubernetes-list-type": "set"
+                          },
                           "limits": {
                             "additionalProperties": {
                               "anyOf": [
@@ -7228,6 +8093,22 @@
                           "failureThreshold": {
                             "format": "int32",
                             "type": "integer"
+                          },
+                          "grpc": {
+                            "properties": {
+                              "port": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "service": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "port"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "httpGet": {
                             "properties": {
@@ -7411,6 +8292,18 @@
                   "type": "object",
                   "x-kubernetes-map-type": "atomic"
                 },
+                "os": {
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "overhead": {
                   "additionalProperties": {
                     "anyOf": [
@@ -7451,6 +8344,37 @@
                   },
                   "type": "array"
                 },
+                "resourceClaims": {
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "properties": {
+                          "resourceClaimName": {
+                            "type": "string"
+                          },
+                          "resourceClaimTemplateName": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
                 "restartPolicy": {
                   "type": "string"
                 },
@@ -7459,6 +8383,25 @@
                 },
                 "schedulerName": {
                   "type": "string"
+                },
+                "schedulingGates": {
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
                 },
                 "securityContext": {
                   "properties": {
@@ -7645,9 +8588,26 @@
                         "type": "object",
                         "additionalProperties": false
                       },
+                      "matchLabelKeys": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      },
                       "maxSkew": {
                         "format": "int32",
                         "type": "integer"
+                      },
+                      "minDomains": {
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "nodeAffinityPolicy": {
+                        "type": "string"
+                      },
+                      "nodeTaintsPolicy": {
+                        "type": "string"
                       },
                       "topologyKey": {
                         "type": "string"
@@ -8014,6 +8974,9 @@
                                       },
                                       "name": {
                                         "type": "string"
+                                      },
+                                      "namespace": {
+                                        "type": "string"
                                       }
                                     },
                                     "required": [
@@ -8025,6 +8988,23 @@
                                   },
                                   "resources": {
                                     "properties": {
+                                      "claims": {
+                                        "items": {
+                                          "properties": {
+                                            "name": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "name"
+                                          ],
+                                          "type": "object",
+                                          "x-kubernetes-map-type": "atomic",
+                                          "additionalProperties": false
+                                        },
+                                        "type": "array",
+                                        "x-kubernetes-list-type": "set"
+                                      },
                                       "limits": {
                                         "additionalProperties": {
                                           "anyOf": [
@@ -9149,6 +10129,22 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "grpc": {
+                    "properties": {
+                      "port": {
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "service": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "port"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
                   "httpGet": {
                     "properties": {
                       "host": {
@@ -9300,6 +10296,22 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "grpc": {
+                    "properties": {
+                      "port": {
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "service": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "port"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
                   "httpGet": {
                     "properties": {
                       "host": {
@@ -9397,6 +10409,23 @@
               },
               "resources": {
                 "properties": {
+                  "claims": {
+                    "items": {
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "set"
+                  },
                   "limits": {
                     "additionalProperties": {
                       "anyOf": [
@@ -9546,6 +10575,22 @@
                   "failureThreshold": {
                     "format": "int32",
                     "type": "integer"
+                  },
+                  "grpc": {
+                    "properties": {
+                      "port": {
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "service": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "port"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "httpGet": {
                     "properties": {
@@ -9738,7 +10783,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Annotations for Redis Enterprise UI service",
+          "description": "Annotations for Redis Enterprise UI service. This annotations will override the overlapping global annotations set under spec.services.servicesAnnotations The specified annotations will not override annotations that already exist and didn't originate from the operator, except for the 'redis.io/last-keys' annotation which is reserved.",
           "type": "object"
         },
         "uiServiceType": {
@@ -10750,6 +11795,9 @@
               "dbType": {
                 "type": "string"
               },
+              "major": {
+                "type": "boolean"
+              },
               "version": {
                 "type": "string"
               }
@@ -10762,6 +11810,10 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "ingressOrRouteMethodStatus": {
+          "description": "The ingressOrRouteSpec/ActiveActive spec method that exist",
+          "type": "string"
         },
         "licenseStatus": {
           "properties": {
@@ -10776,6 +11828,17 @@
             },
             "shardsLimit": {
               "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "managedAPIs": {
+          "description": "Indicates cluster APIs that are being managed by the operator. This only applies to cluster APIs which are optionally-managed by the operator, such as cluster LDAP configuration. Most other APIs are automatically managed by the operator, and are not listed here.",
+          "properties": {
+            "ldap": {
+              "description": "Indicate whether cluster LDAP configuration is managed by the operator. When this is enabled, the operator will reconcile the cluster LDAP configuration according to the '.spec.ldap' field in the RedisEnterpriseCluster resource.",
+              "type": "boolean"
             }
           },
           "type": "object",
@@ -10832,6 +11895,24 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "persistenceStatus": {
+          "description": "The status of the Persistent Volume Claims that are used for Redis Enterprise Cluster persistence. The status will correspond to the status of one or more of the PVCs (failed/resizing if one of them is in resize or failed to resize)",
+          "properties": {
+            "status": {
+              "description": "The current status of the PVCs",
+              "type": "string"
+            },
+            "succeeded": {
+              "description": "The number of PVCs that are provisioned with the expected size",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "redisEnterpriseIPFamily": {
+          "type": "string"
         },
         "specStatus": {
           "type": "string"

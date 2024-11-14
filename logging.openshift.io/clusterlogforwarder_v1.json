@@ -15,16 +15,261 @@
     "spec": {
       "description": "Specification of the desired behavior of ClusterLogForwarder",
       "properties": {
+        "filters": {
+          "description": "Filters are applied to log records passing through a pipeline. There are different types of filter that can select and modify log records in different ways. See [FilterTypeSpec] for a list of filter types.",
+          "items": {
+            "description": "Filter defines a filter for log messages. See [FilterTypeSpec] for a list of filter types.",
+            "properties": {
+              "drop": {
+                "description": "A drop filter applies a sequence of tests to a log record and drops the record if any test passes. Each test contains a sequence of conditions, all conditions must be true for the test to pass. A DropTestsSpec contains an array of tests which contains an array of conditions",
+                "items": {
+                  "properties": {
+                    "test": {
+                      "description": "DropConditions is an array of DropCondition which are conditions that are ANDed together",
+                      "items": {
+                        "properties": {
+                          "field": {
+                            "description": "A dot delimited path to a field in the log record. It must start with a `.`. The path can contain alpha-numeric characters and underscores (a-zA-Z0-9_). If segments contain characters outside of this range, the segment must be quoted. Examples: `.kubernetes.namespace_name`, `.log_type`, '.kubernetes.labels.foobar', `.kubernetes.labels.\"foo-bar/baz\"`",
+                            "type": "string"
+                          },
+                          "matches": {
+                            "description": "A regular expression that the field will match. If the value of the field defined in the DropTest matches the regular expression, the log record will be dropped. Must define only one of matches OR notMatches",
+                            "type": "string"
+                          },
+                          "notMatches": {
+                            "description": "A regular expression that the field does not match. If the value of the field defined in the DropTest does not match the regular expression, the log record will be dropped. Must define only one of matches or notMatches",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "kubeAPIAudit": {
+                "description": "KubeAPIAudit filter Kube API server audit logs, as described in [Kubernetes Auditing]. \n # Policy Filtering \n Policy event rules are the same format as the [Kube Audit Policy] with some minor extensions. The extensions are described here, see the [Kube Audit Policy] for the standard rule behavior. Rules are checked in order, checking stops at the first matching rule. \n An audit policy event contains meta-data describing who made the request. It can also include the full body of the API request, and the response that was sent. The `level` of an audit rule determines how much data is included in the event: \n - None: the event is dropped. - Metadata: Only the audit metadata is included, request and response bodies are removed. - Request: Audit metadata and the request body are included, the response body is removed. - RequestResponse: All data is included: metadata, request body and response body. Note the response body can be very large. For example the a command like `oc get -A pods` generates a response body containing the YAML description of every pod in the cluster. \n # Extensions \n The following features are extensions to the standard [Kube Audit Policy] \n ## Wildcards \n Names of users, groups, namespaces, and resources can have a leading or trailing '*' character. For example namespace 'openshift-*' matches 'openshift-apiserver' or 'openshift-authentication. Resource '*/status' matches 'Pod/status' or 'Deployment/status' \n ## Default Rules \n Events that do not match any rule in the policy are filtered as follows: - User events (ie. non-system and non-serviceaccount) are forwarded - Read-only system events (get/list/watch etc) are dropped - Service account write events that occur within the same namespace as the service account are dropped - All other events are forwarded, subject to any configured [rate limits][#rate-lmiting] \n If you want to disable these defaults, end your rules list with rule that has only a `level` field. An empty rule matches any event, and prevents the defaults from taking effect. \n ## Omit Response Codes \n You can drop events based on the HTTP status code in the response. See the OmitResponseCodes field. \n [Kube Audit Policy]: https://kubernetes.io/docs/reference/config-api/apiserver-audit.v1/#audit-k8s-io-v1-Policy [Kubernetes Auditing]: https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/",
+                "properties": {
+                  "omitResponseCodes": {
+                    "description": "OmitResponseCodes is a list of HTTP status code for which no events are created. If this field is missing or null, the default value used is [404, 409, 422, 429] (NotFound, Conflict, UnprocessableEntity, TooManyRequests) If it is the empty list [], then no status codes are omitted. Otherwise this field should be a list of integer status codes to omit.",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "omitStages": {
+                    "description": "OmitStages is a list of stages for which no events are created. Note that this can also be specified per rule in which case the union of both are omitted.",
+                    "items": {
+                      "description": "Stage defines the stages in request handling that audit events may be generated.",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "rules": {
+                    "description": "Rules specify the audit Level a request should be recorded at. A request may match multiple rules, in which case the FIRST matching rule is used. PolicyRules are strictly ordered. \n If Rules is empty or missing default rules apply, see [KubeAPIAudit]",
+                    "items": {
+                      "description": "PolicyRule maps requests based off metadata to an audit Level. Requests must match the rules of every field (an intersection of rules).",
+                      "properties": {
+                        "level": {
+                          "description": "The Level that requests matching this rule are recorded at.",
+                          "type": "string"
+                        },
+                        "namespaces": {
+                          "description": "Namespaces that this rule matches. The empty string \"\" matches non-namespaced resources. An empty list implies every namespace.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "nonResourceURLs": {
+                          "description": "NonResourceURLs is a set of URL paths that should be audited. `*`s are allowed, but only as the full, final step in the path. Examples: - `/metrics` - Log requests for apiserver metrics - `/healthz*` - Log all health checks",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "omitManagedFields": {
+                          "description": "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. - a value of 'true' will drop the managed fields from the API audit log - a value of 'false' indicates that the managed fileds should be included in the API audit log Note that the value, if specified, in this rule will override the global default If a value is not specified then the global default specified in Policy.OmitManagedFields will stand.",
+                          "type": "boolean"
+                        },
+                        "omitStages": {
+                          "description": "OmitStages is a list of stages for which no events are created. Note that this can also be specified policy wide in which case the union of both are omitted. An empty list means no restrictions will apply.",
+                          "items": {
+                            "description": "Stage defines the stages in request handling that audit events may be generated.",
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "resources": {
+                          "description": "Resources that this rule matches. An empty list implies all kinds in all API groups.",
+                          "items": {
+                            "description": "GroupResources represents resource kinds in an API group.",
+                            "properties": {
+                              "group": {
+                                "description": "Group is the name of the API group that contains the resources. The empty string represents the core API group.",
+                                "type": "string"
+                              },
+                              "resourceNames": {
+                                "description": "ResourceNames is a list of resource instance names that the policy matches. Using this field requires Resources to be specified. An empty list implies that every instance of the resource is matched.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "resources": {
+                                "description": "Resources is a list of resources this rule applies to. \n For example: - `pods` matches pods. - `pods/log` matches the log subresource of pods. - `*` matches all resources and their subresources. - `pods/*` matches all subresources of pods. - `*/scale` matches all scale subresources. \n If wildcard is present, the validation rule will ensure resources do not overlap with each other. \n An empty list implies all resources and subresources in this API groups apply.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        },
+                        "userGroups": {
+                          "description": "The user groups this rule applies to. A user is considered matching if it is a member of any of the UserGroups. An empty list implies every user group.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "users": {
+                          "description": "The users (by authenticated user name) this rule applies to. An empty list implies every user.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "verbs": {
+                          "description": "The verbs that match this rule. An empty list implies every verb.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "level"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "name": {
+                "description": "Name used to refer to the filter from a `pipeline`.",
+                "type": "string"
+              },
+              "prune": {
+                "description": "The PruneFilterSpec consists of two arrays, namely in and notIn, which dictate the fields to be pruned.",
+                "properties": {
+                  "in": {
+                    "description": "`In` is an array of dot-delimited field paths. Fields included here are removed from the log record. Each field path expression must start with a `.`. The path can contain alpha-numeric characters and underscores (a-zA-Z0-9_). If segments contain characters outside of this range, the segment must be quoted otherwise paths do NOT need to be quoted. Examples: `.kubernetes.namespace_name`, `.log_type`, '.kubernetes.labels.foobar', `.kubernetes.labels.\"foo-bar/baz\"` NOTE1: `In` CANNOT contain `.log_type` or `.message` as those fields are required and cannot be pruned. NOTE2: If this filter is used in a pipeline with GoogleCloudLogging, `.hostname` CANNOT be added to this list as it is a required field.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "notIn": {
+                    "description": "`NotIn` is an array of dot-delimited field paths. All fields besides the ones listed here are removed from the log record Each field path expression must start with a `.`. The path can contain alpha-numeric characters and underscores (a-zA-Z0-9_). If segments contain characters outside of this range, the segment must be quoted otherwise paths do NOT need to be quoted. Examples: `.kubernetes.namespace_name`, `.log_type`, '.kubernetes.labels.foobar', `.kubernetes.labels.\"foo-bar/baz\"` NOTE1: `NotIn` MUST contain `.log_type` and `.message` as those fields are required and cannot be pruned. NOTE2: If this filter is used in a pipeline with GoogleCloudLogging, `.hostname` MUST be added to this list as it is a required field.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": {
+                "description": "Type of filter.",
+                "enum": [
+                  "kubeAPIAudit",
+                  "drop",
+                  "prune"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "inputs": {
           "description": "Inputs are named filters for log messages to be forwarded. \n There are three built-in inputs named `application`, `infrastructure` and `audit`. You don't need to define inputs here if those are sufficient for your needs. See `inputRefs` for more.",
           "items": {
-            "description": "InputSpec defines a selector of log messages.",
+            "description": "InputSpec defines a selector of log messages for a given log type. The input is rejected if more than one of the following subfields are defined: application, infrastructure, audit, and receiver.",
             "properties": {
               "application": {
                 "description": "Application, if present, enables named set of `application` logs that can specify a set of match criteria",
                 "properties": {
+                  "containerLimit": {
+                    "description": "Container limit applied to each container of the pod(s) selected by this input. No container of pods on selected by this input can exceed this limit.  This limit is applied per collector deployment.",
+                    "properties": {
+                      "maxRecordsPerSecond": {
+                        "description": "MaxRecordsPerSecond is the maximum number of log records allowed per input/output in a pipeline",
+                        "format": "int64",
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "excludes": {
+                    "description": "Excludes is the set of namespaces and containers to ignore when collecting logs. Takes precedence over Includes option.",
+                    "items": {
+                      "properties": {
+                        "container": {
+                          "description": "Container resources. Creates a combined file pattern together with Namespace resources. Supports glob patterns and presumes \"*\" if ommitted.",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace resources. Creates a combined file pattern together with Container resources. Supports glob patterns and presumes \"*\" if ommitted. Note: infrastructure namespaces are still excluded for \"*\" values unless a qualifying glob pattern is specified.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "includes": {
+                    "description": "Includes is the set of namespaces and containers to include when collecting logs. Note: infrastructure namespaces are still excluded for \"*\" values unless a qualifying glob pattern is specified.",
+                    "items": {
+                      "properties": {
+                        "container": {
+                          "description": "Container resources. Creates a combined file pattern together with Namespace resources. Supports glob patterns and presumes \"*\" if ommitted.",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace resources. Creates a combined file pattern together with Container resources. Supports glob patterns and presumes \"*\" if ommitted. Note: infrastructure namespaces are still excluded for \"*\" values unless a qualifying glob pattern is specified.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
                   "namespaces": {
-                    "description": "Namespaces from which to collect application logs. Only messages from these namespaces are collected. If absent or empty, logs are collected from all namespaces.",
+                    "description": "Namespaces from which to collect application logs. Only messages from these namespaces are collected. If absent or empty, logs are collected from all namespaces. This field supports globs (e.g. mynam*space, *myanmespace) Deprecated: Use []NamespaceContainerSpec instead.",
                     "items": {
                       "type": "string"
                     },
@@ -33,6 +278,36 @@
                   "selector": {
                     "description": "Selector for logs from pods with matching labels. Only messages from pods with these labels are collected. If absent or empty, logs are collected regardless of labels.",
                     "properties": {
+                      "matchExpressions": {
+                        "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                        "items": {
+                          "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+                          "properties": {
+                            "key": {
+                              "description": "key is the label key that the selector applies to.",
+                              "type": "string"
+                            },
+                            "operator": {
+                              "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
+                              "type": "string"
+                            },
+                            "values": {
+                              "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
                       "matchLabels": {
                         "additionalProperties": {
                           "type": "string"
@@ -42,6 +317,7 @@
                       }
                     },
                     "type": "object",
+                    "x-kubernetes-map-type": "atomic",
                     "additionalProperties": false
                   }
                 },
@@ -50,15 +326,86 @@
               },
               "audit": {
                 "description": "Audit, if present, enables `audit` logs.",
-                "type": "object"
+                "properties": {
+                  "sources": {
+                    "description": "Sources defines the list of audit sources to collect. This field is optional and its exclusion results in the collection of all audit sources. Valid sources are: kubeAPI, openshiftAPI, auditd, ovn",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
               },
               "infrastructure": {
                 "description": "Infrastructure, if present, enables `infrastructure` logs.",
-                "type": "object"
+                "properties": {
+                  "sources": {
+                    "description": "Sources defines the list of infrastructure sources to collect. This field is optional and omission results in the collection of all infrastructure sources. Valid sources are: node, container",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
               },
               "name": {
                 "description": "Name used to refer to the input of a `pipeline`.",
                 "type": "string"
+              },
+              "receiver": {
+                "description": "Receiver to receive logs from non-cluster sources.",
+                "properties": {
+                  "http": {
+                    "description": "HTTPReceiver receives encoded logs as a HTTP endpoint.",
+                    "properties": {
+                      "format": {
+                        "description": "Format is the format of incoming log data.",
+                        "enum": [
+                          "kubeAPIAudit"
+                        ],
+                        "type": "string"
+                      },
+                      "port": {
+                        "default": 8443,
+                        "description": "Port the Receiver listens on. It must be a value between 1024 and 65535",
+                        "format": "int32",
+                        "maximum": 65535,
+                        "minimum": 1024,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "format"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "syslog": {
+                    "description": "SyslogReceiver receives logs from rsyslog",
+                    "properties": {
+                      "port": {
+                        "default": 10514,
+                        "description": "Port the Receiver listens on. It must be a value between 1024 and 65535",
+                        "format": "int32",
+                        "maximum": 65535,
+                        "minimum": 1024,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": {
+                    "description": "Type of Receiver plugin.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
               }
             },
             "required": [
@@ -100,6 +447,28 @@
           "items": {
             "description": "Output defines a destination for log messages.",
             "properties": {
+              "azureMonitor": {
+                "properties": {
+                  "azureResourceId": {
+                    "description": "AzureResourceId the Resource ID of the Azure resource the data should be associated with. https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-collector-api?tabs=powershell#request-headers",
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "description": "CustomerId che unique identifier for the Log Analytics workspace. https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-collector-api?tabs=powershell#request-uri-parameters",
+                    "type": "string"
+                  },
+                  "host": {
+                    "description": "Host alternative host for dedicated Azure regions. (for example for China region) https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure",
+                    "type": "string"
+                  },
+                  "logType": {
+                    "description": "LogType the record type of the data that is being submitted. Can only contain letters, numbers, and underscores (_), and may not exceed 100 characters. https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-collector-api?tabs=powershell#request-headers",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "cloudwatch": {
                 "description": "Cloudwatch provides configuration for the output type `cloudwatch` \n Note: the cloudwatch output recognizes the following keys in the Secret: \n `aws_secret_access_key`: AWS secret access key. `aws_access_key_id`: AWS secret access key ID. \n Or for sts-enabled clusters `credentials` or `role_arn` key specifying a properly formatted role arn",
                 "properties": {
@@ -151,7 +520,7 @@
                 "type": "object"
               },
               "googleCloudLogging": {
-                "description": "GoogleCloudLogging provides configuration for sending logs to Google Cloud Logging",
+                "description": "GoogleCloudLogging provides configuration for sending logs to Google Cloud Logging. Exactly one of billingAccountID, organizationID, folderID, or projectID must be set.",
                 "properties": {
                   "billingAccountId": {
                     "type": "string"
@@ -199,7 +568,7 @@
                   },
                   "timeout": {
                     "description": "Timeout specifies the Http request timeout in seconds. If not set, 10secs is used.",
-                    "type": "string"
+                    "type": "integer"
                   }
                 },
                 "type": "object",
@@ -218,6 +587,18 @@
                   "topic": {
                     "description": "Topic specifies the target topic to send logs to.",
                     "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "limit": {
+                "description": "Limit imposes a limit in records-per-second on the total aggregate rate of logs forwarded to this output from any given collector container. The total log flow from an individual collector container to this output cannot exceed the limit.  Generally, one collector is deployed per cluster node Logs may be dropped to enforce the limit. Missing or 0 means no rate limit.",
+                "properties": {
+                  "maxRecordsPerSecond": {
+                    "description": "MaxRecordsPerSecond is the maximum number of log records allowed per input/output in a pipeline",
+                    "format": "int64",
+                    "type": "integer"
                   }
                 },
                 "type": "object",
@@ -263,11 +644,19 @@
                 "description": "Splunk Deliver log data to Splunk\u2019s HTTP Event Collector Provides optional extra properties for `type: splunk_hec` ('splunk_hec_logs' after Vector 0.23",
                 "properties": {
                   "fields": {
-                    "description": "Fields to be added to Splunk index. https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC Should be a valid JSON object",
+                    "description": "Deprecated. Fields to be added to Splunk index.",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "indexKey": {
+                    "description": "IndexKey is a meta-data key field to use to send events to. For example: 'IndexKey: kubernetes.namespace_name` will use the kubernetes namespace as the index. If the IndexKey is not found, the default index defined within Splunk is used. Only one of IndexKey or IndexName can be defined. If IndexKey && IndexName are not specified, the default index defined within Splunk is used.",
+                    "type": "string"
+                  },
+                  "indexName": {
+                    "description": "IndexName is the name of the index to send events to. Only one of IndexKey or IndexName can be defined. If IndexKey && IndexName are not specified, the default index defined within Splunk is used.",
+                    "type": "string"
                   }
                 },
                 "type": "object",
@@ -325,29 +714,6 @@
                 "type": "object",
                 "additionalProperties": false
               },
-              "azureMonitor": {
-                "description": "AzureMonitor provides configuration for sending logs to Azure Monitor.",
-                "properties": {
-                  "azureResourceId": {
-                    "type": "string",
-                    "description": "AzureResourceId the Resource ID of the Azure resource the data should be associated with. https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-collector-api?tabs=powershell#request-headers"
-                  },
-                  "customerId": {
-                    "type": "string",
-                    "description": "CustomerId che unique identifier for the Log Analytics workspace. https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-collector-api?tabs=powershell#request-uri-parameters"
-                  },
-                  "host": {
-                    "type": "string",
-                    "description": "Host alternative host for dedicated Azure regions.(for example for China region) https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure"
-                  },
-                  "logType": {
-                    "type": "string",
-                    "description": "LogType the record type of the data that is being submitted."
-                  }
-                },
-                "type": "object",
-                "additionalProperties": false
-              },
               "tls": {
                 "description": "TLS contains settings for controlling options on TLS client connections.",
                 "properties": {
@@ -359,7 +725,7 @@
                     "description": "TLSSecurityProfile is the security profile to apply to the output connection",
                     "properties": {
                       "custom": {
-                        "description": "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic. An example custom profile looks like this: \n ciphers: - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 minTLSVersion: TLSv1.1",
+                        "description": "custom is a user-defined TLS security profile. Be extremely careful using a custom profile as invalid configurations can be catastrophic. An example custom profile looks like this: \n ciphers: - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 minTLSVersion: VersionTLS11",
                         "nullable": true,
                         "properties": {
                           "ciphers": {
@@ -370,7 +736,7 @@
                             "type": "array"
                           },
                           "minTLSVersion": {
-                            "description": "minTLSVersion is used to specify the minimal version of the TLS protocol that is negotiated during the TLS handshake. For example, to use TLS versions 1.1, 1.2 and 1.3 (yaml): \n minTLSVersion: TLSv1.1 \n NOTE: currently the highest minTLSVersion allowed is VersionTLS12",
+                            "description": "minTLSVersion is used to specify the minimal version of the TLS protocol that is negotiated during the TLS handshake. For example, to use TLS versions 1.1, 1.2 and 1.3 (yaml): \n minTLSVersion: VersionTLS11 \n NOTE: currently the highest minTLSVersion allowed is VersionTLS12",
                             "enum": [
                               "VersionTLS10",
                               "VersionTLS11",
@@ -384,17 +750,17 @@
                         "additionalProperties": false
                       },
                       "intermediate": {
-                        "description": "intermediate is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29 \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 minTLSVersion: TLSv1.2",
+                        "description": "intermediate is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Intermediate_compatibility_.28recommended.29 \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 minTLSVersion: VersionTLS12",
                         "nullable": true,
                         "type": "object"
                       },
                       "modern": {
-                        "description": "modern is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 minTLSVersion: TLSv1.3 \n NOTE: Currently unsupported.",
+                        "description": "modern is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Modern_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 minTLSVersion: VersionTLS13 \n NOTE: Currently unsupported.",
                         "nullable": true,
                         "type": "object"
                       },
                       "old": {
-                        "description": "old is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 - DHE-RSA-CHACHA20-POLY1305 - ECDHE-ECDSA-AES128-SHA256 - ECDHE-RSA-AES128-SHA256 - ECDHE-ECDSA-AES128-SHA - ECDHE-RSA-AES128-SHA - ECDHE-ECDSA-AES256-SHA384 - ECDHE-RSA-AES256-SHA384 - ECDHE-ECDSA-AES256-SHA - ECDHE-RSA-AES256-SHA - DHE-RSA-AES128-SHA256 - DHE-RSA-AES256-SHA256 - AES128-GCM-SHA256 - AES256-GCM-SHA384 - AES128-SHA256 - AES256-SHA256 - AES128-SHA - AES256-SHA - DES-CBC3-SHA minTLSVersion: TLSv1.0",
+                        "description": "old is a TLS security profile based on: \n https://wiki.mozilla.org/Security/Server_Side_TLS#Old_backward_compatibility \n and looks like this (yaml): \n ciphers: - TLS_AES_128_GCM_SHA256 - TLS_AES_256_GCM_SHA384 - TLS_CHACHA20_POLY1305_SHA256 - ECDHE-ECDSA-AES128-GCM-SHA256 - ECDHE-RSA-AES128-GCM-SHA256 - ECDHE-ECDSA-AES256-GCM-SHA384 - ECDHE-RSA-AES256-GCM-SHA384 - ECDHE-ECDSA-CHACHA20-POLY1305 - ECDHE-RSA-CHACHA20-POLY1305 - DHE-RSA-AES128-GCM-SHA256 - DHE-RSA-AES256-GCM-SHA384 - DHE-RSA-CHACHA20-POLY1305 - ECDHE-ECDSA-AES128-SHA256 - ECDHE-RSA-AES128-SHA256 - ECDHE-ECDSA-AES128-SHA - ECDHE-RSA-AES128-SHA - ECDHE-ECDSA-AES256-SHA384 - ECDHE-RSA-AES256-SHA384 - ECDHE-ECDSA-AES256-SHA - ECDHE-RSA-AES256-SHA - DHE-RSA-AES128-SHA256 - DHE-RSA-AES256-SHA256 - AES128-GCM-SHA256 - AES256-GCM-SHA384 - AES128-SHA256 - AES256-SHA256 - AES128-SHA - AES256-SHA - DES-CBC3-SHA minTLSVersion: VersionTLS10",
                         "nullable": true,
                         "type": "object"
                       },
@@ -411,6 +777,56 @@
                     },
                     "type": "object",
                     "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "tuning": {
+                "description": "Tuning parameters for the output.  Specifying these parameters will alter the characteristics of log forwarder which may be different from its behavior without the tuning.",
+                "properties": {
+                  "compression": {
+                    "description": "Compression causes data to be compressed before sending over the network. It is an error if the compression type is not supported by the  output.",
+                    "enum": [
+                      "gzip",
+                      "none",
+                      "snappy",
+                      "zlib",
+                      "zstd",
+                      "lz4"
+                    ],
+                    "type": "string"
+                  },
+                  "delivery": {
+                    "description": "Delivery mode for log forwarding. \n - AtLeastOnce (default): if the forwarder crashes or is re-started, any logs that were read before the crash but not sent to their destination will be re-read and re-sent. Note it is possible that some logs are duplicated in the event of a crash - log records are delivered at-least-once. - AtMostOnce: The forwarder makes no effort to recover logs lost during a crash. This mode may give better throughput, but could result in more log loss.",
+                    "enum": [
+                      "AtLeastOnce",
+                      "AtMostOnce"
+                    ],
+                    "type": "string"
+                  },
+                  "maxRetryDuration": {
+                    "description": "MaxRetryDuration is the maximum time to wait between retry attempts after a delivery failure.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "maxWrite": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ],
+                    "description": "MaxWrite limits the maximum payload in terms of bytes of a single \"send\" to the output.",
+                    "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                    "x-kubernetes-int-or-string": true
+                  },
+                  "minRetryDuration": {
+                    "description": "MinRetryDuration is the minimum time to wait between attempts to retry after delivery a failure.",
+                    "format": "int64",
+                    "type": "integer"
                   }
                 },
                 "type": "object",
@@ -456,6 +872,13 @@
                 "description": "DetectMultilineErrors enables multiline error detection of container logs",
                 "type": "boolean"
               },
+              "filterRefs": {
+                "description": "Filters lists the names of filters to be applied to records going through this pipeline. \n Each filter is applied in order. If a filter drops a records, subsequent filters are not applied.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "inputRefs": {
                 "description": "InputRefs lists the names (`input.name`) of inputs to this pipeline. \n The following built-in input names are always available: \n `application` selects all logs from application pods. \n `infrastructure` selects logs from openshift and kubernetes pods and some node logs. \n `audit` selects node logs related to security audits.",
                 "items": {
@@ -497,6 +920,10 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "serviceAccountName": {
+          "description": "ServiceAccountName is the serviceaccount associated with the clusterlogforwarder",
+          "type": "string"
         }
       },
       "type": "object",
@@ -537,6 +964,43 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "filters": {
+          "additionalProperties": {
+            "description": "Conditions is a set of Condition instances.",
+            "items": {
+              "description": "Condition represents an observation of an object's state. Conditions are an extension mechanism intended to be used when the details of an observation are not a priori known or would not apply to all instances of a given Kind. \n Conditions should be added to explicitly convey properties that users and components care about rather than requiring those properties to be inferred from other observations. Once defined, the meaning of a Condition can not be changed arbitrarily - it becomes part of the API, and has the same backwards- and forwards-compatibility concerns of any other part of the API.",
+              "properties": {
+                "lastTransitionTime": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "ConditionReason is intended to be a one-word, CamelCase representation of the category of cause of the current status. It is intended to be used in concise output, such as one-line kubectl get output, and in summarizing occurrences of causes.",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "type": {
+                  "description": "ConditionType is the type of the condition and is typically a CamelCased word or short phrase. \n Condition types should indicate state in the \"abnormal-true\" polarity. For example, if the condition indicates when a policy is invalid, the \"is valid\" case is probably the norm, so the condition should be called \"Invalid\".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "type": "array"
+          },
+          "description": "Filters maps filter name to condition of the filter.",
+          "type": "object"
         },
         "inputs": {
           "additionalProperties": {

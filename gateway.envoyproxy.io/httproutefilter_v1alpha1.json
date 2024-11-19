@@ -1,0 +1,202 @@
+{
+  "description": "HTTPRouteFilter is a custom Envoy Gateway HTTPRouteFilter which provides extended\ntraffic processing options such as path regex rewrite, direct response and more.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the desired state of HTTPRouteFilter.",
+      "properties": {
+        "directResponse": {
+          "description": "HTTPDirectResponseFilter defines the configuration to return a fixed response.",
+          "properties": {
+            "body": {
+              "description": "Body of the Response",
+              "properties": {
+                "inline": {
+                  "description": "Inline contains the value as an inline string.",
+                  "type": "string"
+                },
+                "type": {
+                  "allOf": [
+                    {
+                      "enum": [
+                        "Inline",
+                        "ValueRef"
+                      ]
+                    },
+                    {
+                      "enum": [
+                        "Inline",
+                        "ValueRef"
+                      ]
+                    }
+                  ],
+                  "default": "Inline",
+                  "description": "Type is the type of method to use to read the body value.\nValid values are Inline and ValueRef, default is Inline.",
+                  "type": "string"
+                },
+                "valueRef": {
+                  "description": "ValueRef contains the contents of the body\nspecified as a local object reference.\nOnly a reference to ConfigMap is supported.\n\nThe value of key `response.body` in the ConfigMap will be used as the response body.\nIf the key is not found, the first value in the ConfigMap will be used.",
+                  "properties": {
+                    "group": {
+                      "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                      "maxLength": 253,
+                      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Name is the name of the referent.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "kind",
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "inline must be set for type Inline",
+                  "rule": "(!has(self.type) || self.type == 'Inline')? has(self.inline) : true"
+                },
+                {
+                  "message": "valueRef must be set for type ValueRef",
+                  "rule": "(has(self.type) && self.type == 'ValueRef')? has(self.valueRef) : true"
+                },
+                {
+                  "message": "only ConfigMap is supported for ValueRef",
+                  "rule": "has(self.valueRef) ? self.valueRef.kind == 'ConfigMap' : true"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "contentType": {
+              "description": "Content Type of the response. This will be set in the Content-Type header.",
+              "type": "string"
+            },
+            "statusCode": {
+              "description": "Status Code of the HTTP response\nIf unset, defaults to 200.",
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "urlRewrite": {
+          "description": "HTTPURLRewriteFilter define rewrites of HTTP URL components such as path and host",
+          "properties": {
+            "hostname": {
+              "description": "Hostname is the value to be used to replace the Host header value during\nforwarding.",
+              "properties": {
+                "header": {
+                  "description": "Header is the name of the header whose value would be used to rewrite the Host header",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "HTTPPathModifierType defines the type of Hostname rewrite.",
+                  "enum": [
+                    "Header",
+                    "Backend"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "header must be nil if the type is not Header",
+                  "rule": "!(has(self.header) && self.type != 'Header')"
+                },
+                {
+                  "message": "header must be specified for Header type",
+                  "rule": "!(!has(self.header) && self.type == 'Header')"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "path": {
+              "description": "Path defines a path rewrite.",
+              "properties": {
+                "replaceRegexMatch": {
+                  "description": "ReplaceRegexMatch defines a path regex rewrite. The path portions matched by the regex pattern are replaced by the defined substitution.\nhttps://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-field-config-route-v3-routeaction-regex-rewrite\nSome examples:\n(1) replaceRegexMatch:\n      pattern: ^/service/([^/]+)(/.*)$\n      substitution: \\2/instance/\\1\n    Would transform /service/foo/v1/api into /v1/api/instance/foo.\n(2) replaceRegexMatch:\n      pattern: one\n      substitution: two\n    Would transform /xxx/one/yyy/one/zzz into /xxx/two/yyy/two/zzz.\n(3) replaceRegexMatch:\n      pattern: ^(.*?)one(.*)$\n      substitution: \\1two\\2\n    Would transform /xxx/one/yyy/one/zzz into /xxx/two/yyy/one/zzz.\n(3) replaceRegexMatch:\n      pattern: (?i)/xxx/\n      substitution: /yyy/\n    Would transform path /aaa/XxX/bbb into /aaa/yyy/bbb (case-insensitive).",
+                  "properties": {
+                    "pattern": {
+                      "description": "Pattern matches a regular expression against the value of the HTTP Path.The regex string must\nadhere to the syntax documented in https://github.com/google/re2/wiki/Syntax.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "substitution": {
+                      "description": "Substitution is an expression that replaces the matched portion.The expression may include numbered\ncapture groups that adhere to syntax documented in https://github.com/google/re2/wiki/Syntax.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pattern",
+                    "substitution"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": {
+                  "description": "HTTPPathModifierType defines the type of path redirect or rewrite.",
+                  "enum": [
+                    "ReplaceRegexMatch"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "If HTTPPathModifier type is ReplaceRegexMatch, replaceRegexMatch field needs to be set.",
+                  "rule": "self.type == 'ReplaceRegexMatch' ? has(self.replaceRegexMatch) : !has(self.replaceRegexMatch)"
+                }
+              ],
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

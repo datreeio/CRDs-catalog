@@ -1,5 +1,5 @@
 {
-  "description": "SAMLConnector is the Schema for the samlconnectors API",
+  "description": "AccessList is the Schema for the accesslists API",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,136 +13,183 @@
       "type": "object"
     },
     "spec": {
-      "description": "SAMLConnector resource definition v2 from Teleport",
+      "description": "AccessList resource definition v1 from Teleport",
       "properties": {
-        "acs": {
-          "description": "AssertionConsumerService is a URL for assertion consumer service on the service provider (Teleport's side).",
-          "type": "string"
-        },
-        "allow_idp_initiated": {
-          "description": "AllowIDPInitiated is a flag that indicates if the connector can be used for IdP-initiated logins.",
-          "type": "boolean"
-        },
-        "assertion_key_pair": {
-          "description": "EncryptionKeyPair is a key pair used for decrypting SAML assertions.",
+        "audit": {
+          "description": "audit describes the frequency that this Access List must be audited.",
           "nullable": true,
           "properties": {
-            "cert": {
-              "description": "Cert is a PEM-encoded x509 certificate.",
+            "next_audit_date": {
+              "description": "next_audit_date is when the next audit date should be done by.",
+              "format": "date-time",
               "type": "string"
             },
-            "private_key": {
-              "description": "PrivateKey is a PEM encoded x509 private key.",
-              "type": "string"
+            "notifications": {
+              "description": "notifications is the configuration for notifying users.",
+              "nullable": true,
+              "properties": {
+                "start": {
+                  "description": "start specifies when to start notifying users that the next audit date is coming up.",
+                  "format": "duration",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "recurrence": {
+              "description": "recurrence is the recurrence definition",
+              "nullable": true,
+              "properties": {
+                "day_of_month": {
+                  "description": "day_of_month is the day of month that reviews will be scheduled on. Supported values are 0, 1, 15, and 31.",
+                  "x-kubernetes-int-or-string": true
+                },
+                "frequency": {
+                  "description": "frequency is the frequency of reviews. This represents the period in months between two reviews. Supported values are 0, 1, 3, 6, and 12.",
+                  "x-kubernetes-int-or-string": true
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "type": "object",
           "additionalProperties": false
         },
-        "attributes_to_roles": {
-          "description": "AttributesToRoles is a list of mappings of attribute statements to roles.",
-          "items": {
-            "properties": {
-              "name": {
-                "description": "Name is an attribute statement name.",
+        "description": {
+          "description": "description is an optional plaintext description of the Access List.",
+          "type": "string"
+        },
+        "grants": {
+          "description": "grants describes the access granted by membership to this Access List.",
+          "nullable": true,
+          "properties": {
+            "roles": {
+              "description": "roles are the roles that are granted to users who are members of the Access List.",
+              "items": {
                 "type": "string"
               },
-              "roles": {
-                "description": "Roles is a list of static teleport roles to map to.",
+              "nullable": true,
+              "type": "array"
+            },
+            "traits": {
+              "additionalProperties": {
                 "items": {
                   "type": "string"
                 },
-                "nullable": true,
                 "type": "array"
               },
-              "value": {
-                "description": "Value is an attribute statement value to match.",
+              "description": "traits are the traits that are granted to users who are members of the Access List.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "membership_requires": {
+          "description": "membership_requires describes the requirements for a user to be a member of the Access List. For a membership to an Access List to be effective, the user must meet the requirements of Membership_requires and must be in the members list.",
+          "nullable": true,
+          "properties": {
+            "roles": {
+              "description": "roles are the user roles that must be present for the user to obtain access.",
+              "items": {
+                "type": "string"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "traits": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": "traits are the traits that must be present for the user to obtain access.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "owner_grants": {
+          "description": "owner_grants describes the access granted by owners to this Access List.",
+          "nullable": true,
+          "properties": {
+            "roles": {
+              "description": "roles are the roles that are granted to users who are members of the Access List.",
+              "items": {
+                "type": "string"
+              },
+              "nullable": true,
+              "type": "array"
+            },
+            "traits": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": "traits are the traits that are granted to users who are members of the Access List.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "owners": {
+          "description": "owners is a list of owners of the Access List.",
+          "items": {
+            "properties": {
+              "description": {
+                "description": "description is the plaintext description of the owner and why they are an owner.",
+                "type": "string"
+              },
+              "ineligible_status": {
+                "description": "ineligible_status describes if this owner is eligible or not and if not, describes how they're lacking eligibility.",
+                "x-kubernetes-int-or-string": true
+              },
+              "name": {
+                "description": "name is the username of the owner.",
                 "type": "string"
               }
             },
             "type": "object",
             "additionalProperties": false
           },
+          "nullable": true,
           "type": "array"
         },
-        "audience": {
-          "description": "Audience uniquely identifies our service provider.",
-          "type": "string"
-        },
-        "cert": {
-          "description": "Cert is the identity provider certificate PEM. IDP signs `<Response>` responses using this certificate.",
-          "type": "string"
-        },
-        "client_redirect_settings": {
-          "description": "ClientRedirectSettings defines which client redirect URLs are allowed for non-browser SSO logins other than the standard localhost ones.",
+        "ownership_requires": {
+          "description": "ownership_requires describes the requirements for a user to be an owner of the Access List. For ownership of an Access List to be effective, the user must meet the requirements of ownership_requires and must be in the owners list.",
           "nullable": true,
           "properties": {
-            "allowed_https_hostnames": {
-              "description": "a list of hostnames allowed for https client redirect URLs",
+            "roles": {
+              "description": "roles are the user roles that must be present for the user to obtain access.",
               "items": {
                 "type": "string"
               },
               "nullable": true,
               "type": "array"
             },
-            "insecure_allowed_cidr_ranges": {
-              "description": "a list of CIDRs allowed for HTTP or HTTPS client redirect URLs",
-              "items": {
-                "type": "string"
+            "traits": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
-              "nullable": true,
-              "type": "array"
+              "description": "traits are the traits that must be present for the user to obtain access.",
+              "type": "object"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
-        "display": {
-          "description": "Display controls how this connector is displayed.",
-          "type": "string"
-        },
-        "entity_descriptor": {
-          "description": "EntityDescriptor is XML with descriptor. It can be used to supply configuration parameters in one XML file rather than supplying them in the individual elements.",
-          "type": "string"
-        },
-        "entity_descriptor_url": {
-          "description": "EntityDescriptorURL is a URL that supplies a configuration XML.",
-          "type": "string"
-        },
-        "issuer": {
-          "description": "Issuer is the identity provider issuer.",
-          "type": "string"
-        },
-        "provider": {
-          "description": "Provider is the external identity provider.",
-          "type": "string"
-        },
-        "service_provider_issuer": {
-          "description": "ServiceProviderIssuer is the issuer of the service provider (Teleport).",
-          "type": "string"
-        },
-        "signing_key_pair": {
-          "description": "SigningKeyPair is an x509 key pair used to sign AuthnRequest.",
-          "nullable": true,
-          "properties": {
-            "cert": {
-              "description": "Cert is a PEM-encoded x509 certificate.",
-              "type": "string"
-            },
-            "private_key": {
-              "description": "PrivateKey is a PEM encoded x509 private key.",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "single_logout_url": {
-          "description": "SingleLogoutURL is the SAML Single log-out URL to initiate SAML SLO (single log-out). If this is not provided, SLO is disabled.",
-          "type": "string"
-        },
-        "sso": {
-          "description": "SSO is the URL of the identity provider's SSO service.",
+        "title": {
+          "description": "title is a plaintext short description of the Access List.",
           "type": "string"
         }
       },

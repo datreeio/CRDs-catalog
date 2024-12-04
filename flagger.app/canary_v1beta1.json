@@ -152,6 +152,64 @@
                     },
                     "type": "object"
                   },
+                  "queryParams": {
+                    "additionalProperties": {
+                      "oneOf": [
+                        {
+                          "not": {
+                            "anyOf": [
+                              {
+                                "required": [
+                                  "exact"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "prefix"
+                                ]
+                              },
+                              {
+                                "required": [
+                                  "regex"
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        {
+                          "required": [
+                            "exact"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "prefix"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "regex"
+                          ]
+                        }
+                      ],
+                      "properties": {
+                        "exact": {
+                          "type": "string"
+                        },
+                        "prefix": {
+                          "type": "string"
+                        },
+                        "regex": {
+                          "description": "RE2 style regex-based match (https://github.com/google/re2/wiki/Syntax).",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "description": "Query parameters for matching.",
+                    "type": "object"
+                  },
                   "sourceLabels": {
                     "additionalProperties": {
                       "format": "string",
@@ -308,6 +366,10 @@
                   "name": {
                     "description": "Name of the webhook",
                     "type": "string"
+                  },
+                  "retries": {
+                    "description": "Number of retries for this webhook",
+                    "type": "number"
                   },
                   "timeout": {
                     "description": "Request timeout for this webhook",
@@ -620,6 +682,12 @@
                     "minLength": 1,
                     "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
                     "type": "string"
+                  },
+                  "port": {
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
                   },
                   "sectionName": {
                     "maxLength": 253,
@@ -1169,6 +1237,64 @@
               "description": "AppMesh mesh name",
               "type": "string"
             },
+            "mirror": {
+              "description": "Mirror defines a schema for a filter that mirrors requests.",
+              "items": {
+                "properties": {
+                  "backendRef": {
+                    "properties": {
+                      "group": {
+                        "default": "",
+                        "maxLength": 253,
+                        "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "Service",
+                        "maxLength": 63,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "maxLength": 63,
+                        "minLength": 1,
+                        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                        "type": "string"
+                      },
+                      "port": {
+                        "format": "int32",
+                        "maximum": 65535,
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "Must have port for Service reference",
+                        "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                      }
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "required": [
+                "backendRef"
+              ],
+              "type": "array"
+            },
             "name": {
               "description": "Kubernetes service name",
               "type": "string"
@@ -1228,6 +1354,14 @@
             "rewrite": {
               "description": "Rewrite HTTP URIs",
               "properties": {
+                "authority": {
+                  "format": "string",
+                  "type": "string"
+                },
+                "type": {
+                  "format": "string",
+                  "type": "string"
+                },
                 "uri": {
                   "format": "string",
                   "type": "string"
@@ -1433,8 +1567,13 @@
                         "ROUND_ROBIN",
                         "LEAST_CONN",
                         "RANDOM",
-                        "PASSTHROUGH"
+                        "PASSTHROUGH",
+                        "LEAST_REQUEST"
                       ],
+                      "type": "string"
+                    },
+                    "warmupDurationSecs": {
+                      "description": "Represents the warmup duration of Service.",
                       "type": "string"
                     }
                   },
@@ -1532,6 +1671,10 @@
         },
         "skipAnalysis": {
           "description": "Skip analysis and promote canary",
+          "type": "boolean"
+        },
+        "suspend": {
+          "description": "Suspend Canary disabling/pausing all canary runs",
           "type": "boolean"
         },
         "targetRef": {

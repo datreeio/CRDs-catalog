@@ -12,6 +12,12 @@ if ! command -v kubectl &> /dev/null; then
     printf "please visit https://kubernetes.io/docs/tasks/tools/#kubectl to install it"
     exit 1
 fi
+# Check if the major version is 4 or higher
+if [[ ! ${BASH_VERSION%%.*} -ge 4 ]]; then
+    printf "Bash version is lower than 4"
+    printf "please visit https://www.gnu.org/software/bash/ to install it"
+    exit 1
+fi
 
 # Check if the pyyaml module is installed
 if ! echo 'import yaml' | python3 &> /dev/null; then

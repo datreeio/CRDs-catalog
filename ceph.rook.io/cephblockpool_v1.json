@@ -1,0 +1,508 @@
+{
+  "description": "CephBlockPool represents a Ceph Storage Pool",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "NamedBlockPoolSpec allows a block pool to be created with a non-default name.\nThis is more specific than the NamedPoolSpec so we get schema validation on the\nallowed pool names that can be specified.",
+      "properties": {
+        "application": {
+          "description": "The application name to set on the pool. Only expected to be set for rgw pools.",
+          "type": "string"
+        },
+        "compressionMode": {
+          "description": "DEPRECATED: use Parameters instead, e.g., Parameters[\"compression_mode\"] = \"force\"\nThe inline compression mode in Bluestore OSD to set to (options are: none, passive, aggressive, force)\nDo NOT set a default value for kubebuilder as this will override the Parameters",
+          "enum": [
+            "none",
+            "passive",
+            "aggressive",
+            "force",
+            ""
+          ],
+          "nullable": true,
+          "type": "string"
+        },
+        "crushRoot": {
+          "description": "The root of the crush hierarchy utilized by the pool",
+          "nullable": true,
+          "type": "string"
+        },
+        "deviceClass": {
+          "description": "The device class the OSD should set to for use in the pool",
+          "nullable": true,
+          "type": "string"
+        },
+        "enableRBDStats": {
+          "description": "EnableRBDStats is used to enable gathering of statistics for all RBD images in the pool",
+          "type": "boolean"
+        },
+        "erasureCoded": {
+          "description": "The erasure code settings",
+          "properties": {
+            "algorithm": {
+              "description": "The algorithm for erasure coding",
+              "type": "string"
+            },
+            "codingChunks": {
+              "description": "Number of coding chunks per object in an erasure coded storage pool (required for erasure-coded pool type).\nThis is the number of OSDs that can be lost simultaneously before data cannot be recovered.",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "dataChunks": {
+              "description": "Number of data chunks per object in an erasure coded storage pool (required for erasure-coded pool type).\nThe number of chunks required to recover an object when any single OSD is lost is the same\nas dataChunks so be aware that the larger the number of data chunks, the higher the cost of recovery.",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "codingChunks",
+            "dataChunks"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "failureDomain": {
+          "description": "The failure domain: osd/host/(region or zone if available) - technically also any type in the crush map",
+          "type": "string"
+        },
+        "mirroring": {
+          "description": "The mirroring settings",
+          "properties": {
+            "enabled": {
+              "description": "Enabled whether this pool is mirrored or not",
+              "type": "boolean"
+            },
+            "mode": {
+              "description": "Mode is the mirroring mode: either pool or image",
+              "type": "string"
+            },
+            "peers": {
+              "description": "Peers represents the peers spec",
+              "nullable": true,
+              "properties": {
+                "secretNames": {
+                  "description": "SecretNames represents the Kubernetes Secret names to add rbd-mirror or cephfs-mirror peers",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "snapshotSchedules": {
+              "description": "SnapshotSchedules is the scheduling of snapshot for mirrored images/pools",
+              "items": {
+                "description": "SnapshotScheduleSpec represents the snapshot scheduling settings of a mirrored pool",
+                "properties": {
+                  "interval": {
+                    "description": "Interval represent the periodicity of the snapshot.",
+                    "type": "string"
+                  },
+                  "path": {
+                    "description": "Path is the path to snapshot, only valid for CephFS",
+                    "type": "string"
+                  },
+                  "startTime": {
+                    "description": "StartTime indicates when to start the snapshot",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "name": {
+          "description": "The desired name of the pool if different from the CephBlockPool CR name.",
+          "enum": [
+            ".rgw.root",
+            ".nfs",
+            ".mgr"
+          ],
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Parameters is a list of properties to enable on a given pool",
+          "nullable": true,
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "quotas": {
+          "description": "The quota settings",
+          "nullable": true,
+          "properties": {
+            "maxBytes": {
+              "description": "MaxBytes represents the quota in bytes\nDeprecated in favor of MaxSize",
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxObjects": {
+              "description": "MaxObjects represents the quota in objects",
+              "format": "int64",
+              "type": "integer"
+            },
+            "maxSize": {
+              "description": "MaxSize represents the quota in bytes as a string",
+              "pattern": "^[0-9]+[\\.]?[0-9]*([KMGTPE]i|[kMGTPE])?$",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "replicated": {
+          "description": "The replication settings",
+          "properties": {
+            "hybridStorage": {
+              "description": "HybridStorage represents hybrid storage tier settings",
+              "nullable": true,
+              "properties": {
+                "primaryDeviceClass": {
+                  "description": "PrimaryDeviceClass represents high performance tier (for example SSD or NVME) for Primary OSD",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "secondaryDeviceClass": {
+                  "description": "SecondaryDeviceClass represents low performance tier (for example HDDs) for remaining OSDs",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "primaryDeviceClass",
+                "secondaryDeviceClass"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "replicasPerFailureDomain": {
+              "description": "ReplicasPerFailureDomain the number of replica in the specified failure domain",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "requireSafeReplicaSize": {
+              "description": "RequireSafeReplicaSize if false allows you to set replica 1",
+              "type": "boolean"
+            },
+            "size": {
+              "description": "Size - Number of copies per object in a replicated storage pool, including the object itself (required for replicated pool type)",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "subFailureDomain": {
+              "description": "SubFailureDomain the name of the sub-failure domain",
+              "type": "string"
+            },
+            "targetSizeRatio": {
+              "description": "TargetSizeRatio gives a hint (%) to Ceph in terms of expected consumption of the total cluster capacity",
+              "type": "number"
+            }
+          },
+          "required": [
+            "size"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "statusCheck": {
+          "description": "The mirroring statusCheck",
+          "properties": {
+            "mirror": {
+              "description": "HealthCheckSpec represents the health check of an object store bucket",
+              "nullable": true,
+              "properties": {
+                "disabled": {
+                  "type": "boolean"
+                },
+                "interval": {
+                  "description": "Interval is the internal in second or minute for the health check to run like 60s for 60 seconds",
+                  "type": "string"
+                },
+                "timeout": {
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true,
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "CephBlockPoolStatus represents the mirroring status of Ceph Storage Pool",
+      "properties": {
+        "conditions": {
+          "items": {
+            "description": "Condition represents a status condition on any Rook-Ceph Custom Resource.",
+            "properties": {
+              "lastHeartbeatTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "reason": {
+                "description": "ConditionReason is a reason for a condition",
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "type": {
+                "description": "ConditionType represent a resource's status",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "info": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "object"
+        },
+        "mirroringInfo": {
+          "description": "MirroringInfoSpec is the status of the pool mirroring",
+          "properties": {
+            "details": {
+              "type": "string"
+            },
+            "lastChanged": {
+              "type": "string"
+            },
+            "lastChecked": {
+              "type": "string"
+            },
+            "mode": {
+              "description": "Mode is the mirroring mode",
+              "type": "string"
+            },
+            "peers": {
+              "description": "Peers are the list of peer sites connected to that cluster",
+              "items": {
+                "description": "PeersSpec contains peer details",
+                "properties": {
+                  "client_name": {
+                    "description": "ClientName is the CephX user used to connect to the peer",
+                    "type": "string"
+                  },
+                  "direction": {
+                    "description": "Direction is the peer mirroring direction",
+                    "type": "string"
+                  },
+                  "mirror_uuid": {
+                    "description": "MirrorUUID is the mirror UUID",
+                    "type": "string"
+                  },
+                  "site_name": {
+                    "description": "SiteName is the current site name",
+                    "type": "string"
+                  },
+                  "uuid": {
+                    "description": "UUID is the peer UUID",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "site_name": {
+              "description": "SiteName is the current site name",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "mirroringStatus": {
+          "description": "MirroringStatusSpec is the status of the pool mirroring",
+          "properties": {
+            "details": {
+              "description": "Details contains potential status errors",
+              "type": "string"
+            },
+            "lastChanged": {
+              "description": "LastChanged is the last time time the status last changed",
+              "type": "string"
+            },
+            "lastChecked": {
+              "description": "LastChecked is the last time time the status was checked",
+              "type": "string"
+            },
+            "summary": {
+              "description": "Summary is the mirroring status summary",
+              "properties": {
+                "daemon_health": {
+                  "description": "DaemonHealth is the health of the mirroring daemon",
+                  "type": "string"
+                },
+                "health": {
+                  "description": "Health is the mirroring health",
+                  "type": "string"
+                },
+                "image_health": {
+                  "description": "ImageHealth is the health of the mirrored image",
+                  "type": "string"
+                },
+                "states": {
+                  "description": "States is the various state for all mirrored images",
+                  "nullable": true,
+                  "properties": {
+                    "error": {
+                      "description": "Error is when the mirroring state is errored",
+                      "type": "integer"
+                    },
+                    "replaying": {
+                      "description": "Replaying is when the replay of the mirroring journal is on-going",
+                      "type": "integer"
+                    },
+                    "starting_replay": {
+                      "description": "StartingReplay is when the replay of the mirroring journal starts",
+                      "type": "integer"
+                    },
+                    "stopped": {
+                      "description": "Stopped is when the mirroring state is stopped",
+                      "type": "integer"
+                    },
+                    "stopping_replay": {
+                      "description": "StopReplaying is when the replay of the mirroring journal stops",
+                      "type": "integer"
+                    },
+                    "syncing": {
+                      "description": "Syncing is when the image is syncing",
+                      "type": "integer"
+                    },
+                    "unknown": {
+                      "description": "Unknown is when the mirroring state is unknown",
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the latest generation observed by the controller.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "phase": {
+          "description": "ConditionType represent a resource's status",
+          "type": "string"
+        },
+        "snapshotScheduleStatus": {
+          "description": "SnapshotScheduleStatusSpec is the status of the snapshot schedule",
+          "properties": {
+            "details": {
+              "description": "Details contains potential status errors",
+              "type": "string"
+            },
+            "lastChanged": {
+              "description": "LastChanged is the last time time the status last changed",
+              "type": "string"
+            },
+            "lastChecked": {
+              "description": "LastChecked is the last time time the status was checked",
+              "type": "string"
+            },
+            "snapshotSchedules": {
+              "description": "SnapshotSchedules is the list of snapshots scheduled",
+              "items": {
+                "description": "SnapshotSchedulesSpec is the list of snapshot scheduled for images in a pool",
+                "properties": {
+                  "image": {
+                    "description": "Image is the mirrored image",
+                    "type": "string"
+                  },
+                  "items": {
+                    "description": "Items is the list schedules times for a given snapshot",
+                    "items": {
+                      "description": "SnapshotSchedule is a schedule",
+                      "properties": {
+                        "interval": {
+                          "description": "Interval is the interval in which snapshots will be taken",
+                          "type": "string"
+                        },
+                        "start_time": {
+                          "description": "StartTime is the snapshot starting time",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the RADOS namespace the image is part of",
+                    "type": "string"
+                  },
+                  "pool": {
+                    "description": "Pool is the pool name",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "nullable": true,
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "x-kubernetes-preserve-unknown-fields": true,
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "metadata",
+    "spec"
+  ],
+  "type": "object"
+}

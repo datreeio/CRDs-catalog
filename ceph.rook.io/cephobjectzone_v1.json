@@ -16,7 +16,7 @@
       "description": "ObjectZoneSpec represent the spec of an ObjectZone",
       "properties": {
         "customEndpoints": {
-          "description": "If this zone cannot be accessed from other peer Ceph clusters via the ClusterIP Service\nendpoint created by Rook, you must set this to the externally reachable endpoint(s). You may\ninclude the port in the definition. For example: \"https://my-object-store.my-domain.net:443\".\nIn many cases, you should set this to the endpoint of the ingress resource that makes the\nCephObjectStore associated with this CephObjectStoreZone reachable to peer clusters.\nThe list can have one or more endpoints pointing to different RGW servers in the zone.\n\n\nIf a CephObjectStore endpoint is omitted from this list, that object store's gateways will\nnot receive multisite replication data\n(see CephObjectStore.spec.gateway.disableMultisiteSyncTraffic).",
+          "description": "If this zone cannot be accessed from other peer Ceph clusters via the ClusterIP Service\nendpoint created by Rook, you must set this to the externally reachable endpoint(s). You may\ninclude the port in the definition. For example: \"https://my-object-store.my-domain.net:443\".\nIn many cases, you should set this to the endpoint of the ingress resource that makes the\nCephObjectStore associated with this CephObjectStoreZone reachable to peer clusters.\nThe list can have one or more endpoints pointing to different RGW servers in the zone.\n\nIf a CephObjectStore endpoint is omitted from this list, that object store's gateways will\nnot receive multisite replication data\n(see CephObjectStore.spec.gateway.disableMultisiteSyncTraffic).",
           "items": {
             "type": "string"
           },
@@ -52,6 +52,10 @@
               "description": "The device class the OSD should set to for use in the pool",
               "nullable": true,
               "type": "string"
+            },
+            "enableCrushUpdates": {
+              "description": "Allow rook operator to change the pool CRUSH tunables once the pool is created",
+              "type": "boolean"
             },
             "enableRBDStats": {
               "description": "EnableRBDStats is used to enable gathering of statistics for all RBD images in the pool",
@@ -285,6 +289,10 @@
               "nullable": true,
               "type": "string"
             },
+            "enableCrushUpdates": {
+              "description": "Allow rook operator to change the pool CRUSH tunables once the pool is created",
+              "type": "boolean"
+            },
             "enableRBDStats": {
               "description": "EnableRBDStats is used to enable gathering of statistics for all RBD images in the pool",
               "type": "boolean"
@@ -516,15 +524,75 @@
                 }
               ]
             },
+            "poolPlacements": {
+              "description": "PoolPlacements control which Pools are associated with a particular RGW bucket.\nOnce PoolPlacements are defined, RGW client will be able to associate pool\nwith ObjectStore bucket by providing \"<LocationConstraint>\" during s3 bucket creation\nor \"X-Storage-Policy\" header during swift container creation.\nSee: https://docs.ceph.com/en/latest/radosgw/placement/#placement-targets\nPoolPlacement with name: \"default\" will be used as a default pool if no option\nis provided during bucket creation.\nIf default placement is not provided, spec.sharedPools.dataPoolName and spec.sharedPools.MetadataPoolName will be used as default pools.\nIf spec.sharedPools are also empty, then RGW pools (spec.dataPool and spec.metadataPool) will be used as defaults.",
+              "items": {
+                "properties": {
+                  "dataNonECPoolName": {
+                    "description": "The data pool used to store ObjectStore data that cannot use erasure coding (ex: multi-part uploads).\nIf dataPoolName is not erasure coded, then there is no need for dataNonECPoolName.",
+                    "type": "string"
+                  },
+                  "dataPoolName": {
+                    "description": "The data pool used to store ObjectStore objects data.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "default": {
+                    "description": "Sets given placement as default. Only one placement in the list can be marked as default.\nDefault is false.",
+                    "type": "boolean"
+                  },
+                  "metadataPoolName": {
+                    "description": "The metadata pool used to store ObjectStore bucket index.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Pool placement name. Name can be arbitrary. Placement with name \"default\" will be used as default.",
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z0-9._/-]+$",
+                    "type": "string"
+                  },
+                  "storageClasses": {
+                    "description": "StorageClasses can be selected by user to override dataPoolName during object creation.\nEach placement has default STANDARD StorageClass pointing to dataPoolName.\nThis list allows defining additional StorageClasses on top of default STANDARD storage class.",
+                    "items": {
+                      "properties": {
+                        "dataPoolName": {
+                          "description": "DataPoolName is the data pool used to store ObjectStore objects data.",
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the StorageClass name. Ceph allows arbitrary name for StorageClasses,\nhowever most clients/libs insist on AWS names so it is recommended to use\none of the valid x-amz-storage-class values for better compatibility:\nREDUCED_REDUNDANCY | STANDARD_IA | ONEZONE_IA | INTELLIGENT_TIERING | GLACIER | DEEP_ARCHIVE | OUTPOSTS | GLACIER_IR | SNOW | EXPRESS_ONEZONE\nSee AWS docs: https://aws.amazon.com/de/s3/storage-classes/",
+                          "minLength": 1,
+                          "pattern": "^[a-zA-Z0-9._/-]+$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "dataPoolName",
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "dataPoolName",
+                  "metadataPoolName",
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
             "preserveRadosNamespaceDataOnDelete": {
               "description": "Whether the RADOS namespaces should be preserved on deletion of the object store",
               "type": "boolean"
             }
           },
-          "required": [
-            "dataPoolName",
-            "metadataPoolName"
-          ],
           "type": "object",
           "additionalProperties": false
         },
@@ -534,8 +602,6 @@
         }
       },
       "required": [
-        "dataPool",
-        "metadataPool",
         "zoneGroup"
       ],
       "type": "object",

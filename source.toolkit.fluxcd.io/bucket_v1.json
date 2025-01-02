@@ -1,5 +1,5 @@
 {
-  "description": "OCIRepository is the Schema for the ocirepositories API",
+  "description": "Bucket is the Schema for the buckets API.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,10 +13,14 @@
       "type": "object"
     },
     "spec": {
-      "description": "OCIRepositorySpec defines the desired state of OCIRepository",
+      "description": "BucketSpec specifies the required configuration to produce an Artifact for\nan object storage bucket.",
       "properties": {
+        "bucketName": {
+          "description": "BucketName is the name of the object storage bucket.",
+          "type": "string"
+        },
         "certSecretRef": {
-          "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nregistry. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.\n\nNote: Support for the `caFile`, `certFile` and `keyFile` keys have\nbeen deprecated.",
+          "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nbucket. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.\n\nThis field is only supported for the `generic` provider.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -28,52 +32,41 @@
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "endpoint": {
+          "description": "Endpoint is the object storage address the BucketName is located at.",
+          "type": "string"
         },
         "ignore": {
           "description": "Ignore overrides the set of excluded patterns in the .sourceignore format\n(which is the same as .gitignore). If not provided, a default will be used,\nconsult the documentation for your version to find out what those are.",
           "type": "string"
         },
         "insecure": {
-          "description": "Insecure allows connecting to a non-TLS HTTP container registry.",
+          "description": "Insecure allows connecting to a non-TLS HTTP Endpoint.",
           "type": "boolean"
         },
         "interval": {
-          "description": "Interval at which the OCIRepository URL is checked for updates.\nThis interval is approximate and may be subject to jitter to ensure\nefficient use of resources.",
+          "description": "Interval at which the Bucket Endpoint is checked for updates.\nThis interval is approximate and may be subject to jitter to ensure\nefficient use of resources.",
           "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
           "type": "string"
         },
-        "layerSelector": {
-          "description": "LayerSelector specifies which layer should be extracted from the OCI artifact.\nWhen not specified, the first layer found in the artifact is selected.",
-          "properties": {
-            "mediaType": {
-              "description": "MediaType specifies the OCI media type of the layer\nwhich should be extracted from the OCI Artifact. The\nfirst layer matching this type is selected.",
-              "type": "string"
-            },
-            "operation": {
-              "description": "Operation specifies how the selected layer should be processed.\nBy default, the layer compressed content is extracted to storage.\nWhen the operation is set to 'copy', the layer compressed content\nis persisted to storage as it is.",
-              "enum": [
-                "extract",
-                "copy"
-              ],
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
+        "prefix": {
+          "description": "Prefix to use for server-side filtering of files in the Bucket.",
+          "type": "string"
         },
         "provider": {
           "default": "generic",
-          "description": "The provider used for authentication, can be 'aws', 'azure', 'gcp' or 'generic'.\nWhen not specified, defaults to 'generic'.",
+          "description": "Provider of the object storage bucket.\nDefaults to 'generic', which expects an S3 (API) compatible object\nstorage.",
           "enum": [
             "generic",
             "aws",
-            "azure",
-            "gcp"
+            "gcp",
+            "azure"
           ],
           "type": "string"
         },
         "proxySecretRef": {
-          "description": "ProxySecretRef specifies the Secret containing the proxy configuration\nto use while communicating with the container registry.",
+          "description": "ProxySecretRef specifies the Secret containing the proxy configuration\nto use while communicating with the Bucket server.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -86,31 +79,12 @@
           "type": "object",
           "additionalProperties": false
         },
-        "ref": {
-          "description": "The OCI reference to pull and monitor for changes,\ndefaults to the latest tag.",
-          "properties": {
-            "digest": {
-              "description": "Digest is the image digest to pull, takes precedence over SemVer.\nThe value should be in the format 'sha256:<HASH>'.",
-              "type": "string"
-            },
-            "semver": {
-              "description": "SemVer is the range of tags to pull selecting the latest within\nthe range, takes precedence over Tag.",
-              "type": "string"
-            },
-            "semverFilter": {
-              "description": "SemverFilter is a regex pattern to filter the tags within the SemVer range.",
-              "type": "string"
-            },
-            "tag": {
-              "description": "Tag is the image tag to pull, defaults to latest.",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
+        "region": {
+          "description": "Region of the Endpoint where the BucketName is located in.",
+          "type": "string"
         },
         "secretRef": {
-          "description": "SecretRef contains the secret name containing the registry login\ncredentials to resolve image metadata.\nThe secret must be of type kubernetes.io/dockerconfigjson.",
+          "description": "SecretRef specifies the Secret containing authentication credentials\nfor the Bucket.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -123,62 +97,38 @@
           "type": "object",
           "additionalProperties": false
         },
-        "serviceAccountName": {
-          "description": "ServiceAccountName is the name of the Kubernetes ServiceAccount used to authenticate\nthe image pull if the service account has attached pull secrets. For more information:\nhttps://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account",
-          "type": "string"
-        },
-        "suspend": {
-          "description": "This flag tells the controller to suspend the reconciliation of this source.",
-          "type": "boolean"
-        },
-        "timeout": {
-          "default": "60s",
-          "description": "The timeout for remote OCI Repository operations like pulling, defaults to 60s.",
-          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m))+$",
-          "type": "string"
-        },
-        "url": {
-          "description": "URL is a reference to an OCI artifact repository hosted\non a remote container registry.",
-          "pattern": "^oci://.*$",
-          "type": "string"
-        },
-        "verify": {
-          "description": "Verify contains the secret name containing the trusted public keys\nused to verify the signature and specifies which provider to use to check\nwhether OCI image is authentic.",
+        "sts": {
+          "description": "STS specifies the required configuration to use a Security Token\nService for fetching temporary credentials to authenticate in a\nBucket provider.\n\nThis field is only supported for the `aws` and `generic` providers.",
           "properties": {
-            "matchOIDCIdentity": {
-              "description": "MatchOIDCIdentity specifies the identity matching criteria to use\nwhile verifying an OCI artifact which was signed using Cosign keyless\nsigning. The artifact's identity is deemed to be verified if any of the\nspecified matchers match against the identity.",
-              "items": {
-                "description": "OIDCIdentityMatch specifies options for verifying the certificate identity,\ni.e. the issuer and the subject of the certificate.",
-                "properties": {
-                  "issuer": {
-                    "description": "Issuer specifies the regex pattern to match against to verify\nthe OIDC issuer in the Fulcio certificate. The pattern must be a\nvalid Go regular expression.",
-                    "type": "string"
-                  },
-                  "subject": {
-                    "description": "Subject specifies the regex pattern to match against to verify\nthe identity subject in the Fulcio certificate. The pattern must\nbe a valid Go regular expression.",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "issuer",
-                  "subject"
-                ],
-                "type": "object",
-                "additionalProperties": false
+            "certSecretRef": {
+              "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nSTS endpoint. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.\n\nThis field is only supported for the `ldap` provider.",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent.",
+                  "type": "string"
+                }
               },
-              "type": "array"
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "endpoint": {
+              "description": "Endpoint is the HTTP/S endpoint of the Security Token Service from\nwhere temporary credentials will be fetched.",
+              "pattern": "^(http|https)://.*$",
+              "type": "string"
             },
             "provider": {
-              "default": "cosign",
-              "description": "Provider specifies the technology used to sign the OCI Artifact.",
+              "description": "Provider of the Security Token Service.",
               "enum": [
-                "cosign",
-                "notation"
+                "aws",
+                "ldap"
               ],
               "type": "string"
             },
             "secretRef": {
-              "description": "SecretRef specifies the Kubernetes Secret containing the\ntrusted public keys.",
+              "description": "SecretRef specifies the Secret containing authentication credentials\nfor the STS endpoint. This Secret must contain the fields `username`\nand `password` and is supported only for the `ldap` provider.",
               "properties": {
                 "name": {
                   "description": "Name of the referent.",
@@ -193,27 +143,61 @@
             }
           },
           "required": [
+            "endpoint",
             "provider"
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "suspend": {
+          "description": "Suspend tells the controller to suspend the reconciliation of this\nBucket.",
+          "type": "boolean"
+        },
+        "timeout": {
+          "default": "60s",
+          "description": "Timeout for fetch operations, defaults to 60s.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m))+$",
+          "type": "string"
         }
       },
       "required": [
-        "interval",
-        "url"
+        "bucketName",
+        "endpoint",
+        "interval"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "STS configuration is only supported for the 'aws' and 'generic' Bucket providers",
+          "rule": "self.provider == 'aws' || self.provider == 'generic' || !has(self.sts)"
+        },
+        {
+          "message": "'aws' is the only supported STS provider for the 'aws' Bucket provider",
+          "rule": "self.provider != 'aws' || !has(self.sts) || self.sts.provider == 'aws'"
+        },
+        {
+          "message": "'ldap' is the only supported STS provider for the 'generic' Bucket provider",
+          "rule": "self.provider != 'generic' || !has(self.sts) || self.sts.provider == 'ldap'"
+        },
+        {
+          "message": "spec.sts.secretRef is not required for the 'aws' STS provider",
+          "rule": "!has(self.sts) || self.sts.provider != 'aws' || !has(self.sts.secretRef)"
+        },
+        {
+          "message": "spec.sts.certSecretRef is not required for the 'aws' STS provider",
+          "rule": "!has(self.sts) || self.sts.provider != 'aws' || !has(self.sts.certSecretRef)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
       "default": {
         "observedGeneration": -1
       },
-      "description": "OCIRepositoryStatus defines the observed state of OCIRepository",
+      "description": "BucketStatus records the observed state of a Bucket.",
       "properties": {
         "artifact": {
-          "description": "Artifact represents the output of the last successful OCI Repository sync.",
+          "description": "Artifact represents the last successful Bucket reconciliation.",
           "properties": {
             "digest": {
               "description": "Digest is the digest of the file in the form of '<algorithm>:<checksum>'.",
@@ -260,7 +244,7 @@
           "additionalProperties": false
         },
         "conditions": {
-          "description": "Conditions holds the conditions for the OCIRepository.",
+          "description": "Conditions holds the conditions for the Bucket.",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
@@ -315,16 +299,12 @@
           },
           "type": "array"
         },
-        "contentConfigChecksum": {
-          "description": "ContentConfigChecksum is a checksum of all the configurations related to\nthe content of the source artifact:\n - .spec.ignore\n - .spec.layerSelector\nobserved in .status.observedGeneration version of the object. This can\nbe used to determine if the content configuration has changed and the\nartifact needs to be rebuilt.\nIt has the format of `<algo>:<checksum>`, for example: `sha256:<checksum>`.\n\nDeprecated: Replaced with explicit fields for observed artifact content\nconfig in the status.",
-          "type": "string"
-        },
         "lastHandledReconcileAt": {
           "description": "LastHandledReconcileAt holds the value of the most recent\nreconcile request value, so a change of the annotation value\ncan be detected.",
           "type": "string"
         },
         "observedGeneration": {
-          "description": "ObservedGeneration is the last observed generation.",
+          "description": "ObservedGeneration is the last observed generation of the Bucket object.",
           "format": "int64",
           "type": "integer"
         },
@@ -332,27 +312,8 @@
           "description": "ObservedIgnore is the observed exclusion patterns used for constructing\nthe source artifact.",
           "type": "string"
         },
-        "observedLayerSelector": {
-          "description": "ObservedLayerSelector is the observed layer selector used for constructing\nthe source artifact.",
-          "properties": {
-            "mediaType": {
-              "description": "MediaType specifies the OCI media type of the layer\nwhich should be extracted from the OCI Artifact. The\nfirst layer matching this type is selected.",
-              "type": "string"
-            },
-            "operation": {
-              "description": "Operation specifies how the selected layer should be processed.\nBy default, the layer compressed content is extracted to storage.\nWhen the operation is set to 'copy', the layer compressed content\nis persisted to storage as it is.",
-              "enum": [
-                "extract",
-                "copy"
-              ],
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
         "url": {
-          "description": "URL is the download link for the artifact output of the last OCI Repository sync.",
+          "description": "URL is the dynamic fetch link for the latest Artifact.\nIt is provided on a \"best effort\" basis, and using the precise\nBucketStatus.Artifact data is recommended.",
           "type": "string"
         }
       },

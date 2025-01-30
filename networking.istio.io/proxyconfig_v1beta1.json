@@ -6,11 +6,13 @@
         "concurrency": {
           "description": "The number of worker threads to run.",
           "format": "int32",
+          "minimum": 0,
           "nullable": true,
           "type": "integer"
         },
         "environmentVariables": {
           "additionalProperties": {
+            "maxLength": 2048,
             "type": "string"
           },
           "description": "Additional environment variables for the proxy.",
@@ -32,10 +34,28 @@
           "properties": {
             "matchLabels": {
               "additionalProperties": {
-                "type": "string"
+                "maxLength": 63,
+                "type": "string",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "wildcard not allowed in label value match",
+                    "rule": "!self.contains('*')"
+                  }
+                ]
               },
               "description": "One or more labels that indicate a specific set of pods/VMs on which a policy should be applied.",
-              "type": "object"
+              "maxProperties": 4096,
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "wildcard not allowed in label key match",
+                  "rule": "self.all(key, !key.contains('*'))"
+                },
+                {
+                  "message": "key must not be empty",
+                  "rule": "self.all(key, key.size() != 0)"
+                }
+              ]
             }
           },
           "type": "object",
@@ -46,8 +66,97 @@
       "additionalProperties": false
     },
     "status": {
+      "properties": {
+        "conditions": {
+          "description": "Current service state of the resource.",
+          "items": {
+            "properties": {
+              "lastProbeTime": {
+                "description": "Last time we probed the condition.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "description": "Last time the condition transitioned from one status to another.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "Human-readable message indicating details about last transition.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status is the status of the condition.",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type is the type of the condition.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "observedGeneration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Resource Generation to which the Reconciled Condition refers.",
+          "x-kubernetes-int-or-string": true
+        },
+        "validationMessages": {
+          "description": "Includes any errors or warnings detected by Istio's analyzers.",
+          "items": {
+            "properties": {
+              "documentationUrl": {
+                "description": "A url pointing to the Istio documentation for this specific error type.",
+                "type": "string"
+              },
+              "level": {
+                "description": "Represents how severe a message is.\n\nValid Options: UNKNOWN, ERROR, WARNING, INFO",
+                "enum": [
+                  "UNKNOWN",
+                  "ERROR",
+                  "WARNING",
+                  "INFO"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "properties": {
+                  "code": {
+                    "description": "A 7 character code matching `^IST[0-9]{4}$` intended to uniquely identify the message type.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "A human-readable name for the message type.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
       "type": "object",
-      "x-kubernetes-preserve-unknown-fields": true
+      "x-kubernetes-preserve-unknown-fields": true,
+      "additionalProperties": false
     }
   },
   "type": "object"

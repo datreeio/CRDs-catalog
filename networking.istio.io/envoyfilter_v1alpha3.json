@@ -308,24 +308,48 @@
             "properties": {
               "group": {
                 "description": "group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
                 "type": "string"
               },
               "kind": {
                 "description": "kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
                 "type": "string"
               },
               "name": {
                 "description": "name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
                 "type": "string"
               },
               "namespace": {
                 "description": "namespace is the namespace of the referent.",
-                "type": "string"
+                "type": "string",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "cross namespace referencing is not currently supported",
+                    "rule": "self.size() == 0"
+                  }
+                ]
               }
             },
+            "required": [
+              "kind",
+              "name"
+            ],
             "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "Support kinds are core/Service, networking.istio.io/ServiceEntry, gateway.networking.k8s.io/Gateway",
+                "rule": "[self.group, self.kind] in [['core','Service'], ['','Service'], ['gateway.networking.k8s.io','Gateway'], ['networking.istio.io','ServiceEntry']]"
+              }
+            ],
             "additionalProperties": false
           },
+          "maxItems": 16,
           "type": "array"
         },
         "workloadSelector": {
@@ -333,9 +357,17 @@
           "properties": {
             "labels": {
               "additionalProperties": {
-                "type": "string"
+                "maxLength": 63,
+                "type": "string",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "wildcard is not supported in selector",
+                    "rule": "!self.contains('*')"
+                  }
+                ]
               },
               "description": "One or more labels that indicate a specific set of pods/VMs on which the configuration should be applied.",
+              "maxProperties": 256,
               "type": "object"
             }
           },
@@ -344,11 +376,106 @@
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "only one of targetRefs or workloadSelector can be set",
+          "rule": "(has(self.workloadSelector)?1:0)+(has(self.targetRefs)?1:0)<=1"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
+      "properties": {
+        "conditions": {
+          "description": "Current service state of the resource.",
+          "items": {
+            "properties": {
+              "lastProbeTime": {
+                "description": "Last time we probed the condition.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "description": "Last time the condition transitioned from one status to another.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "Human-readable message indicating details about last transition.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status is the status of the condition.",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type is the type of the condition.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "observedGeneration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Resource Generation to which the Reconciled Condition refers.",
+          "x-kubernetes-int-or-string": true
+        },
+        "validationMessages": {
+          "description": "Includes any errors or warnings detected by Istio's analyzers.",
+          "items": {
+            "properties": {
+              "documentationUrl": {
+                "description": "A url pointing to the Istio documentation for this specific error type.",
+                "type": "string"
+              },
+              "level": {
+                "description": "Represents how severe a message is.\n\nValid Options: UNKNOWN, ERROR, WARNING, INFO",
+                "enum": [
+                  "UNKNOWN",
+                  "ERROR",
+                  "WARNING",
+                  "INFO"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "properties": {
+                  "code": {
+                    "description": "A 7 character code matching `^IST[0-9]{4}$` intended to uniquely identify the message type.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "A human-readable name for the message type.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
       "type": "object",
-      "x-kubernetes-preserve-unknown-fields": true
+      "x-kubernetes-preserve-unknown-fields": true,
+      "additionalProperties": false
     }
   },
   "type": "object"

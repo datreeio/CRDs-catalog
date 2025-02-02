@@ -10,12 +10,14 @@
               "additionalProperties": {
                 "type": "string"
               },
+              "maxProperties": 256,
               "type": "object"
             },
             "labels": {
               "additionalProperties": {
                 "type": "string"
               },
+              "maxProperties": 256,
               "type": "object"
             }
           },
@@ -69,17 +71,22 @@
                 "command": {
                   "description": "Command to run.",
                   "items": {
+                    "minLength": 1,
                     "type": "string"
                   },
                   "type": "array"
                 }
               },
+              "required": [
+                "command"
+              ],
               "type": "object",
               "additionalProperties": false
             },
             "failureThreshold": {
               "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded.",
               "format": "int32",
+              "minimum": 0,
               "type": "integer"
             },
             "httpGet": {
@@ -94,6 +101,7 @@
                   "items": {
                     "properties": {
                       "name": {
+                        "pattern": "^[-_A-Za-z0-9]+$",
                         "type": "string"
                       },
                       "value": {
@@ -113,10 +121,22 @@
                   "description": "Port on which the endpoint lives.",
                   "maximum": 4294967295,
                   "minimum": 0,
-                  "type": "integer"
+                  "type": "integer",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "port must be between 1-65535",
+                      "rule": "0 < self && self <= 65535"
+                    }
+                  ]
                 },
                 "scheme": {
-                  "type": "string"
+                  "type": "string",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "scheme must be one of [HTTP, HTTPS]",
+                      "rule": "self in ['', 'HTTP', 'HTTPS']"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -128,16 +148,19 @@
             "initialDelaySeconds": {
               "description": "Number of seconds after the container has started before readiness probes are initiated.",
               "format": "int32",
+              "minimum": 0,
               "type": "integer"
             },
             "periodSeconds": {
               "description": "How often (in seconds) to perform the probe.",
               "format": "int32",
+              "minimum": 0,
               "type": "integer"
             },
             "successThreshold": {
               "description": "Minimum consecutive successes for the probe to be considered successful after having failed.",
               "format": "int32",
+              "minimum": 0,
               "type": "integer"
             },
             "tcpSocket": {
@@ -149,7 +172,13 @@
                 "port": {
                   "maximum": 4294967295,
                   "minimum": 0,
-                  "type": "integer"
+                  "type": "integer",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "port must be between 1-65535",
+                      "rule": "0 < self && self <= 65535"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -161,6 +190,7 @@
             "timeoutSeconds": {
               "description": "Number of seconds after which the probe times out.",
               "format": "int32",
+              "minimum": 0,
               "type": "integer"
             }
           },
@@ -172,34 +202,62 @@
           "properties": {
             "address": {
               "description": "Address associated with the network endpoint without the port.",
-              "type": "string"
+              "maxLength": 256,
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "UDS must be an absolute path or abstract socket",
+                  "rule": "self.startsWith('unix://') ? (self.substring(7,8) == '/' || self.substring(7,8) == '@') : true"
+                },
+                {
+                  "message": "UDS may not be a dir",
+                  "rule": "self.startsWith('unix://') ? !self.endsWith('/') : true"
+                }
+              ]
             },
             "labels": {
               "additionalProperties": {
                 "type": "string"
               },
               "description": "One or more labels associated with the endpoint.",
+              "maxProperties": 256,
               "type": "object"
             },
             "locality": {
               "description": "The locality associated with the endpoint.",
+              "maxLength": 2048,
               "type": "string"
             },
             "network": {
               "description": "Network enables Istio to group endpoints resident in the same L3 domain/network.",
+              "maxLength": 2048,
               "type": "string"
             },
             "ports": {
               "additionalProperties": {
                 "maximum": 4294967295,
                 "minimum": 0,
-                "type": "integer"
+                "type": "integer",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "port must be between 1-65535",
+                    "rule": "0 < self && self <= 65535"
+                  }
+                ]
               },
               "description": "Set of ports associated with the endpoint.",
-              "type": "object"
+              "maxProperties": 128,
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "port name must be valid",
+                  "rule": "self.all(key, size(key) < 63 && key.matches('^[a-zA-Z0-9](?:[-a-zA-Z0-9]*[a-zA-Z0-9])?$'))"
+                }
+              ]
             },
             "serviceAccount": {
               "description": "The service account associated with the workload if a sidecar is present in the workload.",
+              "maxLength": 253,
               "type": "string"
             },
             "weight": {
@@ -210,6 +268,12 @@
             }
           },
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "UDS may not include ports",
+              "rule": "(has(self.address) && self.address.startsWith('unix://')) ? !has(self.ports) : true"
+            }
+          ],
           "additionalProperties": false
         }
       },
@@ -220,9 +284,101 @@
       "additionalProperties": false
     },
     "status": {
+      "properties": {
+        "conditions": {
+          "description": "Current service state of the resource.",
+          "items": {
+            "properties": {
+              "lastProbeTime": {
+                "description": "Last time we probed the condition.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "description": "Last time the condition transitioned from one status to another.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "Human-readable message indicating details about last transition.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "Unique, one-word, CamelCase reason for the condition's last transition.",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status is the status of the condition.",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type is the type of the condition.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "observedGeneration": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "Resource Generation to which the Reconciled Condition refers.",
+          "x-kubernetes-int-or-string": true
+        },
+        "validationMessages": {
+          "description": "Includes any errors or warnings detected by Istio's analyzers.",
+          "items": {
+            "properties": {
+              "documentationUrl": {
+                "description": "A url pointing to the Istio documentation for this specific error type.",
+                "type": "string"
+              },
+              "level": {
+                "description": "Represents how severe a message is.\n\nValid Options: UNKNOWN, ERROR, WARNING, INFO",
+                "enum": [
+                  "UNKNOWN",
+                  "ERROR",
+                  "WARNING",
+                  "INFO"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "properties": {
+                  "code": {
+                    "description": "A 7 character code matching `^IST[0-9]{4}$` intended to uniquely identify the message type.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "A human-readable name for the message type.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
       "type": "object",
-      "x-kubernetes-preserve-unknown-fields": true
+      "x-kubernetes-preserve-unknown-fields": true,
+      "additionalProperties": false
     }
   },
+  "required": [
+    "spec"
+  ],
   "type": "object"
 }

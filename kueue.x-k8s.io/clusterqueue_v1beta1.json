@@ -1,0 +1,650 @@
+{
+  "description": "ClusterQueue is the Schema for the clusterQueue API.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "ClusterQueueSpec defines the desired state of ClusterQueue",
+      "properties": {
+        "admissionChecks": {
+          "description": "admissionChecks lists the AdmissionChecks required by this ClusterQueue.\nCannot be used along with AdmissionCheckStrategy.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "admissionChecksStrategy": {
+          "description": "admissionCheckStrategy defines a list of strategies to determine which ResourceFlavors require AdmissionChecks.\nThis property cannot be used in conjunction with the 'admissionChecks' property.",
+          "properties": {
+            "admissionChecks": {
+              "description": "admissionChecks is a list of strategies for AdmissionChecks",
+              "items": {
+                "description": "AdmissionCheckStrategyRule defines rules for a single AdmissionCheck",
+                "properties": {
+                  "name": {
+                    "description": "name is an AdmissionCheck's name.",
+                    "type": "string"
+                  },
+                  "onFlavors": {
+                    "description": "onFlavors is a list of ResourceFlavors' names that this AdmissionCheck should run for.\nIf empty, the AdmissionCheck will run for all workloads submitted to the ClusterQueue.",
+                    "items": {
+                      "description": "ResourceFlavorReference is the name of the ResourceFlavor.",
+                      "maxLength": 253,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "cohort": {
+          "description": "cohort that this ClusterQueue belongs to. CQs that belong to the\nsame cohort can borrow unused resources from each other.\n\nA CQ can be a member of a single borrowing cohort. A workload submitted\nto a queue referencing this CQ can borrow quota from any CQ in the cohort.\nOnly quota for the [resource, flavor] pairs listed in the CQ can be\nborrowed.\nIf empty, this ClusterQueue cannot borrow from any other ClusterQueue and\nvice versa.\n\nA cohort is a name that links CQs together, but it doesn't reference any\nobject.\n\nValidation of a cohort name is equivalent to that of object names:\nsubdomain in DNS (RFC 1123).",
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+          "type": "string"
+        },
+        "fairSharing": {
+          "description": "fairSharing defines the properties of the ClusterQueue when participating in fair sharing.\nThe values are only relevant if fair sharing is enabled in the Kueue configuration.",
+          "properties": {
+            "weight": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": 1,
+              "description": "weight gives a comparative advantage to this ClusterQueue when competing for unused\nresources in the cohort against other ClusterQueues.\nThe share of a ClusterQueue is based on the dominant resource usage above nominal\nquotas for each resource, divided by the weight.\nAdmission prioritizes scheduling workloads from ClusterQueues with the lowest share\nand preempting workloads from the ClusterQueues with the highest share.\nA zero weight implies infinite share value, meaning that this ClusterQueue will always\nbe at disadvantage against other ClusterQueues.",
+              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+              "x-kubernetes-int-or-string": true
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "flavorFungibility": {
+          "default": {},
+          "description": "flavorFungibility defines whether a workload should try the next flavor\nbefore borrowing or preempting in the flavor being evaluated.",
+          "properties": {
+            "whenCanBorrow": {
+              "default": "Borrow",
+              "description": "whenCanBorrow determines whether a workload should try the next flavor\nbefore borrowing in current flavor. The possible values are:\n\n- `Borrow` (default): allocate in current flavor if borrowing\n  is possible.\n- `TryNextFlavor`: try next flavor even if the current\n  flavor has enough resources to borrow.",
+              "enum": [
+                "Borrow",
+                "TryNextFlavor"
+              ],
+              "type": "string"
+            },
+            "whenCanPreempt": {
+              "default": "TryNextFlavor",
+              "description": "whenCanPreempt determines whether a workload should try the next flavor\nbefore borrowing in current flavor. The possible values are:\n\n- `Preempt`: allocate in current flavor if it's possible to preempt some workloads.\n- `TryNextFlavor` (default): try next flavor even if there are enough\n  candidates for preemption in the current flavor.",
+              "enum": [
+                "Preempt",
+                "TryNextFlavor"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "namespaceSelector": {
+          "description": "namespaceSelector defines which namespaces are allowed to submit workloads to\nthis clusterQueue. Beyond this basic support for policy, a policy agent like\nGatekeeper should be used to enforce more advanced policies.\nDefaults to null which is a nothing selector (no namespaces eligible).\nIf set to an empty selector `{}`, then all namespaces are eligible.",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "preemption": {
+          "default": {},
+          "description": "preemption describes policies to preempt Workloads from this ClusterQueue\nor the ClusterQueue's cohort.\n\nPreemption can happen in two scenarios:\n\n- When a Workload fits within the nominal quota of the ClusterQueue, but\n  the quota is currently borrowed by other ClusterQueues in the cohort.\n  Preempting Workloads in other ClusterQueues allows this ClusterQueue to\n  reclaim its nominal quota.\n- When a Workload doesn't fit within the nominal quota of the ClusterQueue\n  and there are admitted Workloads in the ClusterQueue with lower priority.\n\nThe preemption algorithm tries to find a minimal set of Workloads to\npreempt to accomomdate the pending Workload, preempting Workloads with\nlower priority first.",
+          "properties": {
+            "borrowWithinCohort": {
+              "default": {},
+              "description": "borrowWithinCohort provides configuration to allow preemption within\ncohort while borrowing.",
+              "properties": {
+                "maxPriorityThreshold": {
+                  "description": "maxPriorityThreshold allows to restrict the set of workloads which\nmight be preempted by a borrowing workload, to only workloads with\npriority less than or equal to the specified threshold priority.\nWhen the threshold is not specified, then any workload satisfying the\npolicy can be preempted by the borrowing workload.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "policy": {
+                  "default": "Never",
+                  "description": "policy determines the policy for preemption to reclaim quota within cohort while borrowing.\nPossible values are:\n- `Never` (default): do not allow for preemption, in other\n   ClusterQueues within the cohort, for a borrowing workload.\n- `LowerPriority`: allow preemption, in other ClusterQueues\n   within the cohort, for a borrowing workload, but only if\n   the preempted workloads are of lower priority.",
+                  "enum": [
+                    "Never",
+                    "LowerPriority"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "reclaimWithinCohort": {
+              "default": "Never",
+              "description": "reclaimWithinCohort determines whether a pending Workload can preempt\nWorkloads from other ClusterQueues in the cohort that are using more than\ntheir nominal quota. The possible values are:\n\n- `Never` (default): do not preempt Workloads in the cohort.\n- `LowerPriority`: **Classic Preemption** if the pending Workload\n  fits within the nominal quota of its ClusterQueue, only preempt\n  Workloads in the cohort that have lower priority than the pending\n  Workload. **Fair Sharing** only preempt Workloads in the cohort that\n  have lower priority than the pending Workload and that satisfy the\n  fair sharing preemptionStategies.\n- `Any`: **Classic Preemption** if the pending Workload fits within\n   the nominal quota of its ClusterQueue, preempt any Workload in the\n   cohort, irrespective of priority. **Fair Sharing** preempt Workloads\n   in the cohort that satisfy the fair sharing preemptionStrategies.",
+              "enum": [
+                "Never",
+                "LowerPriority",
+                "Any"
+              ],
+              "type": "string"
+            },
+            "withinClusterQueue": {
+              "default": "Never",
+              "description": "withinClusterQueue determines whether a pending Workload that doesn't fit\nwithin the nominal quota for its ClusterQueue, can preempt active Workloads in\nthe ClusterQueue. The possible values are:\n\n- `Never` (default): do not preempt Workloads in the ClusterQueue.\n- `LowerPriority`: only preempt Workloads in the ClusterQueue that have\n  lower priority than the pending Workload.\n- `LowerOrNewerEqualPriority`: only preempt Workloads in the ClusterQueue that\n  either have a lower priority than the pending workload or equal priority\n  and are newer than the pending workload.",
+              "enum": [
+                "Never",
+                "LowerPriority",
+                "LowerOrNewerEqualPriority"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "reclaimWithinCohort=Never and borrowWithinCohort.Policy!=Never",
+              "rule": "!(self.reclaimWithinCohort == 'Never' && has(self.borrowWithinCohort) &&  self.borrowWithinCohort.policy != 'Never')"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "queueingStrategy": {
+          "default": "BestEffortFIFO",
+          "description": "QueueingStrategy indicates the queueing strategy of the workloads\nacross the queues in this ClusterQueue.\nCurrent Supported Strategies:\n\n- StrictFIFO: workloads are ordered strictly by creation time.\nOlder workloads that can't be admitted will block admitting newer\nworkloads even if they fit available quota.\n- BestEffortFIFO: workloads are ordered by creation time,\nhowever older workloads that can't be admitted will not block\nadmitting newer workloads that fit existing quota.",
+          "enum": [
+            "StrictFIFO",
+            "BestEffortFIFO"
+          ],
+          "type": "string"
+        },
+        "resourceGroups": {
+          "description": "resourceGroups describes groups of resources.\nEach resource group defines the list of resources and a list of flavors\nthat provide quotas for these resources.\nEach resource and each flavor can only form part of one resource group.\nresourceGroups can be up to 16.",
+          "items": {
+            "properties": {
+              "coveredResources": {
+                "description": "coveredResources is the list of resources covered by the flavors in this\ngroup.\nExamples: cpu, memory, vendor.com/gpu.\nThe list cannot be empty and it can contain up to 16 resources.",
+                "items": {
+                  "description": "ResourceName is the name identifying various resources in a ResourceList.",
+                  "type": "string"
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array"
+              },
+              "flavors": {
+                "description": "flavors is the list of flavors that provide the resources of this group.\nTypically, different flavors represent different hardware models\n(e.g., gpu models, cpu architectures) or pricing models (on-demand vs spot\ncpus).\nEach flavor MUST list all the resources listed for this group in the same\norder as the .resources field.\nThe list cannot be empty and it can contain up to 16 flavors.",
+                "items": {
+                  "properties": {
+                    "name": {
+                      "description": "name of this flavor. The name should match the .metadata.name of a\nResourceFlavor. If a matching ResourceFlavor does not exist, the\nClusterQueue will have an Active condition set to False.",
+                      "maxLength": 253,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "resources": {
+                      "description": "resources is the list of quotas for this flavor per resource.\nThere could be up to 16 resources.",
+                      "items": {
+                        "properties": {
+                          "borrowingLimit": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "borrowingLimit is the maximum amount of quota for the [flavor, resource]\ncombination that this ClusterQueue is allowed to borrow from the unused\nquota of other ClusterQueues in the same cohort.\nIn total, at a given time, Workloads in a ClusterQueue can consume a\nquantity of quota equal to nominalQuota+borrowingLimit, assuming the other\nClusterQueues in the cohort have enough unused quota.\nIf null, it means that there is no borrowing limit.\nIf not null, it must be non-negative.\nborrowingLimit must be null if spec.cohort is empty.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "lendingLimit": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "lendingLimit is the maximum amount of unused quota for the [flavor, resource]\ncombination that this ClusterQueue can lend to other ClusterQueues in the same cohort.\nIn total, at a given time, ClusterQueue reserves for its exclusive use\na quantity of quota equals to nominalQuota - lendingLimit.\nIf null, it means that there is no lending limit, meaning that\nall the nominalQuota can be borrowed by other clusterQueues in the cohort.\nIf not null, it must be non-negative.\nlendingLimit must be null if spec.cohort is empty.\nThis field is in beta stage and is enabled by default.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "name": {
+                            "description": "name of this resource.",
+                            "type": "string"
+                          },
+                          "nominalQuota": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "nominalQuota is the quantity of this resource that is available for\nWorkloads admitted by this ClusterQueue at a point in time.\nThe nominalQuota must be non-negative.\nnominalQuota should represent the resources in the cluster available for\nrunning jobs (after discounting resources consumed by system components\nand pods not managed by kueue). In an autoscaled cluster, nominalQuota\nshould account for resources that can be provided by a component such as\nKubernetes cluster-autoscaler.\n\nIf the ClusterQueue belongs to a cohort, the sum of the quotas for each\n(flavor, resource) combination defines the maximum quantity that can be\nallocated by a ClusterQueue in the cohort.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "nominalQuota"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "maxItems": 16,
+                      "minItems": 1,
+                      "type": "array",
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "resources"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map"
+              }
+            },
+            "required": [
+              "coveredResources",
+              "flavors"
+            ],
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "flavors must have the same number of resources as the coveredResources",
+                "rule": "self.flavors.all(x, size(x.resources) == size(self.coveredResources))"
+              }
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "stopPolicy": {
+          "default": "None",
+          "description": "stopPolicy - if set to a value different from None, the ClusterQueue is considered Inactive, no new reservation being\nmade.\n\nDepending on its value, its associated workloads will:\n\n- None - Workloads are admitted\n- HoldAndDrain - Admitted workloads are evicted and Reserving workloads will cancel the reservation.\n- Hold - Admitted workloads will run to completion and Reserving workloads will cancel the reservation.",
+          "enum": [
+            "None",
+            "Hold",
+            "HoldAndDrain"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "borrowingLimit must be nil when cohort is empty",
+          "rule": "!has(self.cohort) && has(self.resourceGroups) ? self.resourceGroups.all(rg, rg.flavors.all(f, f.resources.all(r, !has(r.borrowingLimit)))) : true"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "ClusterQueueStatus defines the observed state of ClusterQueue",
+      "properties": {
+        "admittedWorkloads": {
+          "description": "admittedWorkloads is the number of workloads currently admitted to this\nclusterQueue and haven't finished yet.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "conditions": {
+          "description": "conditions hold the latest available observations of the ClusterQueue\ncurrent state.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "fairSharing": {
+          "description": "FairSharing contains the information about the current status of fair sharing.",
+          "properties": {
+            "weightedShare": {
+              "description": "WeightedShare represent the maximum of the ratios of usage above nominal\nquota to the lendable resources in the cohort, among all the resources\nprovided by the ClusterQueue, and divided by the weight.\nIf zero, it means that the usage of the ClusterQueue is below the nominal quota.\nIf the ClusterQueue has a weight of zero, this will return 9223372036854775807,\nthe maximum possible share value.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "weightedShare"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "flavorsReservation": {
+          "description": "flavorsReservation are the reserved quotas, by flavor, currently in use by the\nworkloads assigned to this ClusterQueue.",
+          "items": {
+            "properties": {
+              "name": {
+                "description": "name of the flavor.",
+                "maxLength": 253,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "resources": {
+                "description": "resources lists the quota usage for the resources in this flavor.",
+                "items": {
+                  "properties": {
+                    "borrowed": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "Borrowed is quantity of quota that is borrowed from the cohort. In other\nwords, it's the used quota that is over the nominalQuota.",
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "name": {
+                      "description": "name of the resource",
+                      "type": "string"
+                    },
+                    "total": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "total is the total quantity of used quota, including the amount borrowed\nfrom the cohort.",
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 16,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map"
+              }
+            },
+            "required": [
+              "name",
+              "resources"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "flavorsUsage": {
+          "description": "flavorsUsage are the used quotas, by flavor, currently in use by the\nworkloads admitted in this ClusterQueue.",
+          "items": {
+            "properties": {
+              "name": {
+                "description": "name of the flavor.",
+                "maxLength": 253,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "resources": {
+                "description": "resources lists the quota usage for the resources in this flavor.",
+                "items": {
+                  "properties": {
+                    "borrowed": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "Borrowed is quantity of quota that is borrowed from the cohort. In other\nwords, it's the used quota that is over the nominalQuota.",
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "name": {
+                      "description": "name of the resource",
+                      "type": "string"
+                    },
+                    "total": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "description": "total is the total quantity of used quota, including the amount borrowed\nfrom the cohort.",
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 16,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map"
+              }
+            },
+            "required": [
+              "name",
+              "resources"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "pendingWorkloads": {
+          "description": "pendingWorkloads is the number of workloads currently waiting to be\nadmitted to this clusterQueue.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "pendingWorkloadsStatus": {
+          "description": "PendingWorkloadsStatus contains the information exposed about the current\nstatus of the pending workloads in the cluster queue.\nDeprecated: This field will be removed on v1beta2, use VisibilityOnDemand\n(https://kueue.sigs.k8s.io/docs/tasks/manage/monitor_pending_workloads/pending_workloads_on_demand/)\ninstead.",
+          "properties": {
+            "clusterQueuePendingWorkload": {
+              "description": "Head contains the list of top pending workloads.",
+              "items": {
+                "description": "ClusterQueuePendingWorkload contains the information identifying a pending workload\nin the cluster queue.",
+                "properties": {
+                  "name": {
+                    "description": "Name indicates the name of the pending workload.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace indicates the name of the pending workload.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "namespace"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "lastChangeTime": {
+              "description": "LastChangeTime indicates the time of the last change of the structure.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "lastChangeTime"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "reservingWorkloads": {
+          "description": "reservingWorkloads is the number of workloads currently reserving quota in this\nclusterQueue.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

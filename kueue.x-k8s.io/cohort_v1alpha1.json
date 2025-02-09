@@ -1,0 +1,151 @@
+{
+  "description": "Cohort is the Schema for the cohorts API. Using Hierarchical\nCohorts (any Cohort which has a parent) with Fair Sharing\nresults in undefined behavior in 0.9",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "CohortSpec defines the desired state of Cohort",
+      "properties": {
+        "parent": {
+          "description": "Parent references the name of the Cohort's parent, if\nany. It satisfies one of three cases:\n1) Unset. This Cohort is the root of its Cohort tree.\n2) References a non-existent Cohort. We use default Cohort (no borrowing/lending limits).\n3) References an existent Cohort.\n\nIf a cycle is created, we disable all members of the\nCohort, including ClusterQueues, until the cycle is\nremoved.  We prevent further admission while the cycle\nexists.",
+          "maxLength": 253,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+          "type": "string"
+        },
+        "resourceGroups": {
+          "description": "ResourceGroups describes groupings of Resources and\nFlavors.  Each ResourceGroup defines a list of Resources\nand a list of Flavors which provide quotas for these\nResources. Each Resource and each Flavor may only form part\nof one ResourceGroup.  There may be up to 16 ResourceGroups\nwithin a Cohort.\n\nBorrowingLimit limits how much members of this Cohort\nsubtree can borrow from the parent subtree.\n\nLendingLimit limits how much members of this Cohort subtree\ncan lend to the parent subtree.\n\nBorrowing and Lending limits must only be set when the\nCohort has a parent.  Otherwise, the Cohort create/update\nwill be rejected by the webhook.",
+          "items": {
+            "properties": {
+              "coveredResources": {
+                "description": "coveredResources is the list of resources covered by the flavors in this\ngroup.\nExamples: cpu, memory, vendor.com/gpu.\nThe list cannot be empty and it can contain up to 16 resources.",
+                "items": {
+                  "description": "ResourceName is the name identifying various resources in a ResourceList.",
+                  "type": "string"
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array"
+              },
+              "flavors": {
+                "description": "flavors is the list of flavors that provide the resources of this group.\nTypically, different flavors represent different hardware models\n(e.g., gpu models, cpu architectures) or pricing models (on-demand vs spot\ncpus).\nEach flavor MUST list all the resources listed for this group in the same\norder as the .resources field.\nThe list cannot be empty and it can contain up to 16 flavors.",
+                "items": {
+                  "properties": {
+                    "name": {
+                      "description": "name of this flavor. The name should match the .metadata.name of a\nResourceFlavor. If a matching ResourceFlavor does not exist, the\nClusterQueue will have an Active condition set to False.",
+                      "maxLength": 253,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "resources": {
+                      "description": "resources is the list of quotas for this flavor per resource.\nThere could be up to 16 resources.",
+                      "items": {
+                        "properties": {
+                          "borrowingLimit": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "borrowingLimit is the maximum amount of quota for the [flavor, resource]\ncombination that this ClusterQueue is allowed to borrow from the unused\nquota of other ClusterQueues in the same cohort.\nIn total, at a given time, Workloads in a ClusterQueue can consume a\nquantity of quota equal to nominalQuota+borrowingLimit, assuming the other\nClusterQueues in the cohort have enough unused quota.\nIf null, it means that there is no borrowing limit.\nIf not null, it must be non-negative.\nborrowingLimit must be null if spec.cohort is empty.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "lendingLimit": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "lendingLimit is the maximum amount of unused quota for the [flavor, resource]\ncombination that this ClusterQueue can lend to other ClusterQueues in the same cohort.\nIn total, at a given time, ClusterQueue reserves for its exclusive use\na quantity of quota equals to nominalQuota - lendingLimit.\nIf null, it means that there is no lending limit, meaning that\nall the nominalQuota can be borrowed by other clusterQueues in the cohort.\nIf not null, it must be non-negative.\nlendingLimit must be null if spec.cohort is empty.\nThis field is in beta stage and is enabled by default.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "name": {
+                            "description": "name of this resource.",
+                            "type": "string"
+                          },
+                          "nominalQuota": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "description": "nominalQuota is the quantity of this resource that is available for\nWorkloads admitted by this ClusterQueue at a point in time.\nThe nominalQuota must be non-negative.\nnominalQuota should represent the resources in the cluster available for\nrunning jobs (after discounting resources consumed by system components\nand pods not managed by kueue). In an autoscaled cluster, nominalQuota\nshould account for resources that can be provided by a component such as\nKubernetes cluster-autoscaler.\n\nIf the ClusterQueue belongs to a cohort, the sum of the quotas for each\n(flavor, resource) combination defines the maximum quantity that can be\nallocated by a ClusterQueue in the cohort.",
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "nominalQuota"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "maxItems": 16,
+                      "minItems": 1,
+                      "type": "array",
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "resources"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map"
+              }
+            },
+            "required": [
+              "coveredResources",
+              "flavors"
+            ],
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "flavors must have the same number of resources as the coveredResources",
+                "rule": "self.flavors.all(x, size(x.resources) == size(self.coveredResources))"
+              }
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

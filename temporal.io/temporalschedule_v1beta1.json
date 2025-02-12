@@ -1,0 +1,884 @@
+{
+  "description": "A TemporalSchedule creates a schedule in the targeted temporal cluster.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "TemporalScheduleSpec defines the desired state of Schedule.",
+      "properties": {
+        "allowDeletion": {
+          "description": "AllowDeletion makes the controller delete the Temporal schedule if the\nCRD is deleted.",
+          "type": "boolean"
+        },
+        "memo": {
+          "description": "Memo is optional non-indexed info that will be shown in list workflow.",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "namespaceRef": {
+          "description": "Reference to the temporal namespace the schedule will be created in.",
+          "properties": {
+            "name": {
+              "description": "The name of the temporal object to reference.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "The namespace of the temporal object to reference.\nDefaults to the namespace of the requested resource if omitted.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "schedule": {
+          "description": "Schedule contains all fields related to a schedule.",
+          "properties": {
+            "action": {
+              "description": "ScheduleAction contains the actions that the schedule should perform.",
+              "properties": {
+                "workflow": {
+                  "description": "ScheduleWorkflowAction describes a workflow to launch.",
+                  "properties": {
+                    "executionTimeout": {
+                      "description": "WorkflowExecutionTimeout is the timeout for duration of workflow execution.",
+                      "type": "string"
+                    },
+                    "id": {
+                      "description": "WorkflowID represents the business identifier of the workflow execution.\nThe WorkflowID of the started workflow may not match this exactly,\nit may have a timestamp appended for uniqueness.\nDefaults to a uuid.",
+                      "type": "string"
+                    },
+                    "inputs": {
+                      "description": "Inputs contains arguments to pass to the workflow.",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "memo": {
+                      "description": "Memo is optional non-indexed info that will be shown in list workflow.",
+                      "type": "object",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "retryPolicy": {
+                      "description": "RetryPolicy is the retry policy for the workflow. If a retry policy is specified,\nin case of workflow failure server will start new workflow execution if\nneeded based on the retry policy.",
+                      "properties": {
+                        "backoffCoefficient": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "Coefficient used to calculate the next retry interval.\nThe next retry interval is previous interval multiplied by the coefficient.\nMust be 1 or larger.",
+                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "initialInterval": {
+                          "description": "Interval of the first retry. If retryBackoffCoefficient is 1.0 then it is used for all retries.",
+                          "type": "string"
+                        },
+                        "maximumAttempts": {
+                          "description": "Maximum number of attempts. When exceeded the retries stop even if not expired yet.\n1 disables retries. 0 means unlimited (up to the timeouts).",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "maximumInterval": {
+                          "description": "Maximum interval between retries. Exponential backoff leads to interval increase.\nThis value is the cap of the increase. Default is 100x of the initial interval.",
+                          "type": "string"
+                        },
+                        "nonRetryableErrorTypes": {
+                          "description": "Non-Retryable errors types. Will stop retrying if the error type matches this list. Note that\nthis is not a substring match, the error *type* (not message) must match exactly.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "runTimeout": {
+                      "description": "WorkflowRunTimeout is the timeout for duration of a single workflow run.",
+                      "type": "string"
+                    },
+                    "searchAttributes": {
+                      "description": "SearchAttributes is optional indexed info that can be used in query of List/Scan/Count workflow APIs. The key\nand value type must be registered on Temporal server side. For supported operations on different server versions\nsee [Visibility].\n\n[Visibility]: https://docs.temporal.io/visibility",
+                      "type": "object",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "taskQueue": {
+                      "description": "TaskQueue represents a workflow task queue.\nThis is also the name of the activity task queue on which activities are scheduled.",
+                      "type": "string"
+                    },
+                    "taskTimeout": {
+                      "description": "WorkflowTaskTimeout is The timeout for processing workflow task from the time the worker\npulled this task.",
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "WorkflowType represents the identifier used by a workflow author to define the workflow\nWorkflow type name.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "taskQueue",
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "workflow"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "policy": {
+              "description": "SchedulePolicies represent policies for overlaps, catchups, pause on failure, and workflow ID.",
+              "properties": {
+                "catchupWindow": {
+                  "description": "CatchupWindow The Temporal Server might be down or unavailable at the time\nwhen a Schedule should take an Action. When the Server comes back up,\nCatchupWindow controls which missed Actions should be taken at that point.",
+                  "type": "string"
+                },
+                "overlap": {
+                  "description": "Overlap controls what happens when an Action would be started by a\nSchedule at the same time that an older Action is still running.\n\nSupported values:\n\n\"skip\" - Default. Nothing happens; the Workflow Execution is not started.\n\n\"bufferOne\" - Starts the Workflow Execution as soon as the current one completes.\nThe buffer is limited to one. If another Workflow Execution is supposed to start,\nbut one is already in the buffer, only the one in the buffer eventually starts.\n\n\"bufferAll\" - Allows an unlimited number of Workflows to buffer. They are started sequentially.\n\n\"cancelOther\" - Cancels the running Workflow Execution, and then starts the new one\nafter the old one completes cancellation.\n\n\"terminateOther\" - Terminates the running Workflow Execution and starts the new one immediately.\n\n\"allowAll\" - Starts any number of concurrent Workflow Executions.\nWith this policy (and only this policy), more than one Workflow Execution,\nstarted by the Schedule, can run simultaneously.",
+                  "enum": [
+                    "skip",
+                    "bufferOne",
+                    "bufferAll",
+                    "cancelOther",
+                    "terminateOther",
+                    "allowAll"
+                  ],
+                  "type": "string"
+                },
+                "pauseOnFailure": {
+                  "description": "PauseOnFailure if true, and a workflow run fails or times out, turn on \"paused\".\nThis applies after retry policies: the full chain of retries must fail to trigger a pause here.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "spec": {
+              "description": "ScheduleSpec is a complete description of a set of absolute timestamps.",
+              "properties": {
+                "calendars": {
+                  "description": "Calendars represents calendar-based specifications of times.",
+                  "items": {
+                    "description": "ScheduleCalendarSpec is an event specification relative to the calendar, similar to a traditional cron specification.\nA timestamp matches if at least one range of each field matches the\ncorresponding fields of the timestamp, except for year: if year is missing,\nthat means all years match. For all fields besides year, at least one Range must be present to match anything.",
+                    "properties": {
+                      "comment": {
+                        "description": "Comment describes the intention of this schedule.",
+                        "type": "string"
+                      },
+                      "dayOfMonth": {
+                        "default": [
+                          {
+                            "end": 31
+                          }
+                        ],
+                        "description": "DayOfMonth range to match (1-31)\nDefaults to match all days.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "default": 1,
+                              "description": "Start of the range (inclusive).\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "dayOfWeek": {
+                        "default": [
+                          {
+                            "end": 6
+                          }
+                        ],
+                        "description": "DayOfWeek range to match (0-6; 0 is Sunday)\nDefaults to match all days of the week.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "hour": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Hour range to match (0-23).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "minute": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Minute range to match (0-59).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "month": {
+                        "default": [
+                          {
+                            "end": 12
+                          }
+                        ],
+                        "description": "Month range to match (1-12).\nDefaults to match all months.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "default": 1,
+                              "description": "Start of the range (inclusive).\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "second": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Second range to match (0-59).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "year": {
+                        "description": "Year range to match.\nDefaults to match all years.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "minimum": 1970,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).",
+                              "format": "int32",
+                              "minimum": 1970,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "crons": {
+                  "description": "Crons are cron based specifications of times.\nCrons is provided for easy migration from legacy Cron Workflows. For new\nuse cases, we recommend using ScheduleSpec.Calendars or ScheduleSpec.\nIntervals for readability and maintainability. Once a schedule is created all\nexpressions in Crons will be translated to ScheduleSpec.Calendars on the server.\n\nFor example, `0 12 * * MON-WED,FRI` is every M/Tu/W/F at noon\n\nThe string can have 5, 6, or 7 fields, separated by spaces, and they are interpreted in the\nsame way as a ScheduleCalendarSpec:\n\n\t- 5 fields:         Minute, Hour, DayOfMonth, Month, DayOfWeek\n\n\t- 6 fields:         Minute, Hour, DayOfMonth, Month, DayOfWeek, Year\n\n\t- 7 fields: Second, Minute, Hour, DayOfMonth, Month, DayOfWeek, Year\n\nNotes:\n\t- If Year is not given, it defaults to *.\n\t- If Second is not given, it defaults to 0.\n\t- Shorthands @yearly, @monthly, @weekly, @daily, and @hourly are also\n\t\taccepted instead of the 5-7 time fields.\n\t- @every <interval>[/<phase>] is accepted and gets compiled into an\n\t\tIntervalSpec instead. <interval> and <phase> should be a decimal integer\n\t\twith a unit suffix s, m, h, or d.\n\t- Optionally, the string can be preceded by CRON_TZ=<time zone name> or\n\t\tTZ=<time zone name>, which will get copied to ScheduleSpec.TimeZoneName. (In which case the ScheduleSpec.TimeZone field should be left empty.)\n\t- Optionally, \"#\" followed by a comment can appear at the end of the string.\n\t- Note that the special case that some cron implementations have for\n\t\ttreating DayOfMonth and DayOfWeek as \"or\" instead of \"and\" when both\n\t\tare set is not implemented.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "endAt": {
+                  "description": "EndAt represents the end of the schedule. Any times after `endAt` will be skipped.\nDefaults to the end of time.\nFor example: 2024-05-13T00:00:00Z",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "excludeCalendars": {
+                  "description": "ExcludeCalendars defines any matching times that will be skipped.\n\nAll fields of the ScheduleCalendarSpec including seconds must match a time for the time to be skipped.",
+                  "items": {
+                    "description": "ScheduleCalendarSpec is an event specification relative to the calendar, similar to a traditional cron specification.\nA timestamp matches if at least one range of each field matches the\ncorresponding fields of the timestamp, except for year: if year is missing,\nthat means all years match. For all fields besides year, at least one Range must be present to match anything.",
+                    "properties": {
+                      "comment": {
+                        "description": "Comment describes the intention of this schedule.",
+                        "type": "string"
+                      },
+                      "dayOfMonth": {
+                        "default": [
+                          {
+                            "end": 31
+                          }
+                        ],
+                        "description": "DayOfMonth range to match (1-31)\nDefaults to match all days.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "default": 1,
+                              "description": "Start of the range (inclusive).\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 31,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "dayOfWeek": {
+                        "default": [
+                          {
+                            "end": 6
+                          }
+                        ],
+                        "description": "DayOfWeek range to match (0-6; 0 is Sunday)\nDefaults to match all days of the week.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 6,
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "hour": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Hour range to match (0-23).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 23,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "minute": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Minute range to match (0-59).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "month": {
+                        "default": [
+                          {
+                            "end": 12
+                          }
+                        ],
+                        "description": "Month range to match (1-12).\nDefaults to match all months.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "default": 1,
+                              "description": "Start of the range (inclusive).\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 12,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "second": {
+                        "default": [
+                          {
+                            "start": 0
+                          }
+                        ],
+                        "description": "Second range to match (0-59).\nDefaults to 0.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).\nDefaults to 0.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "maximum": 59,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "year": {
+                        "description": "Year range to match.\nDefaults to match all years.",
+                        "items": {
+                          "description": "If end < start, then end is interpreted as\nequal to start. This means you can use a Range with start set to a value, and\nend and step unset to represent a single value.",
+                          "properties": {
+                            "end": {
+                              "description": "End of the range (inclusive).\nDefaults to start.",
+                              "format": "int32",
+                              "minimum": 1970,
+                              "type": "integer"
+                            },
+                            "start": {
+                              "description": "Start of the range (inclusive).",
+                              "format": "int32",
+                              "minimum": 1970,
+                              "type": "integer"
+                            },
+                            "step": {
+                              "default": 1,
+                              "description": "Step to be take between each value.\nDefaults to 1.",
+                              "format": "int32",
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "intervals": {
+                  "description": "Intervals represents interval-based specifications of times.",
+                  "items": {
+                    "description": "ScheduleIntervalSpec matches times that can be expressed as:\n\n\tEpoch + (n * every) + offset\n\n\twhere n is all integers \u2265 0.\n\nFor example, an `every` of 1 hour with `offset` of zero would match every hour, on the hour. The same `every` but an `offset`\nof 19 minutes would match every `xx:19:00`. An `every` of 28 days with `offset` zero would match `2022-02-17T00:00:00Z`\n(among other times). The same `every` with `offset` of 3 days, 5 hours, and 23 minutes would match `2022-02-20T05:23:00Z`\ninstead.",
+                    "properties": {
+                      "every": {
+                        "description": "Every describes the period to repeat the interval.",
+                        "type": "string"
+                      },
+                      "offset": {
+                        "description": "Offset is a fixed offset added to the intervals period.\nDefaults to 0.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "every"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "jitter": {
+                  "description": "Jitter represents a duration that is used to apply a jitter to scheduled times.\nAll times will be incremented by a random value from 0 to this amount of jitter, capped\nby the time until the next schedule.\nDefaults to 0.",
+                  "type": "string"
+                },
+                "startAt": {
+                  "description": "StartAt represents the start of the schedule. Any times before `startAt` will be skipped.\nTogether, `startAt` and `endAt` make an inclusive interval.\nDefaults to the beginning of time.\nFor example: 2024-05-13T00:00:00Z",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "timezoneName": {
+                  "description": "TimeZoneName represents the IANA time zone name, for example `US/Pacific`.\n\nThe definition will be loaded by Temporal Server from the environment it runs in.\n\nCalendar spec matching is based on literal matching of the clock time\nwith no special handling of DST: if you write a calendar spec that fires\nat 2:30am and specify a time zone that follows DST, that action will not\nbe triggered on the day that has no 2:30am. Similarly, an action that\nfires at 1:30am will be triggered twice on the day that has two 1:30s.\n\nNote: No actions are taken on leap-seconds (e.g. 23:59:60 UTC).\nDefaults to UTC.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "state": {
+              "description": "ScheduleState describes the current state of a schedule.",
+              "properties": {
+                "limitedActions": {
+                  "description": "LimitedActions limits actions. While true RemainingActions will be decremented for each action taken.\nSkipped actions (due to overlap policy) do not count against remaining actions.",
+                  "type": "boolean"
+                },
+                "notes": {
+                  "description": "Note is an informative human-readable message with contextual notes, e.g. the reason\na Schedule is paused. The system may overwrite this message on certain\nconditions, e.g. when pause-on-failure happens.",
+                  "type": "string"
+                },
+                "paused": {
+                  "description": "Paused is true if the schedule is paused.",
+                  "type": "boolean"
+                },
+                "remainingActions": {
+                  "description": "RemainingActions represents the Actions remaining in this Schedule.\nOnce this number hits 0, no further Actions are taken.\nmanual actions through backfill or ScheduleHandle.Trigger still run.",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "searchAttributes": {
+          "description": "SearchAttributes is optional indexed info that can be used in query of List/Scan/Count workflow APIs. The key\nand value type must be registered on Temporal server side. For supported operations on different server versions\nsee [Visibility].\n\n[Visibility]: https://docs.temporal.io/visibility",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        }
+      },
+      "required": [
+        "namespaceRef",
+        "schedule"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "TemporalScheduleStatus defines the observed state of Schedule.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions represent the latest available observations of the Schedule state.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

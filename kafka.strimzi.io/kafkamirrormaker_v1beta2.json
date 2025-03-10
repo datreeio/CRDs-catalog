@@ -1,5 +1,16 @@
 {
   "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
     "spec": {
       "description": "The specification of Kafka MirrorMaker.",
       "oneOf": [
@@ -50,6 +61,10 @@
                   "description": "Configure whether access token should be treated as JWT. This should be set to `false` if the authorization server returns opaque tokens. Defaults to `true`.",
                   "type": "boolean"
                 },
+                "accessTokenLocation": {
+                  "description": "Path to the token file containing an access token to be used for authentication.",
+                  "type": "string"
+                },
                 "audience": {
                   "description": "OAuth audience to use when authenticating against the authorization server. Some authorization servers require the audience to be explicitly set. The possible values depend on how the authorization server is configured. By default, `audience` is not specified when performing the token endpoint request.",
                   "type": "string"
@@ -71,12 +86,39 @@
                     }
                   },
                   "required": [
+                    "secretName",
                     "certificate",
+                    "key"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "clientAssertion": {
+                  "description": "Link to Kubernetes secret containing the client assertion which was manually configured for the client.",
+                  "properties": {
+                    "key": {
+                      "description": "The key under which the secret value is stored in the Kubernetes Secret.",
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "description": "The name of the Kubernetes Secret containing the secret value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
                     "key",
                     "secretName"
                   ],
                   "type": "object",
                   "additionalProperties": false
+                },
+                "clientAssertionLocation": {
+                  "description": "Path to the file containing the client assertion to be used for authentication.",
+                  "type": "string"
+                },
+                "clientAssertionType": {
+                  "description": "The client assertion type. If not set, and either `clientAssertion` or `clientAssertionLocation` is configured, this value defaults to `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`.",
+                  "type": "string"
                 },
                 "clientId": {
                   "description": "OAuth Client ID which the Kafka client can use to authenticate against the OAuth server and use the token endpoint URI.",
@@ -113,6 +155,18 @@
                   "description": "Enable or disable OAuth metrics. Default value is `false`.",
                   "type": "boolean"
                 },
+                "httpRetries": {
+                  "description": "The maximum number of retries to attempt if an initial HTTP request fails. If not set, the default is to not attempt any retries.",
+                  "type": "integer"
+                },
+                "httpRetryPauseMs": {
+                  "description": "The pause to take before retrying a failed HTTP request. If not set, the default is to not pause at all but to immediately repeat a request.",
+                  "type": "integer"
+                },
+                "includeAcceptHeader": {
+                  "description": "Whether the Accept header should be set in requests to the authorization servers. The default value is `true`.",
+                  "type": "boolean"
+                },
                 "maxTokenExpirySeconds": {
                   "description": "Set or limit time-to-live of the access tokens to the specified number of seconds. This should be set if the authorization server returns opaque tokens.",
                   "type": "integer"
@@ -130,8 +184,8 @@
                     }
                   },
                   "required": [
-                    "password",
-                    "secretName"
+                    "secretName",
+                    "password"
                   ],
                   "type": "object",
                   "additionalProperties": false
@@ -159,6 +213,13 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "saslExtensions": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "SASL extensions parameters.",
+                  "type": "object"
+                },
                 "scope": {
                   "description": "OAuth scope to use when authenticating against the authorization server. Some authorization servers require this to be set. The possible values depend on how authorization server is configured. By default `scope` is not specified when doing the token endpoint request.",
                   "type": "string"
@@ -166,9 +227,31 @@
                 "tlsTrustedCertificates": {
                   "description": "Trusted certificates for TLS connection to the OAuth server.",
                   "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "certificate": {}
+                        },
+                        "required": [
+                          "certificate"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "pattern": {}
+                        },
+                        "required": [
+                          "pattern"
+                        ]
+                      }
+                    ],
                     "properties": {
                       "certificate": {
-                        "description": "The name of the file certificate in the Secret.",
+                        "description": "The name of the file certificate in the secret.",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "Pattern for the certificate files in the secret. Use the link:https://en.wikipedia.org/wiki/Glob_(programming)[_glob syntax_] for the pattern. All files in the secret that match the pattern are used.",
                         "type": "string"
                       },
                       "secretName": {
@@ -177,7 +260,6 @@
                       }
                     },
                     "required": [
-                      "certificate",
                       "secretName"
                     ],
                     "type": "object",
@@ -239,9 +321,31 @@
                 "trustedCertificates": {
                   "description": "Trusted certificates for TLS connection.",
                   "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "certificate": {}
+                        },
+                        "required": [
+                          "certificate"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "pattern": {}
+                        },
+                        "required": [
+                          "pattern"
+                        ]
+                      }
+                    ],
                     "properties": {
                       "certificate": {
-                        "description": "The name of the file certificate in the Secret.",
+                        "description": "The name of the file certificate in the secret.",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "Pattern for the certificate files in the secret. Use the link:https://en.wikipedia.org/wiki/Glob_(programming)[_glob syntax_] for the pattern. All files in the secret that match the pattern are used.",
                         "type": "string"
                       },
                       "secretName": {
@@ -250,7 +354,6 @@
                       }
                     },
                     "required": [
-                      "certificate",
                       "secretName"
                     ],
                     "type": "object",
@@ -271,7 +374,7 @@
           "additionalProperties": false
         },
         "image": {
-          "description": "The docker image for the pods.",
+          "description": "The container image used for Kafka MirrorMaker pods. If no image name is explicitly specified, it is determined based on the `spec.version` configuration. The image names are specifically mapped to corresponding versions in the Cluster Operator configuration.",
           "type": "string"
         },
         "include": {
@@ -282,9 +385,11 @@
           "description": "JVM Options for pods.",
           "properties": {
             "-XX": {
+              "additionalProperties": {
+                "type": "string"
+              },
               "description": "A map of -XX options to the JVM.",
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "type": "object"
             },
             "-Xms": {
               "description": "-Xms option to to the JVM.",
@@ -358,9 +463,11 @@
           "description": "Logging configuration for MirrorMaker.",
           "properties": {
             "loggers": {
+              "additionalProperties": {
+                "type": "string"
+              },
               "description": "A Map from logger name to logger level.",
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "type": "object"
             },
             "type": {
               "description": "Logging type, must be either 'inline' or 'external'.",
@@ -411,7 +518,7 @@
               "type": "string"
             },
             "valueFrom": {
-              "description": "ConfigMap entry where the Prometheus JMX Exporter configuration is stored. For details of the structure of this configuration, see the {JMXExporter}.",
+              "description": "ConfigMap entry where the Prometheus JMX Exporter configuration is stored. ",
               "properties": {
                 "configMapKeyRef": {
                   "description": "Reference to the key in the ConfigMap containing the configuration.",
@@ -474,6 +581,10 @@
                   "description": "Configure whether access token should be treated as JWT. This should be set to `false` if the authorization server returns opaque tokens. Defaults to `true`.",
                   "type": "boolean"
                 },
+                "accessTokenLocation": {
+                  "description": "Path to the token file containing an access token to be used for authentication.",
+                  "type": "string"
+                },
                 "audience": {
                   "description": "OAuth audience to use when authenticating against the authorization server. Some authorization servers require the audience to be explicitly set. The possible values depend on how the authorization server is configured. By default, `audience` is not specified when performing the token endpoint request.",
                   "type": "string"
@@ -495,12 +606,39 @@
                     }
                   },
                   "required": [
+                    "secretName",
                     "certificate",
+                    "key"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "clientAssertion": {
+                  "description": "Link to Kubernetes secret containing the client assertion which was manually configured for the client.",
+                  "properties": {
+                    "key": {
+                      "description": "The key under which the secret value is stored in the Kubernetes Secret.",
+                      "type": "string"
+                    },
+                    "secretName": {
+                      "description": "The name of the Kubernetes Secret containing the secret value.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
                     "key",
                     "secretName"
                   ],
                   "type": "object",
                   "additionalProperties": false
+                },
+                "clientAssertionLocation": {
+                  "description": "Path to the file containing the client assertion to be used for authentication.",
+                  "type": "string"
+                },
+                "clientAssertionType": {
+                  "description": "The client assertion type. If not set, and either `clientAssertion` or `clientAssertionLocation` is configured, this value defaults to `urn:ietf:params:oauth:client-assertion-type:jwt-bearer`.",
+                  "type": "string"
                 },
                 "clientId": {
                   "description": "OAuth Client ID which the Kafka client can use to authenticate against the OAuth server and use the token endpoint URI.",
@@ -537,6 +675,18 @@
                   "description": "Enable or disable OAuth metrics. Default value is `false`.",
                   "type": "boolean"
                 },
+                "httpRetries": {
+                  "description": "The maximum number of retries to attempt if an initial HTTP request fails. If not set, the default is to not attempt any retries.",
+                  "type": "integer"
+                },
+                "httpRetryPauseMs": {
+                  "description": "The pause to take before retrying a failed HTTP request. If not set, the default is to not pause at all but to immediately repeat a request.",
+                  "type": "integer"
+                },
+                "includeAcceptHeader": {
+                  "description": "Whether the Accept header should be set in requests to the authorization servers. The default value is `true`.",
+                  "type": "boolean"
+                },
                 "maxTokenExpirySeconds": {
                   "description": "Set or limit time-to-live of the access tokens to the specified number of seconds. This should be set if the authorization server returns opaque tokens.",
                   "type": "integer"
@@ -554,8 +704,8 @@
                     }
                   },
                   "required": [
-                    "password",
-                    "secretName"
+                    "secretName",
+                    "password"
                   ],
                   "type": "object",
                   "additionalProperties": false
@@ -583,6 +733,13 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "saslExtensions": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "SASL extensions parameters.",
+                  "type": "object"
+                },
                 "scope": {
                   "description": "OAuth scope to use when authenticating against the authorization server. Some authorization servers require this to be set. The possible values depend on how authorization server is configured. By default `scope` is not specified when doing the token endpoint request.",
                   "type": "string"
@@ -590,9 +747,31 @@
                 "tlsTrustedCertificates": {
                   "description": "Trusted certificates for TLS connection to the OAuth server.",
                   "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "certificate": {}
+                        },
+                        "required": [
+                          "certificate"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "pattern": {}
+                        },
+                        "required": [
+                          "pattern"
+                        ]
+                      }
+                    ],
                     "properties": {
                       "certificate": {
-                        "description": "The name of the file certificate in the Secret.",
+                        "description": "The name of the file certificate in the secret.",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "Pattern for the certificate files in the secret. Use the link:https://en.wikipedia.org/wiki/Glob_(programming)[_glob syntax_] for the pattern. All files in the secret that match the pattern are used.",
                         "type": "string"
                       },
                       "secretName": {
@@ -601,7 +780,6 @@
                       }
                     },
                     "required": [
-                      "certificate",
                       "secretName"
                     ],
                     "type": "object",
@@ -650,9 +828,31 @@
                 "trustedCertificates": {
                   "description": "Trusted certificates for TLS connection.",
                   "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "certificate": {}
+                        },
+                        "required": [
+                          "certificate"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "pattern": {}
+                        },
+                        "required": [
+                          "pattern"
+                        ]
+                      }
+                    ],
                     "properties": {
                       "certificate": {
-                        "description": "The name of the file certificate in the Secret.",
+                        "description": "The name of the file certificate in the secret.",
+                        "type": "string"
+                      },
+                      "pattern": {
+                        "description": "Pattern for the certificate files in the secret. Use the link:https://en.wikipedia.org/wiki/Glob_(programming)[_glob syntax_] for the pattern. All files in the secret that match the pattern are used.",
                         "type": "string"
                       },
                       "secretName": {
@@ -661,7 +861,6 @@
                       }
                     },
                     "required": [
-                      "certificate",
                       "secretName"
                     ],
                     "type": "object",
@@ -720,13 +919,47 @@
         "resources": {
           "description": "CPU and memory resources to reserve.",
           "properties": {
+            "claims": {
+              "items": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
             "limits": {
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                "x-kubernetes-int-or-string": true
+              },
+              "type": "object"
             },
             "requests": {
-              "type": "object",
-              "x-kubernetes-preserve-unknown-fields": true
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                "x-kubernetes-int-or-string": true
+              },
+              "type": "object"
             }
           },
           "type": "object",
@@ -750,14 +983,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -773,6 +1010,24 @@
                 "env": {
                   "description": "Environment variables which should be applied to the container.",
                   "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "value": {}
+                        },
+                        "required": [
+                          "value"
+                        ]
+                      },
+                      {
+                        "properties": {
+                          "valueFrom": {}
+                        },
+                        "required": [
+                          "valueFrom"
+                        ]
+                      }
+                    ],
                     "properties": {
                       "name": {
                         "description": "The environment variable key.",
@@ -781,6 +1036,63 @@
                       "value": {
                         "description": "The environment variable value.",
                         "type": "string"
+                      },
+                      "valueFrom": {
+                        "description": "Reference to the secret or config map property to which the environment variable is set.",
+                        "oneOf": [
+                          {
+                            "properties": {
+                              "secretKeyRef": {}
+                            },
+                            "required": [
+                              "secretKeyRef"
+                            ]
+                          },
+                          {
+                            "properties": {
+                              "configMapKeyRef": {}
+                            },
+                            "required": [
+                              "configMapKeyRef"
+                            ]
+                          }
+                        ],
+                        "properties": {
+                          "configMapKeyRef": {
+                            "description": "Reference to a key in a config map.",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "optional": {
+                                "type": "boolean"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "secretKeyRef": {
+                            "description": "Reference to a key in a secret.",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "optional": {
+                                "type": "boolean"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
                       }
                     },
                     "type": "object",
@@ -793,6 +1105,18 @@
                   "properties": {
                     "allowPrivilegeEscalation": {
                       "type": "boolean"
+                    },
+                    "appArmorProfile": {
+                      "properties": {
+                        "localhostProfile": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
                     },
                     "capabilities": {
                       "properties": {
@@ -881,6 +1205,37 @@
                   },
                   "type": "object",
                   "additionalProperties": false
+                },
+                "volumeMounts": {
+                  "description": "Additional volume mounts which should be applied to the container.",
+                  "items": {
+                    "properties": {
+                      "mountPath": {
+                        "type": "string"
+                      },
+                      "mountPropagation": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "readOnly": {
+                        "type": "boolean"
+                      },
+                      "recursiveReadOnly": {
+                        "type": "string"
+                      },
+                      "subPath": {
+                        "type": "string"
+                      },
+                      "subPathExpr": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
                 }
               },
               "type": "object",
@@ -1046,12 +1401,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -1077,8 +1446,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -1133,12 +1504,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -1164,8 +1549,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -1221,12 +1608,26 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
                                     "additionalProperties": false
+                                  },
+                                  "matchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "mismatchLabelKeys": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
                                   },
                                   "namespaceSelector": {
                                     "properties": {
@@ -1252,8 +1653,10 @@
                                         "type": "array"
                                       },
                                       "matchLabels": {
-                                        "type": "object",
-                                        "x-kubernetes-preserve-unknown-fields": true
+                                        "additionalProperties": {
+                                          "type": "string"
+                                        },
+                                        "type": "object"
                                       }
                                     },
                                     "type": "object",
@@ -1308,12 +1711,26 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
                                 "additionalProperties": false
+                              },
+                              "matchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "mismatchLabelKeys": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
                               },
                               "namespaceSelector": {
                                 "properties": {
@@ -1339,8 +1756,10 @@
                                     "type": "array"
                                   },
                                   "matchLabels": {
-                                    "type": "object",
-                                    "x-kubernetes-preserve-unknown-fields": true
+                                    "additionalProperties": {
+                                      "type": "string"
+                                    },
+                                    "type": "object"
                                   }
                                 },
                                 "type": "object",
@@ -1409,21 +1828,25 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
                   "additionalProperties": false
                 },
                 "priorityClassName": {
-                  "description": "The name of the priority class used to assign priority to the pods. For more information about priority classes, see {K8sPriorityClass}.",
+                  "description": "The name of the priority class used to assign priority to the pods. ",
                   "type": "string"
                 },
                 "schedulerName": {
@@ -1433,6 +1856,18 @@
                 "securityContext": {
                   "description": "Configures pod-level security attributes and common container settings.",
                   "properties": {
+                    "appArmorProfile": {
+                      "properties": {
+                        "localhostProfile": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
                     "fsGroup": {
                       "type": "integer"
                     },
@@ -1527,7 +1962,7 @@
                   "type": "integer"
                 },
                 "tmpDirSizeLimit": {
-                  "description": "Defines the total amount (for example `1Gi`) of local storage required for temporary EmptyDir volume (`/tmp`). Default value is `5Mi`.",
+                  "description": "Defines the total amount of pod memory allocated for the temporary `EmptyDir` volume `/tmp`. Specify the allocation in memory units, for example, `100Mi` for 100 mebibytes. Default value is `5Mi`. The `/tmp` volume is backed by pod memory, not disk storage, so avoid setting a high value as it consumes pod memory resources.",
                   "pattern": "^([0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$",
                   "type": "string"
                 },
@@ -1584,8 +2019,10 @@
                             "type": "array"
                           },
                           "matchLabels": {
-                            "type": "object",
-                            "x-kubernetes-preserve-unknown-fields": true
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
                           }
                         },
                         "type": "object",
@@ -1620,6 +2057,165 @@
                     "additionalProperties": false
                   },
                   "type": "array"
+                },
+                "volumes": {
+                  "description": "Additional volumes that can be mounted to the pod.",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "configMap": {},
+                          "csi": {},
+                          "emptyDir": {},
+                          "persistentVolumeClaim": {},
+                          "secret": {}
+                        }
+                      }
+                    ],
+                    "properties": {
+                      "configMap": {
+                        "description": "ConfigMap to use to populate the volume.",
+                        "properties": {
+                          "defaultMode": {
+                            "type": "integer"
+                          },
+                          "items": {
+                            "items": {
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "integer"
+                                },
+                                "path": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "type": "array"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "csi": {
+                        "description": "CSIVolumeSource object to use to populate the volume.",
+                        "properties": {
+                          "driver": {
+                            "type": "string"
+                          },
+                          "fsType": {
+                            "type": "string"
+                          },
+                          "nodePublishSecretRef": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "readOnly": {
+                            "type": "boolean"
+                          },
+                          "volumeAttributes": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "emptyDir": {
+                        "description": "EmptyDir to use to populate the volume.",
+                        "properties": {
+                          "medium": {
+                            "type": "string"
+                          },
+                          "sizeLimit": {
+                            "properties": {
+                              "amount": {
+                                "type": "string"
+                              },
+                              "format": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "name": {
+                        "description": "Name to use for the volume. Required.",
+                        "type": "string"
+                      },
+                      "persistentVolumeClaim": {
+                        "description": "PersistentVolumeClaim object to use to populate the volume.",
+                        "properties": {
+                          "claimName": {
+                            "type": "string"
+                          },
+                          "readOnly": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "secret": {
+                        "description": "Secret to use populate the volume.",
+                        "properties": {
+                          "defaultMode": {
+                            "type": "integer"
+                          },
+                          "items": {
+                            "items": {
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "mode": {
+                                  "type": "integer"
+                                },
+                                "path": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "type": "array"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          },
+                          "secretName": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
                 }
               },
               "type": "object",
@@ -1637,14 +2233,18 @@
                   "description": "Metadata to apply to the `PodDisruptionBudgetTemplate` resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -1661,14 +2261,18 @@
                   "description": "Metadata applied to the resource.",
                   "properties": {
                     "annotations": {
-                      "description": "Annotations added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Annotations added to the Kubernetes resource.",
+                      "type": "object"
                     },
                     "labels": {
-                      "description": "Labels added to the resource template. Can be applied to different resources such as `StatefulSets`, `Deployments`, `Pods`, and `Services`.",
-                      "type": "object",
-                      "x-kubernetes-preserve-unknown-fields": true
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels added to the Kubernetes resource.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -1686,7 +2290,7 @@
           "description": "The configuration of tracing in Kafka MirrorMaker.",
           "properties": {
             "type": {
-              "description": "Type of the tracing used. Currently the only supported types are `jaeger` for OpenTracing (Jaeger) tracing and `opentelemetry` for OpenTelemetry tracing. The OpenTracing (Jaeger) tracing is deprecated.",
+              "description": "Type of the tracing used. Currently the only supported type is `opentelemetry` for OpenTelemetry tracing. As of Strimzi 0.37.0, `jaeger` type is not supported anymore and this option is ignored.",
               "enum": [
                 "jaeger",
                 "opentelemetry"
@@ -1701,7 +2305,7 @@
           "additionalProperties": false
         },
         "version": {
-          "description": "The Kafka MirrorMaker version. Defaults to {DefaultKafkaVersion}. Consult the documentation to understand the process required to upgrade or downgrade the version.",
+          "description": "The Kafka MirrorMaker version. Defaults to the latest version. Consult the documentation to understand the process required to upgrade or downgrade the version.",
           "type": "string"
         },
         "whitelist": {

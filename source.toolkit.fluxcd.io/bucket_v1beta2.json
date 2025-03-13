@@ -47,6 +47,20 @@
           "description": "BucketName is the name of the object storage bucket.",
           "type": "string"
         },
+        "certSecretRef": {
+          "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nbucket. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.\n\nThis field is only supported for the `generic` provider.",
+          "properties": {
+            "name": {
+              "description": "Name of the referent.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "endpoint": {
           "description": "Endpoint is the object storage address the BucketName is located at.",
           "type": "string"
@@ -79,6 +93,20 @@
           ],
           "type": "string"
         },
+        "proxySecretRef": {
+          "description": "ProxySecretRef specifies the Secret containing the proxy configuration\nto use while communicating with the Bucket server.",
+          "properties": {
+            "name": {
+              "description": "Name of the referent.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "region": {
           "description": "Region of the Endpoint where the BucketName is located in.",
           "type": "string"
@@ -93,6 +121,58 @@
           },
           "required": [
             "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "sts": {
+          "description": "STS specifies the required configuration to use a Security Token\nService for fetching temporary credentials to authenticate in a\nBucket provider.\n\nThis field is only supported for the `aws` and `generic` providers.",
+          "properties": {
+            "certSecretRef": {
+              "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nSTS endpoint. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.\n\nThis field is only supported for the `ldap` provider.",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "endpoint": {
+              "description": "Endpoint is the HTTP/S endpoint of the Security Token Service from\nwhere temporary credentials will be fetched.",
+              "pattern": "^(http|https)://.*$",
+              "type": "string"
+            },
+            "provider": {
+              "description": "Provider of the Security Token Service.",
+              "enum": [
+                "aws",
+                "ldap"
+              ],
+              "type": "string"
+            },
+            "secretRef": {
+              "description": "SecretRef specifies the Secret containing authentication credentials\nfor the STS endpoint. This Secret must contain the fields `username`\nand `password` and is supported only for the `ldap` provider.",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "endpoint",
+            "provider"
           ],
           "type": "object",
           "additionalProperties": false
@@ -114,6 +194,28 @@
         "interval"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "STS configuration is only supported for the 'aws' and 'generic' Bucket providers",
+          "rule": "self.provider == 'aws' || self.provider == 'generic' || !has(self.sts)"
+        },
+        {
+          "message": "'aws' is the only supported STS provider for the 'aws' Bucket provider",
+          "rule": "self.provider != 'aws' || !has(self.sts) || self.sts.provider == 'aws'"
+        },
+        {
+          "message": "'ldap' is the only supported STS provider for the 'generic' Bucket provider",
+          "rule": "self.provider != 'generic' || !has(self.sts) || self.sts.provider == 'ldap'"
+        },
+        {
+          "message": "spec.sts.secretRef is not required for the 'aws' STS provider",
+          "rule": "!has(self.sts) || self.sts.provider != 'aws' || !has(self.sts.secretRef)"
+        },
+        {
+          "message": "spec.sts.certSecretRef is not required for the 'aws' STS provider",
+          "rule": "!has(self.sts) || self.sts.provider != 'aws' || !has(self.sts.certSecretRef)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
@@ -172,7 +274,7 @@
         "conditions": {
           "description": "Conditions holds the conditions for the Bucket.",
           "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource.\n---\nThis struct is intended for direct use as an array at the field path .status.conditions.  For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the observations of a foo's current state.\n\t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t    // other fields\n\t}",
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
               "lastTransitionTime": {
                 "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
@@ -207,7 +309,7 @@
                 "type": "string"
               },
               "type": {
-                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\n---\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions can be\nuseful (see .node.status.conditions), the ability to deconflict is important.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
                 "maxLength": 316,
                 "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
                 "type": "string"

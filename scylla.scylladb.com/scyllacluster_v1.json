@@ -28,10 +28,68 @@
         "alternator": {
           "description": "alternator designates this cluster an Alternator cluster.",
           "properties": {
+            "insecureDisableAuthorization": {
+              "description": "insecureDisableAuthorization disables Alternator authorization. If not specified, the authorization is enabled. For backwards compatibility the authorization is disabled when this field is not specified and a manual port is used.",
+              "type": "boolean"
+            },
+            "insecureEnableHTTP": {
+              "description": "insecureEnableHTTP enables serving Alternator traffic also on insecure HTTP port.",
+              "type": "boolean"
+            },
             "port": {
-              "description": "port is the port number used to bind the Alternator API.",
+              "description": "port is the port number used to bind the Alternator API. Deprecated: `port` is deprecated and may be ignored in the future. Please make sure to avoid using hostNetworking and work with standard Kubernetes concepts like Services.",
               "format": "int32",
               "type": "integer"
+            },
+            "servingCertificate": {
+              "default": {
+                "type": "OperatorManaged"
+              },
+              "description": "servingCertificate references a TLS certificate for serving secure traffic.",
+              "properties": {
+                "operatorManagedOptions": {
+                  "description": "operatorManagedOptions specifies options for certificates manged by the operator.",
+                  "properties": {
+                    "additionalDNSNames": {
+                      "description": "additionalDNSNames represents external DNS names that the certificates should be signed for.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "additionalIPAddresses": {
+                      "description": "additionalIPAddresses represents external IP addresses that the certificates should be signed for.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": {
+                  "description": "type determines the source of this certificate.",
+                  "enum": [
+                    "OperatorManaged",
+                    "UserManaged"
+                  ],
+                  "type": "string"
+                },
+                "userManagedOptions": {
+                  "description": "userManagedOptions specifies options for certificates manged by users.",
+                  "properties": {
+                    "secretName": {
+                      "description": "secretName references a kubernetes.io/tls type secret containing the TLS cert and key.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             },
             "writeIsolation": {
               "description": "writeIsolation indicates the isolation level.",
@@ -49,6 +107,10 @@
           "description": "backups specifies backup tasks in Scylla Manager. When Scylla Manager is not installed, these will be ignored.",
           "items": {
             "properties": {
+              "cron": {
+                "description": "cron specifies the task schedule as a cron expression. It supports an extended syntax including @monthly, @weekly, @daily, @midnight, @hourly, @every X[h|m|s].",
+                "type": "string"
+              },
               "dc": {
                 "description": "dc is a list of datacenter glob patterns, e.g. 'dc1,!otherdc*' used to specify the DCs to include or exclude from backup.",
                 "items": {
@@ -57,7 +119,6 @@
                 "type": "array"
               },
               "interval": {
-                "default": "0",
                 "description": "interval represents a task schedule interval e.g. 3d2h10m, valid units are d, h, m, s.",
                 "type": "string"
               },
@@ -106,8 +167,11 @@
                 "type": "array"
               },
               "startDate": {
-                "default": "now",
                 "description": "startDate specifies the task start date expressed in the RFC3339 format or now[+duration], e.g. now+3d2h10m, valid units are d, h, m, s.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "timezone specifies the timezone of cron field.",
                 "type": "string"
               },
               "uploadParallel": {
@@ -148,6 +212,28 @@
                     },
                     "description": "agentResources specify the resources for the Agent container.",
                     "properties": {
+                      "claims": {
+                        "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. \n This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. \n This field is immutable. It can only be set for containers.",
+                        "items": {
+                          "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                          "properties": {
+                            "name": {
+                              "description": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "name"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      },
                       "limits": {
                         "additionalProperties": {
                           "anyOf": [
@@ -177,7 +263,7 @@
                           "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                           "x-kubernetes-int-or-string": true
                         },
-                        "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                        "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
                         "type": "object"
                       }
                     },
@@ -308,6 +394,7 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
                                 },
                                 "weight": {
@@ -395,6 +482,7 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
                                 },
                                 "type": "array"
@@ -404,6 +492,7 @@
                               "nodeSelectorTerms"
                             ],
                             "type": "object",
+                            "x-kubernetes-map-type": "atomic",
                             "additionalProperties": false
                           }
                         },
@@ -422,7 +511,7 @@
                                   "description": "Required. A pod affinity term, associated with the corresponding weight.",
                                   "properties": {
                                     "labelSelector": {
-                                      "description": "A label query over a set of resources, in this case pods.",
+                                      "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods.",
                                       "properties": {
                                         "matchExpressions": {
                                           "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
@@ -463,7 +552,24 @@
                                         }
                                       },
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
+                                    },
+                                    "matchLabelKeys": {
+                                      "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. Also, MatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
+                                    },
+                                    "mismatchLabelKeys": {
+                                      "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector. Also, MismatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
                                     },
                                     "namespaceSelector": {
                                       "description": "A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means \"this pod's namespace\". An empty selector ({}) matches all namespaces.",
@@ -507,6 +613,7 @@
                                         }
                                       },
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
                                     },
                                     "namespaces": {
@@ -548,7 +655,7 @@
                               "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running",
                               "properties": {
                                 "labelSelector": {
-                                  "description": "A label query over a set of resources, in this case pods.",
+                                  "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods.",
                                   "properties": {
                                     "matchExpressions": {
                                       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
@@ -589,7 +696,24 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
+                                },
+                                "matchLabelKeys": {
+                                  "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. Also, MatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "atomic"
+                                },
+                                "mismatchLabelKeys": {
+                                  "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector. Also, MismatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "atomic"
                                 },
                                 "namespaceSelector": {
                                   "description": "A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means \"this pod's namespace\". An empty selector ({}) matches all namespaces.",
@@ -633,6 +757,7 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
                                 },
                                 "namespaces": {
@@ -671,7 +796,7 @@
                                   "description": "Required. A pod affinity term, associated with the corresponding weight.",
                                   "properties": {
                                     "labelSelector": {
-                                      "description": "A label query over a set of resources, in this case pods.",
+                                      "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods.",
                                       "properties": {
                                         "matchExpressions": {
                                           "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
@@ -712,7 +837,24 @@
                                         }
                                       },
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
+                                    },
+                                    "matchLabelKeys": {
+                                      "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. Also, MatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
+                                    },
+                                    "mismatchLabelKeys": {
+                                      "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector. Also, MismatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
                                     },
                                     "namespaceSelector": {
                                       "description": "A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means \"this pod's namespace\". An empty selector ({}) matches all namespaces.",
@@ -756,6 +898,7 @@
                                         }
                                       },
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
                                     },
                                     "namespaces": {
@@ -797,7 +940,7 @@
                               "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running",
                               "properties": {
                                 "labelSelector": {
-                                  "description": "A label query over a set of resources, in this case pods.",
+                                  "description": "A label query over a set of resources, in this case pods. If it's null, this PodAffinityTerm matches with no Pods.",
                                   "properties": {
                                     "matchExpressions": {
                                       "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
@@ -838,7 +981,24 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
+                                },
+                                "matchLabelKeys": {
+                                  "description": "MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MatchLabelKeys and LabelSelector. Also, MatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "atomic"
+                                },
+                                "mismatchLabelKeys": {
+                                  "description": "MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `LabelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod's pod (anti) affinity. Keys that don't exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both MismatchLabelKeys and LabelSelector. Also, MismatchLabelKeys cannot be set when LabelSelector isn't set. This is an alpha field and requires enabling MatchLabelKeysInPodAffinity feature gate.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "atomic"
                                 },
                                 "namespaceSelector": {
                                   "description": "A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means \"this pod's namespace\". An empty selector ({}) matches all namespaces.",
@@ -882,6 +1042,7 @@
                                     }
                                   },
                                   "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
                                   "additionalProperties": false
                                 },
                                 "namespaces": {
@@ -947,6 +1108,28 @@
                   "resources": {
                     "description": "resources the Scylla container will use.",
                     "properties": {
+                      "claims": {
+                        "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. \n This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. \n This field is immutable. It can only be set for containers.",
+                        "items": {
+                          "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                          "properties": {
+                            "name": {
+                              "description": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "name"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      },
                       "limits": {
                         "additionalProperties": {
                           "anyOf": [
@@ -976,7 +1159,7 @@
                           "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                           "x-kubernetes-int-or-string": true
                         },
-                        "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                        "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
                         "type": "object"
                       }
                     },
@@ -997,6 +1180,27 @@
                       "capacity": {
                         "description": "capacity describes the requested size of each persistent volume.",
                         "type": "string"
+                      },
+                      "metadata": {
+                        "description": "metadata controls shared metadata for the volume claim for this rack. At this point, the values are applied only for the initial claim and are not reconciled during its lifetime. Note that this may get fixed in the future and this behaviour shouldn't be relied on in any way.",
+                        "properties": {
+                          "annotations": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "annotations is a custom key value map that gets merged with managed object annotations.",
+                            "type": "object"
+                          },
+                          "labels": {
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "labels is a custom key value map that gets merged with managed object labels.",
+                            "type": "object"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
                       },
                       "storageClassName": {
                         "description": "storageClassName is the name of a storageClass to request.",
@@ -1166,6 +1370,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "user": {
@@ -1199,6 +1404,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "volumeID": {
@@ -1258,6 +1464,7 @@
                             }
                           },
                           "type": "object",
+                          "x-kubernetes-map-type": "atomic",
                           "additionalProperties": false
                         },
                         "csi": {
@@ -1280,6 +1487,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "readOnly": {
@@ -1329,6 +1537,7 @@
                                       "fieldPath"
                                     ],
                                     "type": "object",
+                                    "x-kubernetes-map-type": "atomic",
                                     "additionalProperties": false
                                   },
                                   "mode": {
@@ -1369,6 +1578,7 @@
                                       "resource"
                                     ],
                                     "type": "object",
+                                    "x-kubernetes-map-type": "atomic",
                                     "additionalProperties": false
                                   }
                                 },
@@ -1400,7 +1610,7 @@
                                   "type": "string"
                                 }
                               ],
-                              "description": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: http://kubernetes.io/docs/user-guide/volumes#emptydir",
+                              "description": "sizeLimit is the total amount of local storage required for this EmptyDir volume. The size limit is also applicable for memory medium. The maximum usage on memory medium EmptyDir would be the minimum value between the SizeLimit specified here and the sum of memory limits of all containers in a pod. The default is nil which means that the limit is undefined. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                               "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                               "x-kubernetes-int-or-string": true
                             }
@@ -1409,7 +1619,7 @@
                           "additionalProperties": false
                         },
                         "ephemeral": {
-                          "description": "ephemeral represents a volume that is handled by a cluster storage driver. The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts, and deleted when the pod is removed. \n Use this if: a) the volume is only needed while the pod runs, b) features of normal volumes like restoring from snapshot or capacity    tracking are needed, c) the storage driver is specified through a storage class, and d) the storage driver supports dynamic volume provisioning through    a PersistentVolumeClaim (see EphemeralVolumeSource for more    information on the connection between this volume type    and PersistentVolumeClaim). \n Use PersistentVolumeClaim or one of the vendor-specific APIs for volumes that persist for longer than the lifecycle of an individual pod. \n Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to be used that way - see the documentation of the driver for more information. \n A pod can use both types of ephemeral volumes and persistent volumes at the same time.",
+                          "description": "ephemeral represents a volume that is handled by a cluster storage driver. The volume's lifecycle is tied to the pod that defines it - it will be created before the pod starts, and deleted when the pod is removed. \n Use this if: a) the volume is only needed while the pod runs, b) features of normal volumes like restoring from snapshot or capacity tracking are needed, c) the storage driver is specified through a storage class, and d) the storage driver supports dynamic volume provisioning through a PersistentVolumeClaim (see EphemeralVolumeSource for more information on the connection between this volume type and PersistentVolumeClaim). \n Use PersistentVolumeClaim or one of the vendor-specific APIs for volumes that persist for longer than the lifecycle of an individual pod. \n Use CSI for light-weight local ephemeral volumes if the CSI driver is meant to be used that way - see the documentation of the driver for more information. \n A pod can use both types of ephemeral volumes and persistent volumes at the same time.",
                           "properties": {
                             "volumeClaimTemplate": {
                               "description": "Will be used to create a stand-alone PVC to provision the volume. The pod in which this EphemeralVolumeSource is embedded will be the owner of the PVC, i.e. the PVC will be deleted together with the pod.  The name of the PVC will be `<pod name>-<volume name>` where `<volume name>` is the name from the `PodSpec.Volumes` array entry. Pod validation will reject the pod if the concatenated name is not valid for a PVC (for example, too long). \n An existing PVC with that name that is not owned by the pod will *not* be used for the pod to avoid using an unrelated volume by mistake. Starting the pod is then blocked until the unrelated PVC is removed. If such a pre-created PVC is meant to be used by the pod, the PVC has to updated with an owner reference to the pod once the pod exists. Normally this should not be necessary, but it may be useful when manually reconstructing a broken cluster. \n This field is read-only and no changes will be made by Kubernetes to the PVC after it has been created. \n Required, must not be nil.",
@@ -1429,7 +1639,7 @@
                                       "type": "array"
                                     },
                                     "dataSource": {
-                                      "description": "dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. If the AnyVolumeDataSource feature gate is enabled, this field will always have the same contents as the DataSourceRef field.",
+                                      "description": "dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified. If the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                                       "properties": {
                                         "apiGroup": {
                                           "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
@@ -1449,10 +1659,11 @@
                                         "name"
                                       ],
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
                                     },
                                     "dataSourceRef": {
-                                      "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any local object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the DataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, both fields (DataSource and DataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. There are two important differences between DataSource and DataSourceRef: * While DataSource only allows two specific types of objects, DataSourceRef   allows any non-core object, as well as PersistentVolumeClaim objects. * While DataSource ignores disallowed values (dropping them), DataSourceRef   preserves all values, and generates an error if a disallowed value is   specified. (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.",
+                                      "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the dataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, when namespace isn't specified in dataSourceRef, both fields (dataSource and dataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. When namespace is specified in dataSourceRef, dataSource isn't set to the same value and must be empty. There are three important differences between dataSource and dataSourceRef: * While dataSource only allows two specific types of objects, dataSourceRef allows any non-core object, as well as PersistentVolumeClaim objects. * While dataSource ignores disallowed values (dropping them), dataSourceRef preserves all values, and generates an error if a disallowed value is specified. * While dataSource only allows local objects, dataSourceRef allows objects in any namespaces. (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled. (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                                       "properties": {
                                         "apiGroup": {
                                           "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
@@ -1464,6 +1675,10 @@
                                         },
                                         "name": {
                                           "description": "Name is the name of resource being referenced",
+                                          "type": "string"
+                                        },
+                                        "namespace": {
+                                          "description": "Namespace is the namespace of resource being referenced Note that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details. (Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                                           "type": "string"
                                         }
                                       },
@@ -1506,7 +1721,7 @@
                                             "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                                             "x-kubernetes-int-or-string": true
                                           },
-                                          "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                                          "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
                                           "type": "object"
                                         }
                                       },
@@ -1555,10 +1770,15 @@
                                         }
                                       },
                                       "type": "object",
+                                      "x-kubernetes-map-type": "atomic",
                                       "additionalProperties": false
                                     },
                                     "storageClassName": {
                                       "description": "storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+                                      "type": "string"
+                                    },
+                                    "volumeAttributesClassName": {
+                                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it's not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
                                       "type": "string"
                                     },
                                     "volumeMode": {
@@ -1649,6 +1869,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             }
                           },
@@ -1815,6 +2036,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "targetPortal": {
@@ -1928,6 +2150,77 @@
                               "items": {
                                 "description": "Projection that may be projected along with other supported volume types",
                                 "properties": {
+                                  "clusterTrustBundle": {
+                                    "description": "ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field of ClusterTrustBundle objects in an auto-updating file. \n Alpha, gated by the ClusterTrustBundleProjection feature gate. \n ClusterTrustBundle objects can either be selected by name, or by the combination of signer name and a label selector. \n Kubelet performs aggressive normalization of the PEM contents written into the pod filesystem.  Esoteric PEM features such as inter-block comments and block headers are stripped.  Certificates are deduplicated. The ordering of certificates within the file is arbitrary, and Kubelet may change the order over time.",
+                                    "properties": {
+                                      "labelSelector": {
+                                        "description": "Select all ClusterTrustBundles that match this label selector.  Only has effect if signerName is set.  Mutually-exclusive with name.  If unset, interpreted as \"match nothing\".  If set but empty, interpreted as \"match everything\".",
+                                        "properties": {
+                                          "matchExpressions": {
+                                            "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                                            "items": {
+                                              "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+                                              "properties": {
+                                                "key": {
+                                                  "description": "key is the label key that the selector applies to.",
+                                                  "type": "string"
+                                                },
+                                                "operator": {
+                                                  "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.",
+                                                  "type": "string"
+                                                },
+                                                "values": {
+                                                  "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "type": "array"
+                                                }
+                                              },
+                                              "required": [
+                                                "key",
+                                                "operator"
+                                              ],
+                                              "type": "object",
+                                              "additionalProperties": false
+                                            },
+                                            "type": "array"
+                                          },
+                                          "matchLabels": {
+                                            "additionalProperties": {
+                                              "type": "string"
+                                            },
+                                            "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                                            "type": "object"
+                                          }
+                                        },
+                                        "type": "object",
+                                        "x-kubernetes-map-type": "atomic",
+                                        "additionalProperties": false
+                                      },
+                                      "name": {
+                                        "description": "Select a single ClusterTrustBundle by object name.  Mutually-exclusive with signerName and labelSelector.",
+                                        "type": "string"
+                                      },
+                                      "optional": {
+                                        "description": "If true, don't block pod startup if the referenced ClusterTrustBundle(s) aren't available.  If using name, then the named ClusterTrustBundle is allowed not to exist.  If using signerName, then the combination of signerName and labelSelector is allowed to match zero ClusterTrustBundles.",
+                                        "type": "boolean"
+                                      },
+                                      "path": {
+                                        "description": "Relative path from the volume root to write the bundle.",
+                                        "type": "string"
+                                      },
+                                      "signerName": {
+                                        "description": "Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "path"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
                                   "configMap": {
                                     "description": "configMap information about the configMap data to project",
                                     "properties": {
@@ -1969,6 +2262,7 @@
                                       }
                                     },
                                     "type": "object",
+                                    "x-kubernetes-map-type": "atomic",
                                     "additionalProperties": false
                                   },
                                   "downwardAPI": {
@@ -1995,6 +2289,7 @@
                                                 "fieldPath"
                                               ],
                                               "type": "object",
+                                              "x-kubernetes-map-type": "atomic",
                                               "additionalProperties": false
                                             },
                                             "mode": {
@@ -2035,6 +2330,7 @@
                                                 "resource"
                                               ],
                                               "type": "object",
+                                              "x-kubernetes-map-type": "atomic",
                                               "additionalProperties": false
                                             }
                                           },
@@ -2091,6 +2387,7 @@
                                       }
                                     },
                                     "type": "object",
+                                    "x-kubernetes-map-type": "atomic",
                                     "additionalProperties": false
                                   },
                                   "serviceAccountToken": {
@@ -2200,6 +2497,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "user": {
@@ -2242,6 +2540,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "sslEnabled": {
@@ -2341,6 +2640,7 @@
                                 }
                               },
                               "type": "object",
+                              "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
                             "volumeName": {
@@ -2414,6 +2714,65 @@
         "exposeOptions": {
           "description": "exposeOptions specifies options for exposing ScyllaCluster services. EXPERIMENTAL. Do not rely on any particular behaviour controlled by this field.",
           "properties": {
+            "broadcastOptions": {
+              "description": "BroadcastOptions defines how ScyllaDB node publishes its IP address to other nodes and clients.",
+              "properties": {
+                "clients": {
+                  "default": {
+                    "type": "ServiceClusterIP"
+                  },
+                  "description": "clients specifies options related to the address that is broadcasted for communication with clients. This field controls the `broadcast_rpc_address` value in ScyllaDB config.",
+                  "properties": {
+                    "podIP": {
+                      "description": "podIP holds options related to Pod IP address.",
+                      "properties": {
+                        "source": {
+                          "default": "Status",
+                          "description": "sourceType specifies source of the Pod IP.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": {
+                      "description": "type of the address that is broadcasted.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "nodes": {
+                  "default": {
+                    "type": "ServiceClusterIP"
+                  },
+                  "description": "nodes specifies options related to the address that is broadcasted for communication with other nodes. This field controls the `broadcast_address` value in ScyllaDB config.",
+                  "properties": {
+                    "podIP": {
+                      "description": "podIP holds options related to Pod IP address.",
+                      "properties": {
+                        "source": {
+                          "default": "Status",
+                          "description": "sourceType specifies source of the Pod IP.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": {
+                      "description": "type of the address that is broadcasted.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "cql": {
               "description": "cql specifies expose options for CQL SSL backend. EXPERIMENTAL. Do not rely on any particular behaviour controlled by this field.",
               "properties": {
@@ -2424,7 +2783,7 @@
                       "additionalProperties": {
                         "type": "string"
                       },
-                      "description": "annotations specifies custom annotations merged into every Ingress object. EXPERIMENTAL. Do not rely on any particular behaviour controlled by this field.",
+                      "description": "annotations is a custom key value map that gets merged with managed object annotations.",
                       "type": "object"
                     },
                     "disabled": {
@@ -2434,6 +2793,13 @@
                     "ingressClassName": {
                       "description": "ingressClassName specifies Ingress class name. EXPERIMENTAL. Do not rely on any particular behaviour controlled by this field.",
                       "type": "string"
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "labels is a custom key value map that gets merged with managed object labels.",
+                      "type": "object"
                     }
                   },
                   "type": "object",
@@ -2442,10 +2808,64 @@
               },
               "type": "object",
               "additionalProperties": false
+            },
+            "nodeService": {
+              "default": {
+                "type": "ClusterIP"
+              },
+              "description": "nodeService controls properties of Service dedicated for each ScyllaCluster node.",
+              "properties": {
+                "allocateLoadBalancerNodePorts": {
+                  "description": "allocateLoadBalancerNodePorts controls value of service.spec.allocateLoadBalancerNodePorts of each node Service. Check Kubernetes corev1.Service documentation about semantic of this field.",
+                  "type": "boolean"
+                },
+                "annotations": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "annotations is a custom key value map that gets merged with managed object annotations.",
+                  "type": "object"
+                },
+                "externalTrafficPolicy": {
+                  "description": "externalTrafficPolicy controls value of service.spec.externalTrafficPolicy of each node Service. Check Kubernetes corev1.Service documentation about semantic of this field.",
+                  "type": "string"
+                },
+                "internalTrafficPolicy": {
+                  "description": "internalTrafficPolicy controls value of service.spec.internalTrafficPolicy of each node Service. Check Kubernetes corev1.Service documentation about semantic of this field.",
+                  "type": "string"
+                },
+                "labels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "labels is a custom key value map that gets merged with managed object labels.",
+                  "type": "object"
+                },
+                "loadBalancerClass": {
+                  "description": "loadBalancerClass controls value of service.spec.loadBalancerClass of each node Service. Check Kubernetes corev1.Service documentation about semantic of this field.",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "type is the Kubernetes Service type.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "externalSeeds": {
+          "description": "externalSeeds specifies the external seeds to propagate to ScyllaDB binary on startup as \"seeds\" parameter of seed-provider.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "forceRedeploymentReason": {
           "description": "forceRedeploymentReason can be used to force a rolling update of all racks by providing a unique string.",
@@ -2479,9 +2899,20 @@
               }
             },
             "type": "object",
+            "x-kubernetes-map-type": "atomic",
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "minReadySeconds": {
+          "description": "minReadySeconds is the minimum number of seconds for which a newly created ScyllaDB node should be ready for it to be considered available. When used to control load balanced traffic, this can give the load balancer in front of a node enough time to notice that the node is ready and start forwarding traffic in time. Because it all depends on timing, the order is not guaranteed and, if possible, you should use readinessGates instead. If not provided, Operator will determine this value.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "minTerminationGracePeriodSeconds": {
+          "description": "minTerminationGracePeriodSeconds specifies minimum duration in seconds to wait before every drained node is terminated. This gives time to potential load balancer in front of a node to notice that node is not ready anymore and stop forwarding new requests. This applies only when node is terminated gracefully. If not provided, Operator will determine this value. EXPERIMENTAL. Do not rely on any particular behaviour controlled by this field.",
+          "format": "int32",
+          "type": "integer"
         },
         "network": {
           "description": "network holds the networking config.",
@@ -2498,10 +2929,53 @@
           "type": "object",
           "additionalProperties": false
         },
+        "podMetadata": {
+          "description": "podMetadata controls shared metadata for all pods created based on this spec.",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "annotations is a custom key value map that gets merged with managed object annotations.",
+              "type": "object"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "labels is a custom key value map that gets merged with managed object labels.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "readinessGates": {
+          "description": "readinessGates specifies custom readiness gates that will be evaluated for every ScyllaDB Pod readiness. It's projected into every ScyllaDB Pod as its readinessGate. Refer to upstream documentation to learn more about readiness gates.",
+          "items": {
+            "description": "PodReadinessGate contains the reference to a pod condition",
+            "properties": {
+              "conditionType": {
+                "description": "ConditionType refers to a condition in the pod's condition list with matching type.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "conditionType"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "repairs": {
           "description": "repairs specify repair tasks in Scylla Manager. When Scylla Manager is not installed, these will be ignored.",
           "items": {
             "properties": {
+              "cron": {
+                "description": "cron specifies the task schedule as a cron expression. It supports an extended syntax including @monthly, @weekly, @daily, @midnight, @hourly, @every X[h|m|s].",
+                "type": "string"
+              },
               "dc": {
                 "description": "dc is a list of datacenter glob patterns, e.g. 'dc1', '!otherdc*' used to specify the DCs to include or exclude from backup.",
                 "items": {
@@ -2523,7 +2997,6 @@
                 "type": "string"
               },
               "interval": {
-                "default": "0",
                 "description": "interval represents a task schedule interval e.g. 3d2h10m, valid units are d, h, m, s.",
                 "type": "string"
               },
@@ -2556,8 +3029,11 @@
                 "type": "string"
               },
               "startDate": {
-                "default": "now",
                 "description": "startDate specifies the task start date expressed in the RFC3339 format or now[+duration], e.g. now+3d2h10m, valid units are d, h, m, s.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "timezone specifies the timezone of cron field.",
                 "type": "string"
               }
             },
@@ -2593,10 +3069,19 @@
     "status": {
       "description": "status is the current status of this scylla cluster.",
       "properties": {
+        "availableMembers": {
+          "description": "availableMembers is the number of ScyllaDB members in all racks that are available.",
+          "format": "int32",
+          "type": "integer"
+        },
         "backups": {
           "description": "backups reflects status of backup tasks.",
           "items": {
             "properties": {
+              "cron": {
+                "description": "cron specifies the task schedule as a cron expression. It supports an extended syntax including @monthly, @weekly, @daily, @midnight, @hourly, @every X[h|m|s].",
+                "type": "string"
+              },
               "dc": {
                 "description": "dc is a list of datacenter glob patterns, e.g. 'dc1,!otherdc*' used to specify the DCs to include or exclude from backup.",
                 "items": {
@@ -2613,7 +3098,6 @@
                 "type": "string"
               },
               "interval": {
-                "default": "0",
                 "description": "interval represents a task schedule interval e.g. 3d2h10m, valid units are d, h, m, s.",
                 "type": "string"
               },
@@ -2662,8 +3146,11 @@
                 "type": "array"
               },
               "startDate": {
-                "default": "now",
                 "description": "startDate specifies the task start date expressed in the RFC3339 format or now[+duration], e.g. now+3d2h10m, valid units are d, h, m, s.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "timezone specifies the timezone of cron field.",
                 "type": "string"
               },
               "uploadParallel": {
@@ -2682,7 +3169,7 @@
         "conditions": {
           "description": "conditions hold conditions describing ScyllaCluster state. To determine whether a cluster rollout is finished, look for Available=True,Progressing=False,Degraded=False.",
           "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n \ttype FooStatus struct{ \t    // Represents the observations of a foo's current state. \t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" \t    // +patchMergeKey=type \t    // +patchStrategy=merge \t    // +listType=map \t    // +listMapKey=type \t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n \t    // other fields \t}",
+            "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, \n type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
             "properties": {
               "lastTransitionTime": {
                 "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
@@ -2739,15 +3226,30 @@
           "description": "managerId contains ID under which cluster was registered in Scylla Manager.",
           "type": "string"
         },
+        "members": {
+          "description": "members is the number of ScyllaDB members in all racks.",
+          "format": "int32",
+          "type": "integer"
+        },
         "observedGeneration": {
           "description": "observedGeneration is the most recent generation observed for this ScyllaCluster. It corresponds to the ScyllaCluster's generation, which is updated on mutation by the API Server.",
           "format": "int64",
+          "type": "integer"
+        },
+        "rackCount": {
+          "description": "rackCount is the number of ScyllaDB racks in this cluster.",
+          "format": "int32",
           "type": "integer"
         },
         "racks": {
           "additionalProperties": {
             "description": "RackStatus is the status of a Scylla Rack",
             "properties": {
+              "availableMembers": {
+                "description": "availableMembers is the number of available members in the Rack.",
+                "format": "int32",
+                "type": "integer"
+              },
               "conditions": {
                 "description": "conditions are the latest available observations of a rack's state.",
                 "items": {
@@ -2781,7 +3283,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "replace_address_first_boot holds addresses which should be replaced by new nodes.",
+                "description": "replace_address_first_boot holds addresses which should be replaced by new nodes. DEPRECATED: since Scylla Operator 1.10 it's only used for deprecated replace node procedure (ScyllaDB OS <5.2, Enterprise <2023.1). With Scylla Operator 1.11+ this field may be empty.",
                 "type": "object"
               },
               "stale": {
@@ -2804,10 +3306,19 @@
           "description": "racks reflect status of cluster racks.",
           "type": "object"
         },
+        "readyMembers": {
+          "description": "readyMembers is the number of ScyllaDB members in all racks that are ready.",
+          "format": "int32",
+          "type": "integer"
+        },
         "repairs": {
           "description": "repairs reflects status of repair tasks.",
           "items": {
             "properties": {
+              "cron": {
+                "description": "cron specifies the task schedule as a cron expression. It supports an extended syntax including @monthly, @weekly, @daily, @midnight, @hourly, @every X[h|m|s].",
+                "type": "string"
+              },
               "dc": {
                 "description": "dc is a list of datacenter glob patterns, e.g. 'dc1', '!otherdc*' used to specify the DCs to include or exclude from backup.",
                 "items": {
@@ -2837,7 +3348,6 @@
                 "type": "string"
               },
               "interval": {
-                "default": "0",
                 "description": "interval represents a task schedule interval e.g. 3d2h10m, valid units are d, h, m, s.",
                 "type": "string"
               },
@@ -2870,8 +3380,11 @@
                 "type": "string"
               },
               "startDate": {
-                "default": "now",
                 "description": "startDate specifies the task start date expressed in the RFC3339 format or now[+duration], e.g. now+3d2h10m, valid units are d, h, m, s.",
+                "type": "string"
+              },
+              "timezone": {
+                "description": "timezone specifies the timezone of cron field.",
                 "type": "string"
               }
             },

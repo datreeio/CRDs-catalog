@@ -5,6 +5,7 @@ import yaml
 import os
 from typing import List
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 
 class Crd:
     def __init__(self, group: str, name: str, kind: str, api_version: str, description: str):
@@ -37,16 +38,12 @@ def list_dirs_in_src_dir(src: str) -> List[str]:
     entries = [os.path.join(src, name) for name in os.listdir(src)]
     return [dir for dir in entries if os.path.isdir(dir)]
 
-from typing import Generator
-
-def CreateCrds(dir: str) -> Generator[Crd, None, None]:
+def CreateCrds(dir: str) -> List[Crd]:
+    print(f"Processing directory {dir}")
     groupName = os.path.basename(dir)
     listing = [os.path.join(dir, file) for file in os.listdir(dir)]
-    files = [file for file in listing if os.path.isfile(file) and file.endswith(".json")]
-    for file in files:
-        entry = CreateCrdEntry(groupName, file)
-        if entry != None:
-            yield entry
+    crds = [CreateCrdEntry(groupName, file) for file in listing if os.path.isfile(file) and file.endswith(".json")]
+    return [crd for crd in crds if crd != None]
 
 def GetFileDescription(file: str) -> str:
     with open(file, "r") as f:
@@ -71,7 +68,7 @@ def CreateCrdEntry(group: str, filepath: str):
       print(f"Error: Unexpected file name format: {filename}", file=sys.stderr)
       return None
     name, version = parts
-    
+
     description = GetFileDescription(filepath)
     kind = SearchForKindInDescription(name, description)
 
@@ -95,11 +92,19 @@ if __name__ == "__main__":
     source = args.source_directory
     output_file = args.output_file
 
-    # List directories in the source directory
     directories = list_dirs_in_src_dir(source)
-    for dir in directories:
-        print(f"Processing directory: {dir}")
-        for crd in CreateCrds(dir):
-            yaml_structure.add_entry(crd)
+    crd_entries: List[Crd] = []
+    with ProcessPoolExecutor() as executor:
+        future_dir_crds = {executor.submit(CreateCrds, dir): dir for dir in directories}
+        for future in future_dir_crds:
+            try:
+                dir_crds = future.result()
+                if dir_crds:
+                    crd_entries.extend(dir_crds)
+            except Exception as e:
+                print(f"Error processing file {future_dir_crds[future]}: {e}", file=sys.stderr)
+
+    for crd in crd_entries:
+        yaml_structure.add_entry(crd)
     yaml_structure.save_to_yaml(output_file)
     print(f"YAML file saved as {output_file}.")

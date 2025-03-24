@@ -141,15 +141,12 @@ def CreateCrdEntry(group: str, filepath: str, crds_root_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate an index.yaml file from CRDs in a source directory.")
-    parser.add_argument("source_directory", type=str, help="Path to the source directory containing CRDs.")
-    parser.add_argument("index_file", type=str, help="Path to index.yaml to edit.")
+    parser.add_argument("index_file", type=str, help="Path to index.yaml to edit. The script will use the base dir of index.yaml as root dir for CRDs.")
     args = parser.parse_args()
 
-    crds_root_dir = args.source_directory
     index_file = args.index_file
 
-    if crds_root_dir[-1] != "/":
-        crds_root_dir += "/"
+    crds_root_dir = os.path.dirname(index_file) + os.sep
 
     data = YamlDataStructure()
     if os.path.exists(index_file):

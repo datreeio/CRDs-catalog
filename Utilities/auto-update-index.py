@@ -62,12 +62,12 @@ class YamlDataStructure:
                     ))
 
 
-    def prune_removed_files(self, source_dir: str):
+    def prune_removed_files(self, crds_root_dir: str):
         nRemoved = 0
         groupKeys = list(self.data.keys())
         for key in groupKeys:
             group = self.data[key]
-            filePaths = [os.path.join(source_dir, entry.filename) for entry in group]
+            filePaths = [os.path.join(crds_root_dir, entry.filename) for entry in group]
             doKeep = [os.path.isfile(filePath) for filePath in filePaths]
             self.data[key] = [entry for entry, keep in zip(group, doKeep) if keep]
             nRemoved += len([1 for keep in doKeep if not keep])
@@ -83,22 +83,24 @@ class SubResult_CrdCollection:
         self.nSkipped = nSkipped
         self.nUpdated = len(list)
 
-def strip_dot_slash(str: str) -> str:
-    return str.lstrip("./")
+def strip_path_prefix(str: str, prefix: str) -> str:
+    if str.startswith(prefix):
+        str = str[len(prefix):]
+    return str
 
 def list_dirs_in_src_dir(src: str) -> List[str]:
-    entries = [strip_dot_slash(os.path.join(src, name)) for name in os.listdir(src)]
+    entries = [os.path.join(src, name) for name in os.listdir(src)]
     return [dir for dir in entries if os.path.isdir(dir)]
 
-def CreateCrds(dir: str, org_data: YamlDataStructure) -> SubResult_CrdCollection:
+def CreateCrds(dir: str, org_data: YamlDataStructure, crds_root_dir: str) -> SubResult_CrdCollection:
     print(f"Processing directory {dir}")
-    groupName = os.path.basename(dir)
+    groupName = strip_path_prefix(dir, crds_root_dir)
     listing = [os.path.join(dir, file) for file in os.listdir(dir)]
     org_data_group = org_data.data.get(groupName, [])
-    skip = [any(crd.filename == file for crd in org_data_group) for file in listing]
+    skip = [any(os.path.join(crds_root_dir, crd.filename) == file for crd in org_data_group) for file in listing]
     nSkipped = len([1 for s in skip if s])
     listing = [file for file, skip in zip(listing, skip) if not skip]
-    crds = [CreateCrdEntry(groupName, file) for file in listing if os.path.isfile(file) and file.endswith(".json")]
+    crds = [CreateCrdEntry(groupName, file, crds_root_dir) for file in listing if os.path.isfile(file) and file.endswith(".json")]
     crds = [crd for crd in crds if crd != None]
     return SubResult_CrdCollection(crds, nSkipped)
 
@@ -114,7 +116,7 @@ def SearchForKindInDescription(lowercaseKind: str, description: str) -> str:
         return lowercaseKind
     return description[offset:offset + len(lowercaseKind)]
 
-def CreateCrdEntry(group: str, filepath: str):
+def CreateCrdEntry(group: str, filepath: str, crds_root_dir: str):
     file_basename = os.path.basename(filepath)
 
     # file ends with .json. Strip this away
@@ -134,7 +136,7 @@ def CreateCrdEntry(group: str, filepath: str):
       name=f"{name}_{version}",
       kind=kind,
       api_version=f"{group}/{version}",
-      filename=filepath
+      filename=strip_path_prefix(filepath, crds_root_dir)
     )
 
 if __name__ == "__main__":
@@ -143,19 +145,22 @@ if __name__ == "__main__":
     parser.add_argument("index_file", type=str, help="Path to index.yaml to edit.")
     args = parser.parse_args()
 
-    source = args.source_directory
+    crds_root_dir = args.source_directory
     index_file = args.index_file
+
+    if crds_root_dir[-1] != "/":
+        crds_root_dir += "/"
 
     data = YamlDataStructure()
     if os.path.exists(index_file):
         data.load_index_file(index_file)
-    nRemoved = data.prune_removed_files(source)
+    nRemoved = data.prune_removed_files(crds_root_dir)
 
-    directories = list_dirs_in_src_dir(source)
+    directories = list_dirs_in_src_dir(crds_root_dir)
     crd_entries: List[Crd] = []
     nSkipped = 0
     with ProcessPoolExecutor() as executor:
-        future_dir_crds = {executor.submit(CreateCrds, dir, data): dir for dir in directories}
+        future_dir_crds = {executor.submit(CreateCrds, dir, data, crds_root_dir): dir for dir in directories}
         for future in future_dir_crds:
             try:
                 partial_result = future.result()

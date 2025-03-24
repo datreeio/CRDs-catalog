@@ -29,8 +29,7 @@ This repository also contains a handy utility that extracts all CRDs from a clus
 ### What does this utility do?
 1. Checks that the prerequisites are installed.
 2. Extracts your CRDs from your cluster using kubectl.
-3. Downloads a script from the [kubeconform](https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py) repo that converts your CRDs from openAPI to JSON schema.
-4. Runs the script, and saves the output to your machine under `$HOME/.datree/crdSchemas/`
+3. Using the script from [openapi2jsonschema.py from kubeconform](https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py) to convert your CRDs from openAPI to JSON schema.
 
 ### Supported Platforms
 

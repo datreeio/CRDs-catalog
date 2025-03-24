@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 fetch_crd() {
     filename=${1%% *}
-    kubectl get crds "$filename" -o yaml >"$TMP_CRD_DIR/$filename.yaml" 2>&1
+    kubectl get crds "$filename" -o yaml >"$TMP/$filename.yaml" 2>&1
 }
 
 # Check if python3 is installed
@@ -48,14 +50,16 @@ if ! echo 'import yaml' | python3 &>/dev/null; then
     done
 fi
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Create temp folder for CRDs
-TMP_CRD_DIR=$HOME/.datree/crds
-mkdir -p "$TMP_CRD_DIR"
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
 
 # Create final schemas directory
 SCHEMAS_DIR=$HOME/.datree/crdSchemas
 mkdir -p "$SCHEMAS_DIR"
-cd "$SCHEMAS_DIR" || exit 1
+cd "$SCHEMAS_DIR"
 
 # Get a list of all CRDs
 printf "Fetching list of CRDs...\n"
@@ -84,12 +88,13 @@ for crd in "${CRD_LIST[@]}"; do
     fi
     ((++FETCHED_CRDS))
 done
+wait $(jobs -p)
 
-# Download converter script
-curl https://raw.githubusercontent.com/yannh/kubeconform/master/scripts/openapi2jsonschema.py --output "$TMP_CRD_DIR/openapi2jsonschema.py" 2>/dev/null
 
 # Convert crds to jsonSchema
-FILENAME_FORMAT="{fullgroup}_{kind}_{version}" python3 "$TMP_CRD_DIR/openapi2jsonschema.py" "$TMP_CRD_DIR"/*.yaml
+CONVERTER_SCRIPT="$SCRIPT_DIR/openapi2jsonschema.py"
+export FILENAME_FORMAT="{fullgroup}_{kind}_{version}"
+python3 "$CONVERTER_SCRIPT" "$TMP"/*.yaml
 conversionResult=$?
 
 # Copy and rename files to support kubeval
@@ -119,5 +124,3 @@ if [ $conversionResult == 0 ]; then
     printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
 fi
-
-rm -rf "$TMP_CRD_DIR"

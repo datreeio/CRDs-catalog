@@ -71,6 +71,10 @@ class YamlDataStructure:
             doKeep = [os.path.isfile(filePath) for filePath in filePaths]
             self.data[key] = [entry for entry, keep in zip(group, doKeep) if keep]
             nRemoved += len([1 for keep in doKeep if not keep])
+
+            if len(self.data[key]) == 0:
+                del self.data[key]
+
         return nRemoved
 
 class SubResult_CrdCollection:

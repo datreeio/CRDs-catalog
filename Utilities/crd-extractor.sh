@@ -31,7 +31,7 @@ if ! echo 'import yaml' | python3 &>/dev/null; then
     printf "the python3 module 'yaml' is required, and is not installed on your machine.\n"
 
     while true; do
-        read -p -r "Do you wish to install this program? (y/n) " yn
+        read -r -p "Do you wish to install this program? (y/n) " yn
         case $yn in
         [Yy])
             pip3 install pyyaml
@@ -121,6 +121,6 @@ if [ $conversionResult == 0 ]; then
 
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
     printf "\n- ${CYAN}datree:${NC}\n\$ datree test /path/to/file\n"
-    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
+    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
     printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
 fi

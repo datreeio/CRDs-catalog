@@ -2571,6 +2571,10 @@
           "description": "Enable Prometheus to be used as a receiver for the Prometheus remote\nwrite protocol.\n\nWARNING: This is not considered an efficient way of ingesting samples.\nUse it with caution for specific low-volume use cases.\nIt is not suitable for replacing the ingestion via scraping and turning\nPrometheus into a push-based metrics collection system.\nFor more information see https://prometheus.io/docs/prometheus/latest/querying/api/#remote-write-receiver\n\nIt requires Prometheus >= v2.33.0.",
           "type": "boolean"
         },
+        "enableServiceLinks": {
+          "description": "Indicates whether information about services should be injected into pod's environment variables",
+          "type": "boolean"
+        },
         "enforcedBodySizeLimit": {
           "description": "When defined, enforcedBodySizeLimit specifies a global limit on the size\nof uncompressed response body that will be accepted by Prometheus.\nTargets responding with a body larger than this many bytes will cause\nthe scrape to fail.\n\nIt requires Prometheus >= v2.28.0.\n\nWhen both `enforcedBodySizeLimit` and `bodySizeLimit` are defined and greater than zero, the following rules apply:\n* Scrape objects without a defined bodySizeLimit value will inherit the global bodySizeLimit value (Prometheus >= 2.45.0) or the enforcedBodySizeLimit value (Prometheus < v2.45.0).\n  If Prometheus version is >= 2.45.0 and the `enforcedBodySizeLimit` is greater than the `bodySizeLimit`, the `bodySizeLimit` will be set to `enforcedBodySizeLimit`.\n* Scrape objects with a bodySizeLimit value less than or equal to enforcedBodySizeLimit keep their specific value.\n* Scrape objects with a bodySizeLimit value greater than enforcedBodySizeLimit are set to enforcedBodySizeLimit.",
           "pattern": "(^0|([0-9]*[.])?[0-9]+((K|M|G|T|E|P)i?)?B)$",
@@ -5090,6 +5094,10 @@
                 "pattern": "^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$",
                 "type": "string"
               },
+              "roundRobinDNS": {
+                "description": "When enabled:\n    - The remote-write mechanism will resolve the hostname via DNS.\n    - It will randomly select one of the resolved IP addresses and connect to it.\n\nWhen disabled (default behavior):\n    - The Go standard library will handle hostname resolution.\n    - It will attempt connections to each resolved IP address sequentially.\n\nNote: The connection timeout applies to the entire resolution and connection process.\n      If disabled, the timeout is distributed across all connection attempts.\n\nIt requires Prometheus >= v3.1.0.",
+                "type": "boolean"
+              },
               "sendExemplars": {
                 "description": "Enables sending of exemplars over remote write. Note that\nexemplar-storage itself must be enabled using the `spec.enableFeatures`\noption for exemplars to be scraped in the first place.\n\nIt requires Prometheus >= v2.27.0.",
                 "type": "boolean"
@@ -6346,7 +6354,7 @@
           "type": "string"
         },
         "shards": {
-          "description": "Number of shards to distribute scraped targets onto.\n\n`spec.replicas` multiplied by `spec.shards` is the total number of Pods\nbeing created.\n\nWhen not defined, the operator assumes only one shard.\n\nNote that scaling down shards will not reshard data onto the remaining\ninstances, it must be manually moved. Increasing shards will not reshard\ndata either but it will continue to be available from the same\ninstances. To query globally, use Thanos sidecar and Thanos querier or\nremote write data to a central location.\nAlerting and recording rules\n\nBy default, the sharding is performed on:\n* The `__address__` target's metadata label for PodMonitor,\nServiceMonitor and ScrapeConfig resources.\n* The `__param_target__` label for Probe resources.\n\nUsers can define their own sharding implementation by setting the\n`__tmp_hash` label during the target discovery with relabeling\nconfiguration (either in the monitoring resources or via scrape class).",
+          "description": "Number of shards to distribute the scraped targets onto.\n\n`spec.replicas` multiplied by `spec.shards` is the total number of Pods\nbeing created.\n\nWhen not defined, the operator assumes only one shard.\n\nNote that scaling down shards will not reshard data onto the remaining\ninstances, it must be manually moved. Increasing shards will not reshard\ndata either but it will continue to be available from the same\ninstances. To query globally, use either\n* Thanos sidecar + querier for query federation and Thanos Ruler for rules.\n* Remote-write to send metrics to a central location.\n\nBy default, the sharding of targets is performed on:\n* The `__address__` target's metadata label for PodMonitor,\nServiceMonitor and ScrapeConfig resources.\n* The `__param_target__` label for Probe resources.\n\nUsers can define their own sharding implementation by setting the\n`__tmp_hash` label during the target discovery with relabeling\nconfiguration (either in the monitoring resources or via scrape class).",
           "format": "int32",
           "type": "integer"
         },

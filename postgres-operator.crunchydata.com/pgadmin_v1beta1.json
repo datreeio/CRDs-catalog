@@ -1,5 +1,5 @@
 {
-  "description": "PGAdmin is the Schema for the pgadmins API",
+  "description": "PGAdmin is the Schema for the PGAdmin API",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -698,6 +698,28 @@
         "config": {
           "description": "Configuration settings for the pgAdmin process. Changes to any of these values will be loaded without validation. Be careful, as you may put pgAdmin into an unusable state.",
           "properties": {
+            "configDatabaseURI": {
+              "description": "A Secret containing the value for the CONFIG_DATABASE_URI setting. More info: https://www.pgadmin.org/docs/pgadmin4/latest/external_database.html",
+              "properties": {
+                "key": {
+                  "description": "The key of the secret to select from.  Must be a valid secret key.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                  "type": "string"
+                },
+                "optional": {
+                  "description": "Specify whether the Secret or its key must be defined",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "files": {
               "description": "Files allows the user to mount projected volumes into the pgAdmin container so that files can be referenced by pgAdmin as needed.",
               "items": {
@@ -896,6 +918,11 @@
                 "additionalProperties": false
               },
               "type": "array"
+            },
+            "gunicorn": {
+              "description": "Settings for the gunicorn server. More info: https://docs.gunicorn.org/en/latest/settings.html",
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
             },
             "ldapBindPassword": {
               "description": "A Secret containing the value for the LDAP_BIND_PASSWORD setting. More info: https://www.pgadmin.org/docs/pgadmin4/latest/ldap.html",
@@ -1181,6 +1208,10 @@
                 "description": "The name for the ServerGroup in pgAdmin. Must be unique in the pgAdmin's ServerGroups since it becomes the ServerGroup name in pgAdmin.",
                 "type": "string"
               },
+              "postgresClusterName": {
+                "description": "PostgresClusterName selects one cluster to add to pgAdmin by name.",
+                "type": "string"
+              },
               "postgresClusterSelector": {
                 "description": "PostgresClusterSelector selects clusters to dynamically add to pgAdmin by matching labels. An empty selector like `{}` will select ALL clusters in the namespace.",
                 "properties": {
@@ -1227,13 +1258,22 @@
               }
             },
             "required": [
-              "name",
-              "postgresClusterSelector"
+              "name"
             ],
             "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "exactly one of \"postgresClusterName\" or \"postgresClusterSelector\" is required",
+                "rule": "[has(self.postgresClusterName),has(self.postgresClusterSelector)].exists_one(x,x)"
+              }
+            ],
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "serviceName": {
+          "description": "ServiceName will be used as the name of a ClusterIP service pointing to the pgAdmin pod and port. If the service already exists, PGO will update the service. For more information about services reference the Kubernetes and CrunchyData documentation. https://kubernetes.io/docs/concepts/services-networking/service/",
+          "type": "string"
         },
         "tolerations": {
           "description": "Tolerations of the PGAdmin pod. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration",
@@ -1266,6 +1306,58 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "users": {
+          "description": "pgAdmin users that are managed via the PGAdmin spec. Users can still be added via the pgAdmin GUI, but those users will not show up here.",
+          "items": {
+            "properties": {
+              "passwordRef": {
+                "description": "A reference to the secret that holds the user's password.",
+                "properties": {
+                  "key": {
+                    "description": "The key of the secret to select from.  Must be a valid secret key.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret or its key must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "role": {
+                "description": "Role determines whether the user has admin privileges or not. Defaults to User. Valid options are Administrator and User.",
+                "enum": [
+                  "Administrator",
+                  "User"
+                ],
+                "type": "string"
+              },
+              "username": {
+                "description": "The username for User in pgAdmin. Must be unique in the pgAdmin's users list.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "passwordRef",
+              "username"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "username"
+          ],
+          "x-kubernetes-list-type": "map"
         }
       },
       "required": [
@@ -1278,7 +1370,7 @@
       "description": "PGAdminStatus defines the observed state of PGAdmin",
       "properties": {
         "conditions": {
-          "description": "conditions represent the observations of pgadmin's current state. Known .status.conditions.type are: \"PersistentVolumeResizing\", \"Progressing\", \"ProxyAvailable\"",
+          "description": "conditions represent the observations of pgAdmin's current state. Known .status.conditions.type is: \"PersistentVolumeResizing\"",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource. --- This struct is intended for direct use as an array at the field path .status.conditions.  For example, type FooStatus struct{ // Represents the observations of a foo's current state. // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\" // +patchMergeKey=type // +patchStrategy=merge // +listType=map // +listMapKey=type Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"` \n // other fields }",
             "properties": {
@@ -1336,6 +1428,14 @@
             "type"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "imageSHA": {
+          "description": "ImageSHA represents the image SHA for the container running pgAdmin.",
+          "type": "string"
+        },
+        "majorVersion": {
+          "description": "MajorVersion represents the major version of the running pgAdmin.",
+          "type": "integer"
         },
         "observedGeneration": {
           "description": "observedGeneration represents the .metadata.generation on which the status was based.",

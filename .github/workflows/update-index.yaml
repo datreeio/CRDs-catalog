@@ -1,0 +1,36 @@
+name: Update Index
+on: [push,pull_request]
+jobs:
+  updateIndex:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr checkout ${{ github.event.pull_request.number }}
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Run auto-update script
+        run: python Utilities/auto-update-index.py . index.yaml
+      - name: Check for changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ -n "$(git status --porcelain index.yaml)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions-bot@users.noreply.github.com"
+            git switch ${{ github.head_ref }}
+            git add index.yaml
+            git commit -m "Auto-update index.yaml."
+            git push
+          else
+            echo "No changes to commit."
+          fi

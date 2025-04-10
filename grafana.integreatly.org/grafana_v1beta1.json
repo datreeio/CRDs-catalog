@@ -7007,6 +7007,10 @@
           "type": "object",
           "additionalProperties": false
         },
+        "disableDefaultAdminSecret": {
+          "description": "DisableDefaultAdminSecret prevents operator from creating default admin-credentials secret",
+          "type": "boolean"
+        },
         "external": {
           "description": "External enables you to configure external grafana instances that is not managed by the operator.",
           "properties": {
@@ -7662,23 +7666,31 @@
                     "description": "RouteTargetReference specifies the target that resolve into endpoints. Only the 'Service'\nkind is allowed. Use 'weight' field to emphasize one over others.",
                     "properties": {
                       "kind": {
+                        "default": "Service",
                         "description": "The kind of target that the route is referring to. Currently, only 'Service' is allowed",
+                        "enum": [
+                          "Service",
+                          ""
+                        ],
                         "type": "string"
                       },
                       "name": {
                         "description": "name of the service/target that is being referred to. e.g. name of the service",
+                        "minLength": 1,
                         "type": "string"
                       },
                       "weight": {
+                        "default": 100,
                         "description": "weight as an integer between 0 and 256, default 100, that specifies the target's relative weight\nagainst other target reference objects. 0 suppresses requests to this backend.",
                         "format": "int32",
+                        "maximum": 256,
+                        "minimum": 0,
                         "type": "integer"
                       }
                     },
                     "required": [
                       "kind",
-                      "name",
-                      "weight"
+                      "name"
                     ],
                     "type": "object",
                     "additionalProperties": false
@@ -7721,15 +7733,33 @@
                       "type": "string"
                     },
                     "certificate": {
-                      "description": "certificate provides certificate contents",
+                      "description": "certificate provides certificate contents. This should be a single serving certificate, not a certificate\nchain. Do not include a CA certificate.",
                       "type": "string"
                     },
                     "destinationCACertificate": {
                       "description": "destinationCACertificate provides the contents of the ca certificate of the final destination.  When using reencrypt\ntermination this file should be provided in order to have routers use it for health checks on the secure connection.\nIf this field is not specified, the router may provide its own destination CA and perform hostname validation using\nthe short service name (service.namespace.svc), which allows infrastructure generated certificates to automatically\nverify.",
                       "type": "string"
                     },
+                    "externalCertificate": {
+                      "description": "externalCertificate provides certificate contents as a secret reference.\nThis should be a single serving certificate, not a certificate\nchain. Do not include a CA certificate. The secret referenced should\nbe present in the same namespace as that of the Route.\nForbidden when `certificate` is set.\nThe router service account needs to be granted with read-only access to this secret,\nplease refer to openshift docs for additional details.",
+                      "properties": {
+                        "name": {
+                          "description": "name of the referent.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
                     "insecureEdgeTerminationPolicy": {
-                      "description": "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While\neach router may make its own decisions on which ports to expose, this is normally port 80.\n\n* Allow - traffic is sent to the server on the insecure port (default)\n* Disable - no traffic is allowed on the insecure port.\n* Redirect - clients are redirected to the secure port.",
+                      "description": "insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While\neach router may make its own decisions on which ports to expose, this is normally port 80.\n\nIf a route does not specify insecureEdgeTerminationPolicy, then the default behavior is \"None\".\n\n* Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).\n\n* None - no traffic is allowed on the insecure port (default).\n\n* Redirect - clients are redirected to the secure port.",
+                      "enum": [
+                        "Allow",
+                        "None",
+                        "Redirect",
+                        ""
+                      ],
                       "type": "string"
                     },
                     "key": {
@@ -7737,7 +7767,12 @@
                       "type": "string"
                     },
                     "termination": {
-                      "description": "termination indicates termination type.",
+                      "description": "termination indicates termination type.\n\n* edge - TLS termination is done by the router and http is used to communicate with the backend (default)\n* passthrough - Traffic is sent straight to the destination without the router providing TLS termination\n* reencrypt - TLS termination is done by the router and https is used to communicate with the backend\n\nNote: passthrough termination is incompatible with httpHeader actions",
+                      "enum": [
+                        "edge",
+                        "reencrypt",
+                        "passthrough"
+                      ],
                       "type": "string"
                     }
                   },
@@ -7745,29 +7780,43 @@
                     "termination"
                   ],
                   "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow",
+                      "rule": "has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true"
+                    }
+                  ],
                   "additionalProperties": false
                 },
                 "to": {
                   "description": "RouteTargetReference specifies the target that resolve into endpoints. Only the 'Service'\nkind is allowed. Use 'weight' field to emphasize one over others.",
                   "properties": {
                     "kind": {
+                      "default": "Service",
                       "description": "The kind of target that the route is referring to. Currently, only 'Service' is allowed",
+                      "enum": [
+                        "Service",
+                        ""
+                      ],
                       "type": "string"
                     },
                     "name": {
                       "description": "name of the service/target that is being referred to. e.g. name of the service",
+                      "minLength": 1,
                       "type": "string"
                     },
                     "weight": {
+                      "default": 100,
                       "description": "weight as an integer between 0 and 256, default 100, that specifies the target's relative weight\nagainst other target reference objects. 0 suppresses requests to this backend.",
                       "format": "int32",
+                      "maximum": 256,
+                      "minimum": 0,
                       "type": "integer"
                     }
                   },
                   "required": [
                     "kind",
-                    "name",
-                    "weight"
+                    "name"
                   ],
                   "type": "object",
                   "additionalProperties": false
@@ -8103,6 +8152,12 @@
         "lastMessage": {
           "type": "string"
         },
+        "libraryPanels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "stage": {
           "type": "string"
         },
@@ -8117,5 +8172,8 @@
       "additionalProperties": false
     }
   },
+  "required": [
+    "spec"
+  ],
   "type": "object"
 }

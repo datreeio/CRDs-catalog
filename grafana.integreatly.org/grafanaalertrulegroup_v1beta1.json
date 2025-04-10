@@ -18,6 +18,8 @@
         "allowCrossNamespaceImport": {
           "default": false,
           "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
+          "default": false,
+          "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
           "type": "boolean"
         },
         "editable": {
@@ -39,6 +41,7 @@
           "type": "string"
         },
         "instanceSelector": {
+          "description": "Selects Grafana instances for import",
           "description": "Selects Grafana instances for import",
           "properties": {
             "matchExpressions": {
@@ -86,6 +89,7 @@
           "x-kubernetes-validations": [
             {
               "message": "spec.instanceSelector is immutable",
+              "message": "spec.instanceSelector is immutable",
               "rule": "self == oldSelf"
             }
           ],
@@ -103,7 +107,6 @@
         "resyncPeriod": {
           "default": "10m0s",
           "description": "How often the resource is synced, defaults to 10m0s if not set",
-          "format": "duration",
           "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
           "type": "string"
         },
@@ -227,6 +230,22 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "record": {
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "metric": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "metric"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
               "title": {
                 "example": "Always firing",
                 "maxLength": 190,
@@ -234,6 +253,8 @@
                 "type": "string"
               },
               "uid": {
+                "description": "UID of the alert rule. Can be any string consisting of alphanumeric characters, - and _ with a maximum length of 40",
+                "maxLength": 40,
                 "pattern": "^[a-zA-Z0-9-_]+$",
                 "type": "string"
               }
@@ -271,14 +292,24 @@
         {
           "message": "disabling spec.allowCrossNamespaceImport requires a recreate to ensure desired state",
           "rule": "!oldSelf.allowCrossNamespaceImport || (oldSelf.allowCrossNamespaceImport && self.allowCrossNamespaceImport)"
+        },
+        {
+          "message": "spec.editable is immutable",
+          "rule": "((!has(oldSelf.editable) && !has(self.editable)) || (has(oldSelf.editable) && has(self.editable)))"
+        },
+        {
+          "message": "disabling spec.allowCrossNamespaceImport requires a recreate to ensure desired state",
+          "rule": "!oldSelf.allowCrossNamespaceImport || (oldSelf.allowCrossNamespaceImport && self.allowCrossNamespaceImport)"
         }
       ],
       "additionalProperties": false
     },
     "status": {
       "description": "The most recent observed state of a Grafana resource",
+      "description": "The most recent observed state of a Grafana resource",
       "properties": {
         "conditions": {
+          "description": "Results when synchonizing resource with Grafana instances",
           "description": "Results when synchonizing resource with Grafana instances",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
@@ -338,11 +369,19 @@
           "description": "Last time the resource was synchronized with Grafana instances",
           "format": "date-time",
           "type": "string"
+        },
+        "lastResync": {
+          "description": "Last time the resource was synchronized with Grafana instances",
+          "format": "date-time",
+          "type": "string"
         }
       },
       "type": "object",
       "additionalProperties": false
     }
   },
+  "required": [
+    "spec"
+  ],
   "type": "object"
 }

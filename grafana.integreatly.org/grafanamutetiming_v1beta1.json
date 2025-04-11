@@ -1,5 +1,5 @@
 {
-  "description": "GrafanaContactPoint is the Schema for the grafanacontactpoints API",
+  "description": "GrafanaMuteTiming is the Schema for the GrafanaMuteTiming API",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,15 +13,23 @@
       "type": "object"
     },
     "spec": {
-      "description": "GrafanaContactPointSpec defines the desired state of GrafanaContactPoint",
+      "description": "GrafanaMuteTimingSpec defines the desired state of GrafanaMuteTiming",
       "properties": {
         "allowCrossNamespaceImport": {
           "default": false,
           "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
           "type": "boolean"
         },
-        "disableResolveMessage": {
-          "type": "boolean"
+        "editable": {
+          "default": true,
+          "description": "Whether to enable or disable editing of the mute timing in Grafana UI",
+          "type": "boolean",
+          "x-kubernetes-validations": [
+            {
+              "message": "spec.editable is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
         },
         "instanceSelector": {
           "description": "Selects Grafana instances for import",
@@ -77,6 +85,7 @@
           "additionalProperties": false
         },
         "name": {
+          "description": "A unique name for the mute timing",
           "type": "string"
         },
         "resyncPeriod": {
@@ -85,115 +94,79 @@
           "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
           "type": "string"
         },
-        "settings": {
-          "x-kubernetes-preserve-unknown-fields": true
-        },
-        "type": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "uid": {
-          "description": "Manually specify the UID the Contact Point is created with. Can be any string consisting of alphanumeric characters, - and _ with a maximum length of 40",
-          "maxLength": 40,
-          "pattern": "^[a-zA-Z0-9-_]+$",
-          "type": "string",
-          "x-kubernetes-validations": [
-            {
-              "message": "spec.uid is immutable",
-              "rule": "self == oldSelf"
-            }
-          ]
-        },
-        "valuesFrom": {
+        "time_intervals": {
+          "description": "Time intervals for muting",
           "items": {
             "properties": {
-              "targetPath": {
+              "days_of_month": {
+                "description": "The date 1-31 of a month. Negative values can also be used to represent days that begin at the end of the month.\nFor example: -1 for the last day of the month.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "location": {
+                "description": "Depending on the location, the time range is displayed in local time.",
                 "type": "string"
               },
-              "valueFrom": {
-                "properties": {
-                  "configMapKeyRef": {
-                    "description": "Selects a key of a ConfigMap.",
-                    "properties": {
-                      "key": {
-                        "description": "The key to select.",
-                        "type": "string"
-                      },
-                      "name": {
-                        "default": "",
-                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
-                        "type": "string"
-                      },
-                      "optional": {
-                        "description": "Specify whether the ConfigMap or its key must be defined",
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "key"
-                    ],
-                    "type": "object",
-                    "x-kubernetes-map-type": "atomic",
-                    "additionalProperties": false
-                  },
-                  "secretKeyRef": {
-                    "description": "Selects a key of a Secret.",
-                    "properties": {
-                      "key": {
-                        "description": "The key of the secret to select from.  Must be a valid secret key.",
-                        "type": "string"
-                      },
-                      "name": {
-                        "default": "",
-                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
-                        "type": "string"
-                      },
-                      "optional": {
-                        "description": "Specify whether the Secret or its key must be defined",
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "key"
-                    ],
-                    "type": "object",
-                    "x-kubernetes-map-type": "atomic",
-                    "additionalProperties": false
-                  }
+              "months": {
+                "description": "The months of the year in either numerical or the full calendar month.\nFor example: 1, may.",
+                "items": {
+                  "type": "string"
                 },
-                "type": "object",
-                "x-kubernetes-validations": [
-                  {
-                    "message": "Either configMapKeyRef or secretKeyRef must be set",
-                    "rule": "(has(self.configMapKeyRef) && !has(self.secretKeyRef)) || (!has(self.configMapKeyRef) && has(self.secretKeyRef))"
-                  }
-                ],
-                "additionalProperties": false
+                "type": "array"
+              },
+              "times": {
+                "description": "The time inclusive of the start and exclusive of the end time (in UTC if no location has been selected, otherwise local time).",
+                "items": {
+                  "properties": {
+                    "end_time": {
+                      "description": "end time",
+                      "type": "string"
+                    },
+                    "start_time": {
+                      "description": "start time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "end_time",
+                    "start_time"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "weekdays": {
+                "description": "The day or range of days of the week.\nFor example: monday, thursday",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "years": {
+                "description": "The year or years for the interval.\nFor example: 2021",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               }
             },
-            "required": [
-              "targetPath",
-              "valueFrom"
-            ],
             "type": "object",
             "additionalProperties": false
           },
-          "maxItems": 99,
+          "minItems": 1,
           "type": "array"
         }
       },
       "required": [
         "instanceSelector",
         "name",
-        "settings",
-        "type"
+        "time_intervals"
       ],
       "type": "object",
       "x-kubernetes-validations": [
-        {
-          "message": "spec.uid is immutable",
-          "rule": "((!has(oldSelf.uid) && !has(self.uid)) || (has(oldSelf.uid) && has(self.uid)))"
-        },
         {
           "message": "disabling spec.allowCrossNamespaceImport requires a recreate to ensure desired state",
           "rule": "!oldSelf.allowCrossNamespaceImport || (oldSelf.allowCrossNamespaceImport && self.allowCrossNamespaceImport)"

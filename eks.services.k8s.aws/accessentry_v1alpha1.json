@@ -1,5 +1,5 @@
 {
-  "description": "FargateProfile is the Schema for the FargateProfiles API",
+  "description": "AccessEntry is the Schema for the AccessEntries API",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,11 +13,35 @@
       "type": "object"
     },
     "spec": {
-      "description": "FargateProfileSpec defines the desired state of FargateProfile.\n\nAn object representing an Fargate profile.",
+      "description": "AccessEntrySpec defines the desired state of AccessEntry.\n\nAn access entry allows an IAM principal (user or role) to access your cluster.\nAccess entries can replace the need to maintain the aws-auth ConfigMap for\nauthentication. For more information about access entries, see Access entries\n(https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html) in\nthe Amazon EKS User Guide.",
       "properties": {
-        "clientRequestToken": {
-          "description": "A unique, case-sensitive identifier that you provide to ensurethe idempotency\nof the request.",
-          "type": "string"
+        "accessPolicies": {
+          "items": {
+            "properties": {
+              "accessScope": {
+                "description": "The scope of an AccessPolicy that's associated to an AccessEntry.",
+                "properties": {
+                  "namespaces": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "policyARN": {
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         },
         "clusterName": {
           "description": "The name of your cluster.",
@@ -43,83 +67,16 @@
           "type": "object",
           "additionalProperties": false
         },
-        "name": {
-          "description": "The name of the Fargate profile.",
-          "type": "string"
-        },
-        "podExecutionRoleARN": {
-          "description": "The Amazon Resource Name (ARN) of the Pod execution role to use for a Pod\nthat matches the selectors in the Fargate profile. The Pod execution role\nallows Fargate infrastructure to register with your cluster as a node, and\nit provides read access to Amazon ECR image repositories. For more information,\nsee Pod execution role (https://docs.aws.amazon.com/eks/latest/userguide/pod-execution-role.html)\nin the Amazon EKS User Guide.",
-          "type": "string"
-        },
-        "podExecutionRoleRef": {
-          "description": "AWSResourceReferenceWrapper provides a wrapper around *AWSResourceReference\ntype to provide more user friendly syntax for references using 'from' field\nEx:\nAPIIDRef:\n\n\tfrom:\n\t  name: my-api",
-          "properties": {
-            "from": {
-              "description": "AWSResourceReference provides all the values necessary to reference another\nk8s resource for finding the identifier(Id/ARN/Name)",
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "namespace": {
-                  "type": "string"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "selectors": {
-          "description": "The selectors to match for a Pod to use this Fargate profile. Each selector\nmust have an associated Kubernetes namespace. Optionally, you can also specify\nlabels for a namespace. You may specify up to five selectors in a Fargate\nprofile.",
-          "items": {
-            "description": "An object representing an Fargate profile selector.",
-            "properties": {
-              "labels": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              "namespace": {
-                "type": "string"
-              }
-            },
-            "type": "object",
-            "additionalProperties": false
-          },
-          "type": "array"
-        },
-        "subnetRefs": {
-          "items": {
-            "description": "AWSResourceReferenceWrapper provides a wrapper around *AWSResourceReference\ntype to provide more user friendly syntax for references using 'from' field\nEx:\nAPIIDRef:\n\n\tfrom:\n\t  name: my-api",
-            "properties": {
-              "from": {
-                "description": "AWSResourceReference provides all the values necessary to reference another\nk8s resource for finding the identifier(Id/ARN/Name)",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "namespace": {
-                    "type": "string"
-                  }
-                },
-                "type": "object",
-                "additionalProperties": false
-              }
-            },
-            "type": "object",
-            "additionalProperties": false
-          },
-          "type": "array"
-        },
-        "subnets": {
-          "description": "The IDs of subnets to launch a Pod into. A Pod running on Fargate isn't assigned\na public IP address, so only private subnets (with no direct route to an\nInternet Gateway) are accepted for this parameter.",
+        "kubernetesGroups": {
+          "description": "The value for name that you've specified for kind: Group as a subject in\na Kubernetes RoleBinding or ClusterRoleBinding object. Amazon EKS doesn't\nconfirm that the value for name exists in any bindings on your cluster. You\ncan specify one or more names.\n\nKubernetes authorizes the principalArn of the access entry to access any\ncluster objects that you've specified in a Kubernetes Role or ClusterRole\nobject that is also specified in a binding's roleRef. For more information\nabout creating Kubernetes RoleBinding, ClusterRoleBinding, Role, or ClusterRole\nobjects, see Using RBAC Authorization in the Kubernetes documentation (https://kubernetes.io/docs/reference/access-authn-authz/rbac/).\n\nIf you want Amazon EKS to authorize the principalArn (instead of, or in addition\nto Kubernetes authorizing the principalArn), you can associate one or more\naccess policies to the access entry using AssociateAccessPolicy. If you associate\nany access policies, the principalARN has all permissions assigned in the\nassociated access policies and all permissions in any Kubernetes Role or\nClusterRole objects that the group names are bound to.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "principalARN": {
+          "description": "The ARN of the IAM principal for the AccessEntry. You can specify one ARN\nfor each access entry. You can't specify the same ARN in more than one access\nentry. This value can't be changed after access entry creation.\n\nThe valid principals differ depending on the type of the access entry in\nthe type field. For STANDARD access entries, you can use every IAM principal\ntype. For nodes (EC2 (for EKS Auto Mode), EC2_LINUX, EC2_WINDOWS, FARGATE_LINUX,\nand HYBRID_LINUX), the only valid ARN is IAM roles. You can't use the STS\nsession principal type with access entries because this is a temporary principal\nfor each session and not a permanent identity that can be assigned permissions.\n\nIAM best practices (https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp)\nrecommend using IAM roles with temporary credentials, rather than IAM users\nwith long-term credentials.",
+          "type": "string"
         },
         "tags": {
           "additionalProperties": {
@@ -127,16 +84,24 @@
           },
           "description": "Metadata that assists with categorization and organization. Each tag consists\nof a key and an optional value. You define both. Tags don't propagate to\nany other cluster or Amazon Web Services resources.",
           "type": "object"
+        },
+        "type": {
+          "description": "The type of the new access entry. Valid values are STANDARD, FARGATE_LINUX,\nEC2_LINUX, EC2_WINDOWS, EC2 (for EKS Auto Mode), HYBRID_LINUX, and HYPERPOD_LINUX.\n\nIf the principalArn is for an IAM role that's used for self-managed Amazon\nEC2 nodes, specify EC2_LINUX or EC2_WINDOWS. Amazon EKS grants the necessary\npermissions to the node for you. If the principalArn is for any other purpose,\nspecify STANDARD. If you don't specify a value, Amazon EKS sets the value\nto STANDARD. If you have the access mode of the cluster set to API_AND_CONFIG_MAP,\nit's unnecessary to create access entries for IAM roles used with Fargate\nprofiles or managed Amazon EC2 nodes, because Amazon EKS creates entries\nin the aws-auth ConfigMap for the roles. You can't change this value once\nyou've created the access entry.\n\nIf you set the value to EC2_LINUX or EC2_WINDOWS, you can't specify values\nfor kubernetesGroups, or associate an AccessPolicy to the access entry.",
+          "type": "string"
+        },
+        "username": {
+          "description": "The username to authenticate to Kubernetes with. We recommend not specifying\na username and letting Amazon EKS specify it for you. For more information\nabout the value Amazon EKS specifies for you, or constraints before specifying\nyour own username, see Creating access entries (https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html#creating-access-entries)\nin the Amazon EKS User Guide.",
+          "type": "string"
         }
       },
       "required": [
-        "name"
+        "principalARN"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "FargateProfileStatus defines the observed state of FargateProfile",
+      "description": "AccessEntryStatus defines the observed state of AccessEntry",
       "properties": {
         "ackResourceMetadata": {
           "description": "All CRs managed by ACK have a common `Status.ACKResourceMetadata` member\nthat is used to contain resource sync state, account ownership,\nconstructed ARN for the resource",
@@ -202,37 +167,9 @@
           "format": "date-time",
           "type": "string"
         },
-        "health": {
-          "description": "The health status of the Fargate profile. If there are issues with your Fargate\nprofile's health, they are listed here.",
-          "properties": {
-            "issues": {
-              "items": {
-                "description": "An issue that is associated with the Fargate profile.",
-                "properties": {
-                  "code": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": "string"
-                  },
-                  "resourceIDs": {
-                    "items": {
-                      "type": "string"
-                    },
-                    "type": "array"
-                  }
-                },
-                "type": "object",
-                "additionalProperties": false
-              },
-              "type": "array"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "status": {
-          "description": "The current status of the Fargate profile.",
+        "modifiedAt": {
+          "description": "The Unix epoch timestamp for the last modification to the object.",
+          "format": "date-time",
           "type": "string"
         }
       },

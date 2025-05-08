@@ -61,13 +61,17 @@ def annotate_file(file_path: str, index_data: Dict[str, List[Dict[str, str]]]):
     docs = []
     with open(file_path, 'r') as f:
         content = f.read()
-    for doc in content.split("---"):
+    if content.startswith("---"):
+        content = content[3:]
+    if content.endswith("---"):
+        content = content[:-3]
+    for doc in content.split("\n---\n"):
         doc = doc.strip()
         if not doc:
             continue
         data = list(yaml.safe_load_all(doc))[0] if doc else {}
-        api_version = data.get("apiVersion")
-        kind = data.get("kind")
+        api_version = data.get("apiVersion") if "apiVersion" in data else None
+        kind = data.get("kind") if "kind" in data else None
 
         lines = doc.splitlines()
         # Remove any existing schema comment

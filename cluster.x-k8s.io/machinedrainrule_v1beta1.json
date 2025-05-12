@@ -19,10 +19,11 @@
           "description": "drain configures if and how Pods are drained.",
           "properties": {
             "behavior": {
-              "description": "behavior defines the drain behavior.\nCan be either \"Drain\" or \"Skip\".\n\"Drain\" means that the Pods to which this MachineDrainRule applies will be drained.\nIf behavior is set to \"Drain\" the order in which Pods are drained can be configured\nwith the order field. When draining Pods of a Node the Pods will be grouped by order\nand one group after another will be drained (by increasing order). Cluster API will\nwait until all Pods of a group are terminated / removed from the Node before starting\nwith the next group.\n\"Skip\" means that the Pods to which this MachineDrainRule applies will be skipped during drain.",
+              "description": "behavior defines the drain behavior.\nCan be either \"Drain\", \"Skip\", or \"WaitCompleted\".\n\"Drain\" means that the Pods to which this MachineDrainRule applies will be drained.\nIf behavior is set to \"Drain\" the order in which Pods are drained can be configured\nwith the order field. When draining Pods of a Node the Pods will be grouped by order\nand one group after another will be drained (by increasing order). Cluster API will\nwait until all Pods of a group are terminated / removed from the Node before starting\nwith the next group.\n\"Skip\" means that the Pods to which this MachineDrainRule applies will be skipped during drain.\n\"WaitCompleted\" means that the pods to which this MachineDrainRule applies will never be evicted\nand we wait for them to be completed, it is enforced that pods marked with this behavior always have Order=0.",
               "enum": [
                 "Drain",
-                "Skip"
+                "Skip",
+                "WaitCompleted"
               ],
               "type": "string"
             },
@@ -145,7 +146,13 @@
           "maxItems": 32,
           "minItems": 1,
           "type": "array",
-          "x-kubernetes-list-type": "atomic"
+          "x-kubernetes-list-type": "atomic",
+          "x-kubernetes-validations": [
+            {
+              "message": "entries in machines must be unique",
+              "rule": "self.all(x, self.exists_one(y, x == y))"
+            }
+          ]
         },
         "pods": {
           "description": "pods defines to which Pods this MachineDrainRule should be applied.\n\nIf pods is not set, the MachineDrainRule applies to all Pods in all Namespaces.\nIf pods contains multiple selectors, the results are ORed.\nWithin a single Pod selector the results of selector and namespaceSelector are ANDed.\nPods will be selected from all Namespaces unless otherwise\nrestricted with the namespaceSelector.\n\nExample: Selects Pods with label \"app\" == \"logging\" in all Namespaces or\n         Pods with label \"app\" == \"prometheus\" in the \"monitoring\"\n         Namespace.\n\n - selector:\n     matchExpressions:\n     - key: app\n       operator: In\n       values:\n       - logging\n - selector:\n     matchLabels:\n       app: prometheus\n   namespaceSelector:\n     matchLabels:\n       kubernetes.io/metadata.name: monitoring",
@@ -254,7 +261,13 @@
           "maxItems": 32,
           "minItems": 1,
           "type": "array",
-          "x-kubernetes-list-type": "atomic"
+          "x-kubernetes-list-type": "atomic",
+          "x-kubernetes-validations": [
+            {
+              "message": "entries in pods must be unique",
+              "rule": "self.all(x, self.exists_one(y, x == y))"
+            }
+          ]
         }
       },
       "required": [

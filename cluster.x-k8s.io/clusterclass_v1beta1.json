@@ -13,8 +13,42 @@
       "type": "object"
     },
     "spec": {
-      "description": "ClusterClassSpec describes the desired state of the ClusterClass.",
+      "description": "spec is the desired state of ClusterClass.",
       "properties": {
+        "availabilityGates": {
+          "description": "availabilityGates specifies additional conditions to include when evaluating Cluster Available condition.\n\nNOTE: this field is considered only for computing v1beta2 conditions.\nNOTE: If a Cluster is using this ClusterClass, and this Cluster defines a custom list of availabilityGates,\nsuch list overrides availabilityGates defined in this field.",
+          "items": {
+            "description": "ClusterAvailabilityGate contains the type of a Cluster condition to be used as availability gate.",
+            "properties": {
+              "conditionType": {
+                "description": "conditionType refers to a condition with matching type in the Cluster's condition list.\nIf the conditions doesn't exist, it will be treated as unknown.\nNote: Both Cluster API conditions or conditions added by 3rd party controllers can be used as availability gates.",
+                "maxLength": 316,
+                "minLength": 1,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              },
+              "polarity": {
+                "description": "polarity of the conditionType specified in this availabilityGate.\nValid values are Positive, Negative and omitted.\nWhen omitted, the default behaviour will be Positive.\nA positive polarity means that the condition should report a true status under normal conditions.\nA negative polarity means that the condition should report a false status under normal conditions.",
+                "enum": [
+                  "Positive",
+                  "Negative"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "conditionType"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "conditionType"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "controlPlane": {
           "description": "controlPlane is a reference to a local struct that holds the details\nfor provisioning the Control Plane for the Cluster.",
           "properties": {
@@ -30,7 +64,7 @@
                       "type": "string"
                     }
                   ],
-                  "description": "Any further remediation is only allowed if at most \"MaxUnhealthy\" machines selected by\n\"selector\" are not healthy.",
+                  "description": "maxUnhealthy specifies the maximum number of unhealthy machines allowed.\nAny further remediation is only allowed if at most \"maxUnhealthy\" machines selected by\n\"selector\" are not healthy.",
                   "x-kubernetes-int-or-string": true
                 },
                 "nodeStartupTimeout": {
@@ -79,13 +113,16 @@
                     "description": "UnhealthyCondition represents a Node condition type and value with a timeout\nspecified as a duration.  When the named condition has been in the given\nstatus for at least the timeout value, a node is considered unhealthy.",
                     "properties": {
                       "status": {
+                        "description": "status of the condition, one of True, False, Unknown.",
                         "minLength": 1,
                         "type": "string"
                       },
                       "timeout": {
+                        "description": "timeout is the duration that a node must be in a given status for,\nafter which the node is considered unhealthy.\nFor example, with a value of \"1h\", the node must match the status\nfor at least 1 hour before being considered unhealthy.",
                         "type": "string"
                       },
                       "type": {
+                        "description": "type of Node condition",
                         "minLength": 1,
                         "type": "string"
                       }
@@ -98,10 +135,13 @@
                     "type": "object",
                     "additionalProperties": false
                   },
+                  "maxItems": 100,
                   "type": "array"
                 },
                 "unhealthyRange": {
-                  "description": "Any further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"UnhealthyRange\". Takes precedence over MaxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
+                  "description": "unhealthyRange specifies the range of unhealthy machines allowed.\nAny further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"unhealthyRange\". Takes precedence over maxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
+                  "maxLength": 32,
+                  "minLength": 1,
                   "pattern": "^\\[[0-9]+-[0-9]+\\]$",
                   "type": "string"
                 }
@@ -169,7 +209,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                  "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
                   "type": "object"
                 }
               },
@@ -181,6 +221,8 @@
               "properties": {
                 "template": {
                   "description": "template defines the template to use for generating the name of the ControlPlane object.\nIf not defined, it will fallback to `{{ .cluster.name }}-{{ .random }}`.\nIf the templated string exceeds 63 characters, it will be trimmed to 58 characters and will\nget concatenated with a random suffix of length 5.\nThe templating mechanism provides the following arguments:\n* `.cluster.name`: The name of the cluster object.\n* `.random`: A random alphanumeric string, without vowels, of length 5.",
+                  "maxLength": 1024,
+                  "minLength": 1,
                   "type": "string"
                 }
               },
@@ -198,6 +240,40 @@
             "nodeVolumeDetachTimeout": {
               "description": "nodeVolumeDetachTimeout is the total amount of time that the controller will spend on waiting for all volumes\nto be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.\nNOTE: This value can be overridden while defining a Cluster.Topology.",
               "type": "string"
+            },
+            "readinessGates": {
+              "description": "readinessGates specifies additional conditions to include when evaluating Machine Ready condition.\n\nThis field can be used e.g. to instruct the machine controller to include in the computation for Machine's ready\ncomputation a condition, managed by an external controllers, reporting the status of special software/hardware installed on the Machine.\n\nNOTE: This field is considered only for computing v1beta2 conditions.\nNOTE: If a Cluster defines a custom list of readinessGates for the control plane,\nsuch list overrides readinessGates defined in this field.\nNOTE: Specific control plane provider implementations might automatically extend the list of readinessGates;\ne.g. the kubeadm control provider adds ReadinessGates for the APIServerPodHealthy, SchedulerPodHealthy conditions, etc.",
+              "items": {
+                "description": "MachineReadinessGate contains the type of a Machine condition to be used as a readiness gate.",
+                "properties": {
+                  "conditionType": {
+                    "description": "conditionType refers to a condition with matching type in the Machine's condition list.\nIf the conditions doesn't exist, it will be treated as unknown.\nNote: Both Cluster API conditions or conditions added by 3rd party controllers can be used as readiness gates.",
+                    "maxLength": 316,
+                    "minLength": 1,
+                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                    "type": "string"
+                  },
+                  "polarity": {
+                    "description": "polarity of the conditionType specified in this readinessGate.\nValid values are Positive, Negative and omitted.\nWhen omitted, the default behaviour will be Positive.\nA positive polarity means that the condition should report a true status under normal conditions.\nA negative polarity means that the condition should report a false status under normal conditions.",
+                    "enum": [
+                      "Positive",
+                      "Negative"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "conditionType"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 32,
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "conditionType"
+              ],
+              "x-kubernetes-list-type": "map"
             },
             "ref": {
               "description": "ref is a required reference to a custom resource\noffered by a provider.",
@@ -288,6 +364,19 @@
           "type": "object",
           "additionalProperties": false
         },
+        "infrastructureNamingStrategy": {
+          "description": "infrastructureNamingStrategy allows changing the naming pattern used when creating the infrastructure object.",
+          "properties": {
+            "template": {
+              "description": "template defines the template to use for generating the name of the Infrastructure object.\nIf not defined, it will fallback to `{{ .cluster.name }}-{{ .random }}`.\nIf the templated string exceeds 63 characters, it will be trimmed to 58 characters and will\nget concatenated with a random suffix of length 5.\nThe templating mechanism provides the following arguments:\n* `.cluster.name`: The name of the cluster object.\n* `.random`: A random alphanumeric string, without vowels, of length 5.",
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "patches": {
           "description": "patches defines the patches which are applied to customize\nreferenced templates of a ClusterClass.\nNote: Patches will be applied in the order of the array.",
           "items": {
@@ -305,10 +394,17 @@
                         "properties": {
                           "op": {
                             "description": "op defines the operation of the patch.\nNote: Only `add`, `replace` and `remove` are supported.",
+                            "enum": [
+                              "add",
+                              "replace",
+                              "remove"
+                            ],
                             "type": "string"
                           },
                           "path": {
                             "description": "path defines the path of the patch.\nNote: Only the spec of a template can be patched, thus the path has to start with /spec/.\nNote: For now the only allowed array modifications are `append` and `prepend`, i.e.:\n* for op: `add`: only index 0 (prepend) and - (append) are allowed\n* for op: `replace` or `remove`: no indexes are allowed",
+                            "maxLength": 512,
+                            "minLength": 1,
                             "type": "string"
                           },
                           "value": {
@@ -320,10 +416,14 @@
                             "properties": {
                               "template": {
                                 "description": "template is the Go template to be used to calculate the value.\nA template can reference variables defined in .spec.variables and builtin variables.\nNote: The template must evaluate to a valid YAML or JSON value.",
+                                "maxLength": 10240,
+                                "minLength": 1,
                                 "type": "string"
                               },
                               "variable": {
                                 "description": "variable is the variable to be used as value.\nVariable can be one of the variables defined in .spec.variables or a builtin variable.",
+                                "maxLength": 256,
+                                "minLength": 1,
                                 "type": "string"
                               }
                             },
@@ -338,6 +438,7 @@
                         "type": "object",
                         "additionalProperties": false
                       },
+                      "maxItems": 100,
                       "type": "array"
                     },
                     "selector": {
@@ -345,10 +446,14 @@
                       "properties": {
                         "apiVersion": {
                           "description": "apiVersion filters templates by apiVersion.",
+                          "maxLength": 512,
+                          "minLength": 1,
                           "type": "string"
                         },
                         "kind": {
                           "description": "kind filters templates by kind.",
+                          "maxLength": 256,
+                          "minLength": 1,
                           "type": "string"
                         },
                         "matchResources": {
@@ -368,8 +473,11 @@
                                 "names": {
                                   "description": "names selects templates by class names.",
                                   "items": {
+                                    "maxLength": 256,
+                                    "minLength": 1,
                                     "type": "string"
                                   },
+                                  "maxItems": 100,
                                   "type": "array"
                                 }
                               },
@@ -382,8 +490,11 @@
                                 "names": {
                                   "description": "names selects templates by class names.",
                                   "items": {
+                                    "maxLength": 256,
+                                    "minLength": 1,
                                     "type": "string"
                                   },
+                                  "maxItems": 100,
                                   "type": "array"
                                 }
                               },
@@ -411,14 +522,19 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "maxItems": 100,
                 "type": "array"
               },
               "description": {
                 "description": "description is a human-readable description of this patch.",
+                "maxLength": 1024,
+                "minLength": 1,
                 "type": "string"
               },
               "enabledIf": {
                 "description": "enabledIf is a Go template to be used to calculate if a patch should be enabled.\nIt can reference variables defined in .spec.variables and builtin variables.\nThe patch will be enabled if the template evaluates to `true`, otherwise it will\nbe disabled.\nIf EnabledIf is not set, the patch will be enabled per default.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               },
               "external": {
@@ -426,10 +542,14 @@
                 "properties": {
                   "discoverVariablesExtension": {
                     "description": "discoverVariablesExtension references an extension which is called to discover variables.",
+                    "maxLength": 512,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "generateExtension": {
                     "description": "generateExtension references an extension which is called to generate patches.",
+                    "maxLength": 512,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "settings": {
@@ -441,6 +561,8 @@
                   },
                   "validateExtension": {
                     "description": "validateExtension references an extension which is called to validate the topology.",
+                    "maxLength": 512,
+                    "minLength": 1,
                     "type": "string"
                   }
                 },
@@ -449,6 +571,8 @@
               },
               "name": {
                 "description": "name of the patch.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               }
             },
@@ -458,6 +582,7 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 1000,
           "type": "array"
         },
         "variables": {
@@ -479,7 +604,7 @@
                     "additionalProperties": {
                       "type": "string"
                     },
-                    "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
+                    "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
                     "type": "object"
                   }
                 },
@@ -488,6 +613,8 @@
               },
               "name": {
                 "description": "name of the variable.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               },
               "required": {
@@ -518,6 +645,8 @@
                       },
                       "description": {
                         "description": "description is a human-readable description of this variable.",
+                        "maxLength": 4096,
+                        "minLength": 1,
                         "type": "string"
                       },
                       "enum": {
@@ -525,6 +654,7 @@
                         "items": {
                           "x-kubernetes-preserve-unknown-fields": true
                         },
+                        "maxItems": 100,
                         "type": "array"
                       },
                       "example": {
@@ -541,6 +671,8 @@
                       },
                       "format": {
                         "description": "format is an OpenAPI v3 format string. Unknown formats are ignored.\nFor a list of supported formats please see: (of the k8s.io/apiextensions-apiserver version we're currently using)\nhttps://github.com/kubernetes/apiextensions-apiserver/blob/master/pkg/apiserver/validation/formats.go\nNOTE: Can only be set if type is string.",
+                        "maxLength": 32,
+                        "minLength": 1,
                         "type": "string"
                       },
                       "items": {
@@ -597,6 +729,8 @@
                       },
                       "pattern": {
                         "description": "pattern is the regex which a string variable must match.\nNOTE: Can only be set if type is string.",
+                        "maxLength": 512,
+                        "minLength": 1,
                         "type": "string"
                       },
                       "properties": {
@@ -606,12 +740,23 @@
                       "required": {
                         "description": "required specifies which fields of an object are required.\nNOTE: Can only be set if type is object.",
                         "items": {
+                          "maxLength": 256,
+                          "minLength": 1,
                           "type": "string"
                         },
+                        "maxItems": 1000,
                         "type": "array"
                       },
                       "type": {
                         "description": "type is the type of the variable.\nValid values are: object, array, string, integer, number or boolean.",
+                        "enum": [
+                          "object",
+                          "array",
+                          "string",
+                          "integer",
+                          "number",
+                          "boolean"
+                        ],
                         "type": "string"
                       },
                       "uniqueItems": {
@@ -633,14 +778,20 @@
                           "properties": {
                             "fieldPath": {
                               "description": "fieldPath represents the field path returned when the validation fails.\nIt must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.\ne.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`\nIf the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`\nIt does not support list numeric index.\nIt supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.\nNumeric index of array is not supported.\nFor field name which contains special characters, use `['specialName']` to refer the field name.\ne.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`",
+                              "maxLength": 512,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "message": {
                               "description": "message represents the message displayed when validation fails. The message is required if the Rule contains\nline breaks. The message must not contain line breaks.\nIf unset, the message is \"failed rule: {Rule}\".\ne.g. \"must be a URL with the host matching spec.host\"",
+                              "maxLength": 512,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "messageExpression": {
                               "description": "messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.\nSince messageExpression is used as a failure message, it must evaluate to a string.\nIf both message and messageExpression are present on a rule, then messageExpression will be used if validation\nfails. If messageExpression results in a runtime error, the validation failure message is produced\nas if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string\nthat contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset.\nmessageExpression has access to all the same variables as the rule; the only difference is the return type.\nExample:\n\"x must be less than max (\"+string(self.max)+\")\"",
+                              "maxLength": 1024,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "reason": {
@@ -656,6 +807,8 @@
                             },
                             "rule": {
                               "description": "rule represents the expression which will be evaluated by CEL.\nref: https://github.com/google/cel-spec\nThe Rule is scoped to the location of the x-kubernetes-validations extension in the schema.\nThe `self` variable in the CEL expression is bound to the scoped value.\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable\nvia `self.field` and field presence can be checked via `has(self.field)`.\nIf the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map\nare accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map\nare accessible via CEL macros and functions such as `self.all(...)`.\nIf the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and\nfunctions.\nIf the Rule is scoped to a scalar, `self` is bound to the scalar value.\nExamples:\n- Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"}\n- Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"}\n- Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL\nexpressions. This includes:\n- Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields.\n- Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.\nAccessible property names are escaped according to the following rules when accessed in the expression:\n- '__' escapes to '__underscores__'\n- '.' escapes to '__dot__'\n- '-' escapes to '__dash__'\n- '/' escapes to '__slash__'\n- Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\nIf `rule` makes use of the `oldSelf` variable it is implicitly a\n`transition rule`.\n\nBy default, the `oldSelf` variable is the same type as `self`.\n\nTransition rules by default are applied only on UPDATE requests and are\nskipped if an old value could not be found.",
+                              "maxLength": 4096,
+                              "minLength": 1,
                               "type": "string"
                             }
                           },
@@ -665,6 +818,7 @@
                           "type": "object",
                           "additionalProperties": false
                         },
+                        "maxItems": 100,
                         "type": "array",
                         "x-kubernetes-list-map-keys": [
                           "rule"
@@ -685,7 +839,7 @@
                             "additionalProperties": {
                               "type": "string"
                             },
-                            "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
+                            "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
                             "type": "object"
                           }
                         },
@@ -712,6 +866,7 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 1000,
           "type": "array"
         },
         "workers": {
@@ -724,10 +879,14 @@
                 "properties": {
                   "class": {
                     "description": "class denotes a type of worker node present in the cluster,\nthis name MUST be unique within a ClusterClass and can be referenced\nin the Cluster to create a managed MachineDeployment.",
+                    "maxLength": 256,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "failureDomain": {
                     "description": "failureDomain is the failure domain the machines will be created in.\nMust match a key in the FailureDomains map stored on the cluster object.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
+                    "maxLength": 256,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "machineHealthCheck": {
@@ -742,7 +901,7 @@
                             "type": "string"
                           }
                         ],
-                        "description": "Any further remediation is only allowed if at most \"MaxUnhealthy\" machines selected by\n\"selector\" are not healthy.",
+                        "description": "maxUnhealthy specifies the maximum number of unhealthy machines allowed.\nAny further remediation is only allowed if at most \"maxUnhealthy\" machines selected by\n\"selector\" are not healthy.",
                         "x-kubernetes-int-or-string": true
                       },
                       "nodeStartupTimeout": {
@@ -791,13 +950,16 @@
                           "description": "UnhealthyCondition represents a Node condition type and value with a timeout\nspecified as a duration.  When the named condition has been in the given\nstatus for at least the timeout value, a node is considered unhealthy.",
                           "properties": {
                             "status": {
+                              "description": "status of the condition, one of True, False, Unknown.",
                               "minLength": 1,
                               "type": "string"
                             },
                             "timeout": {
+                              "description": "timeout is the duration that a node must be in a given status for,\nafter which the node is considered unhealthy.\nFor example, with a value of \"1h\", the node must match the status\nfor at least 1 hour before being considered unhealthy.",
                               "type": "string"
                             },
                             "type": {
+                              "description": "type of Node condition",
                               "minLength": 1,
                               "type": "string"
                             }
@@ -810,10 +972,13 @@
                           "type": "object",
                           "additionalProperties": false
                         },
+                        "maxItems": 100,
                         "type": "array"
                       },
                       "unhealthyRange": {
-                        "description": "Any further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"UnhealthyRange\". Takes precedence over MaxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
+                        "description": "unhealthyRange specifies the range of unhealthy machines allowed.\nAny further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"unhealthyRange\". Takes precedence over maxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
+                        "maxLength": 32,
+                        "minLength": 1,
                         "pattern": "^\\[[0-9]+-[0-9]+\\]$",
                         "type": "string"
                       }
@@ -822,7 +987,7 @@
                     "additionalProperties": false
                   },
                   "minReadySeconds": {
-                    "description": "Minimum number of seconds for which a newly created machine should\nbe ready.\nDefaults to 0 (machine will be considered available as soon as it\nis ready)\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
+                    "description": "minReadySeconds is the minimum number of seconds for which a newly created machine should\nbe ready.\nDefaults to 0 (machine will be considered available as soon as it\nis ready)\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
                     "format": "int32",
                     "type": "integer"
                   },
@@ -831,6 +996,8 @@
                     "properties": {
                       "template": {
                         "description": "template defines the template to use for generating the name of the MachineDeployment object.\nIf not defined, it will fallback to `{{ .cluster.name }}-{{ .machineDeployment.topologyName }}-{{ .random }}`.\nIf the templated string exceeds 63 characters, it will be trimmed to 58 characters and will\nget concatenated with a random suffix of length 5.\nThe templating mechanism provides the following arguments:\n* `.cluster.name`: The name of the cluster object.\n* `.random`: A random alphanumeric string, without vowels, of length 5.\n* `.machineDeployment.topologyName`: The name of the MachineDeployment topology (Cluster.spec.topology.workers.machineDeployments[].name).",
+                        "maxLength": 1024,
+                        "minLength": 1,
                         "type": "string"
                       }
                     },
@@ -849,8 +1016,42 @@
                     "description": "nodeVolumeDetachTimeout is the total amount of time that the controller will spend on waiting for all volumes\nto be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
                     "type": "string"
                   },
+                  "readinessGates": {
+                    "description": "readinessGates specifies additional conditions to include when evaluating Machine Ready condition.\n\nThis field can be used e.g. to instruct the machine controller to include in the computation for Machine's ready\ncomputation a condition, managed by an external controllers, reporting the status of special software/hardware installed on the Machine.\n\nNOTE: This field is considered only for computing v1beta2 conditions.\nNOTE: If a Cluster defines a custom list of readinessGates for a MachineDeployment using this MachineDeploymentClass,\nsuch list overrides readinessGates defined in this field.",
+                    "items": {
+                      "description": "MachineReadinessGate contains the type of a Machine condition to be used as a readiness gate.",
+                      "properties": {
+                        "conditionType": {
+                          "description": "conditionType refers to a condition with matching type in the Machine's condition list.\nIf the conditions doesn't exist, it will be treated as unknown.\nNote: Both Cluster API conditions or conditions added by 3rd party controllers can be used as readiness gates.",
+                          "maxLength": 316,
+                          "minLength": 1,
+                          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                          "type": "string"
+                        },
+                        "polarity": {
+                          "description": "polarity of the conditionType specified in this readinessGate.\nValid values are Positive, Negative and omitted.\nWhen omitted, the default behaviour will be Positive.\nA positive polarity means that the condition should report a true status under normal conditions.\nA negative polarity means that the condition should report a false status under normal conditions.",
+                          "enum": [
+                            "Positive",
+                            "Negative"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "conditionType"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 32,
+                    "type": "array",
+                    "x-kubernetes-list-map-keys": [
+                      "conditionType"
+                    ],
+                    "x-kubernetes-list-type": "map"
+                  },
                   "strategy": {
-                    "description": "The deployment strategy to use to replace existing machines with\nnew ones.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
+                    "description": "strategy is the deployment strategy to use to replace existing machines with\nnew ones.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachineDeploymentClass.",
                     "properties": {
                       "remediation": {
                         "description": "remediation controls the strategy of remediating unhealthy machines\nand how remediating operations should occur during the lifecycle of the dependant MachineSets.",
@@ -872,7 +1073,7 @@
                         "additionalProperties": false
                       },
                       "rollingUpdate": {
-                        "description": "Rolling update config params. Present only if\nMachineDeploymentStrategyType = RollingUpdate.",
+                        "description": "rollingUpdate is the rolling update config params. Present only if\nMachineDeploymentStrategyType = RollingUpdate.",
                         "properties": {
                           "deletePolicy": {
                             "description": "deletePolicy defines the policy used by the MachineDeployment to identify nodes to delete when downscaling.\nValid values are \"Random, \"Newest\", \"Oldest\"\nWhen no value is supplied, the default DeletePolicy of MachineSet is used",
@@ -892,7 +1093,7 @@
                                 "type": "string"
                               }
                             ],
-                            "description": "The maximum number of machines that can be scheduled above the\ndesired number of machines.\nValue can be an absolute number (ex: 5) or a percentage of\ndesired machines (ex: 10%).\nThis can not be 0 if MaxUnavailable is 0.\nAbsolute number is calculated from percentage by rounding up.\nDefaults to 1.\nExample: when this is set to 30%, the new MachineSet can be scaled\nup immediately when the rolling update starts, such that the total\nnumber of old and new machines do not exceed 130% of desired\nmachines. Once old machines have been killed, new MachineSet can\nbe scaled up further, ensuring that total number of machines running\nat any time during the update is at most 130% of desired machines.",
+                            "description": "maxSurge is the maximum number of machines that can be scheduled above the\ndesired number of machines.\nValue can be an absolute number (ex: 5) or a percentage of\ndesired machines (ex: 10%).\nThis can not be 0 if MaxUnavailable is 0.\nAbsolute number is calculated from percentage by rounding up.\nDefaults to 1.\nExample: when this is set to 30%, the new MachineSet can be scaled\nup immediately when the rolling update starts, such that the total\nnumber of old and new machines do not exceed 130% of desired\nmachines. Once old machines have been killed, new MachineSet can\nbe scaled up further, ensuring that total number of machines running\nat any time during the update is at most 130% of desired machines.",
                             "x-kubernetes-int-or-string": true
                           },
                           "maxUnavailable": {
@@ -904,7 +1105,7 @@
                                 "type": "string"
                               }
                             ],
-                            "description": "The maximum number of machines that can be unavailable during the update.\nValue can be an absolute number (ex: 5) or a percentage of desired\nmachines (ex: 10%).\nAbsolute number is calculated from percentage by rounding down.\nThis can not be 0 if MaxSurge is 0.\nDefaults to 0.\nExample: when this is set to 30%, the old MachineSet can be scaled\ndown to 70% of desired machines immediately when the rolling update\nstarts. Once new machines are ready, old MachineSet can be scaled\ndown further, followed by scaling up the new MachineSet, ensuring\nthat the total number of machines available at all times\nduring the update is at least 70% of desired machines.",
+                            "description": "maxUnavailable is the maximum number of machines that can be unavailable during the update.\nValue can be an absolute number (ex: 5) or a percentage of desired\nmachines (ex: 10%).\nAbsolute number is calculated from percentage by rounding down.\nThis can not be 0 if MaxSurge is 0.\nDefaults to 0.\nExample: when this is set to 30%, the old MachineSet can be scaled\ndown to 70% of desired machines immediately when the rolling update\nstarts. Once new machines are ready, old MachineSet can be scaled\ndown further, followed by scaling up the new MachineSet, ensuring\nthat the total number of machines available at all times\nduring the update is at least 70% of desired machines.",
                             "x-kubernetes-int-or-string": true
                           }
                         },
@@ -1032,7 +1233,7 @@
                             "additionalProperties": {
                               "type": "string"
                             },
-                            "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                            "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
                             "type": "object"
                           }
                         },
@@ -1055,6 +1256,7 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "maxItems": 100,
               "type": "array",
               "x-kubernetes-list-map-keys": [
                 "class"
@@ -1068,17 +1270,22 @@
                 "properties": {
                   "class": {
                     "description": "class denotes a type of machine pool present in the cluster,\nthis name MUST be unique within a ClusterClass and can be referenced\nin the Cluster to create a managed MachinePool.",
+                    "maxLength": 256,
+                    "minLength": 1,
                     "type": "string"
                   },
                   "failureDomains": {
                     "description": "failureDomains is the list of failure domains the MachinePool should be attached to.\nMust match a key in the FailureDomains map stored on the cluster object.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachinePoolClass.",
                     "items": {
+                      "maxLength": 256,
+                      "minLength": 1,
                       "type": "string"
                     },
+                    "maxItems": 100,
                     "type": "array"
                   },
                   "minReadySeconds": {
-                    "description": "Minimum number of seconds for which a newly created machine pool should\nbe ready.\nDefaults to 0 (machine will be considered available as soon as it\nis ready)\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachinePoolClass.",
+                    "description": "minReadySeconds is the minimum number of seconds for which a newly created machine pool should\nbe ready.\nDefaults to 0 (machine will be considered available as soon as it\nis ready)\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachinePoolClass.",
                     "format": "int32",
                     "type": "integer"
                   },
@@ -1087,6 +1294,8 @@
                     "properties": {
                       "template": {
                         "description": "template defines the template to use for generating the name of the MachinePool object.\nIf not defined, it will fallback to `{{ .cluster.name }}-{{ .machinePool.topologyName }}-{{ .random }}`.\nIf the templated string exceeds 63 characters, it will be trimmed to 58 characters and will\nget concatenated with a random suffix of length 5.\nThe templating mechanism provides the following arguments:\n* `.cluster.name`: The name of the cluster object.\n* `.random`: A random alphanumeric string, without vowels, of length 5.\n* `.machinePool.topologyName`: The name of the MachinePool topology (Cluster.spec.topology.workers.machinePools[].name).",
+                        "maxLength": 1024,
+                        "minLength": 1,
                         "type": "string"
                       }
                     },
@@ -1214,7 +1423,7 @@
                             "additionalProperties": {
                               "type": "string"
                             },
-                            "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                            "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
                             "type": "object"
                           }
                         },
@@ -1237,6 +1446,7 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "maxItems": 100,
               "type": "array",
               "x-kubernetes-list-map-keys": [
                 "class"
@@ -1252,7 +1462,7 @@
       "additionalProperties": false
     },
     "status": {
-      "description": "ClusterClassStatus defines the observed state of the ClusterClass.",
+      "description": "status is the observed state of ClusterClass.",
       "properties": {
         "conditions": {
           "description": "conditions defines current observed state of the ClusterClass.",
@@ -1260,20 +1470,25 @@
             "description": "Condition defines an observation of a Cluster API resource operational state.",
             "properties": {
               "lastTransitionTime": {
-                "description": "Last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed. If that is not known, then using the time when\nthe API field changed is acceptable.",
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed. If that is not known, then using the time when\nthe API field changed is acceptable.",
                 "format": "date-time",
                 "type": "string"
               },
               "message": {
-                "description": "A human readable message indicating details about the transition.\nThis field may be empty.",
+                "description": "message is a human readable message indicating details about the transition.\nThis field may be empty.",
+                "maxLength": 10240,
+                "minLength": 1,
                 "type": "string"
               },
               "reason": {
-                "description": "The reason for the condition's last transition in CamelCase.\nThe specific API may choose whether or not this field is considered a guaranteed API.\nThis field may be empty.",
+                "description": "reason is the reason for the condition's last transition in CamelCase.\nThe specific API may choose whether or not this field is considered a guaranteed API.\nThis field may be empty.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               },
               "severity": {
                 "description": "severity provides an explicit classification of Reason code, so the users or machines can immediately\nunderstand the current situation and act accordingly.\nThe Severity field MUST be set only when Status=False.",
+                "maxLength": 32,
                 "type": "string"
               },
               "status": {
@@ -1282,6 +1497,8 @@
               },
               "type": {
                 "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions\ncan be useful (see .node.status.conditions), the ability to deconflict is important.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               }
             },
@@ -1380,6 +1597,8 @@
                   "properties": {
                     "from": {
                       "description": "from specifies the origin of the variable definition.\nThis will be `inline` for variables defined in the ClusterClass or the name of a patch defined in the ClusterClass\nfor variables discovered from a DiscoverVariables runtime extensions.",
+                      "maxLength": 256,
+                      "minLength": 1,
                       "type": "string"
                     },
                     "metadata": {
@@ -1396,7 +1615,7 @@
                           "additionalProperties": {
                             "type": "string"
                           },
-                          "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
+                          "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
                           "type": "object"
                         }
                       },
@@ -1431,6 +1650,8 @@
                             },
                             "description": {
                               "description": "description is a human-readable description of this variable.",
+                              "maxLength": 4096,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "enum": {
@@ -1438,6 +1659,7 @@
                               "items": {
                                 "x-kubernetes-preserve-unknown-fields": true
                               },
+                              "maxItems": 100,
                               "type": "array"
                             },
                             "example": {
@@ -1454,6 +1676,8 @@
                             },
                             "format": {
                               "description": "format is an OpenAPI v3 format string. Unknown formats are ignored.\nFor a list of supported formats please see: (of the k8s.io/apiextensions-apiserver version we're currently using)\nhttps://github.com/kubernetes/apiextensions-apiserver/blob/master/pkg/apiserver/validation/formats.go\nNOTE: Can only be set if type is string.",
+                              "maxLength": 32,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "items": {
@@ -1510,6 +1734,8 @@
                             },
                             "pattern": {
                               "description": "pattern is the regex which a string variable must match.\nNOTE: Can only be set if type is string.",
+                              "maxLength": 512,
+                              "minLength": 1,
                               "type": "string"
                             },
                             "properties": {
@@ -1519,12 +1745,23 @@
                             "required": {
                               "description": "required specifies which fields of an object are required.\nNOTE: Can only be set if type is object.",
                               "items": {
+                                "maxLength": 256,
+                                "minLength": 1,
                                 "type": "string"
                               },
+                              "maxItems": 1000,
                               "type": "array"
                             },
                             "type": {
                               "description": "type is the type of the variable.\nValid values are: object, array, string, integer, number or boolean.",
+                              "enum": [
+                                "object",
+                                "array",
+                                "string",
+                                "integer",
+                                "number",
+                                "boolean"
+                              ],
                               "type": "string"
                             },
                             "uniqueItems": {
@@ -1546,14 +1783,20 @@
                                 "properties": {
                                   "fieldPath": {
                                     "description": "fieldPath represents the field path returned when the validation fails.\nIt must be a relative JSON path (i.e. with array notation) scoped to the location of this x-kubernetes-validations extension in the schema and refer to an existing field.\ne.g. when validation checks if a specific attribute `foo` under a map `testMap`, the fieldPath could be set to `.testMap.foo`\nIf the validation checks two lists must have unique attributes, the fieldPath could be set to either of the list: e.g. `.testList`\nIt does not support list numeric index.\nIt supports child operation to refer to an existing field currently. Refer to [JSONPath support in Kubernetes](https://kubernetes.io/docs/reference/kubectl/jsonpath/) for more info.\nNumeric index of array is not supported.\nFor field name which contains special characters, use `['specialName']` to refer the field name.\ne.g. for attribute `foo.34$` appears in a list `testList`, the fieldPath could be set to `.testList['foo.34$']`",
+                                    "maxLength": 512,
+                                    "minLength": 1,
                                     "type": "string"
                                   },
                                   "message": {
                                     "description": "message represents the message displayed when validation fails. The message is required if the Rule contains\nline breaks. The message must not contain line breaks.\nIf unset, the message is \"failed rule: {Rule}\".\ne.g. \"must be a URL with the host matching spec.host\"",
+                                    "maxLength": 512,
+                                    "minLength": 1,
                                     "type": "string"
                                   },
                                   "messageExpression": {
                                     "description": "messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails.\nSince messageExpression is used as a failure message, it must evaluate to a string.\nIf both message and messageExpression are present on a rule, then messageExpression will be used if validation\nfails. If messageExpression results in a runtime error, the validation failure message is produced\nas if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string\nthat contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset.\nmessageExpression has access to all the same variables as the rule; the only difference is the return type.\nExample:\n\"x must be less than max (\"+string(self.max)+\")\"",
+                                    "maxLength": 1024,
+                                    "minLength": 1,
                                     "type": "string"
                                   },
                                   "reason": {
@@ -1569,6 +1812,8 @@
                                   },
                                   "rule": {
                                     "description": "rule represents the expression which will be evaluated by CEL.\nref: https://github.com/google/cel-spec\nThe Rule is scoped to the location of the x-kubernetes-validations extension in the schema.\nThe `self` variable in the CEL expression is bound to the scoped value.\nIf the Rule is scoped to an object with properties, the accessible properties of the object are field selectable\nvia `self.field` and field presence can be checked via `has(self.field)`.\nIf the Rule is scoped to an object with additionalProperties (i.e. a map) the value of the map\nare accessible via `self[mapKey]`, map containment can be checked via `mapKey in self` and all entries of the map\nare accessible via CEL macros and functions such as `self.all(...)`.\nIf the Rule is scoped to an array, the elements of the array are accessible via `self[i]` and also by macros and\nfunctions.\nIf the Rule is scoped to a scalar, `self` is bound to the scalar value.\nExamples:\n- Rule scoped to a map of objects: {\"rule\": \"self.components['Widget'].priority < 10\"}\n- Rule scoped to a list of integers: {\"rule\": \"self.values.all(value, value >= 0 && value < 100)\"}\n- Rule scoped to a string value: {\"rule\": \"self.startsWith('kube')\"}\n\nUnknown data preserved in custom resources via x-kubernetes-preserve-unknown-fields is not accessible in CEL\nexpressions. This includes:\n- Unknown field values that are preserved by object schemas with x-kubernetes-preserve-unknown-fields.\n- Object properties where the property schema is of an \"unknown type\". An \"unknown type\" is recursively defined as:\n  - A schema with no type and x-kubernetes-preserve-unknown-fields set to true\n  - An array where the items schema is of an \"unknown type\"\n  - An object where the additionalProperties schema is of an \"unknown type\"\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible.\nAccessible property names are escaped according to the following rules when accessed in the expression:\n- '__' escapes to '__underscores__'\n- '.' escapes to '__dot__'\n- '-' escapes to '__dash__'\n- '/' escapes to '__slash__'\n- Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Rule accessing a property named \"namespace\": {\"rule\": \"self.__namespace__ > 0\"}\n  - Rule accessing a property named \"x-prop\": {\"rule\": \"self.x__dash__prop > 0\"}\n  - Rule accessing a property named \"redact__d\": {\"rule\": \"self.redact__underscores__d > 0\"}\n\nIf `rule` makes use of the `oldSelf` variable it is implicitly a\n`transition rule`.\n\nBy default, the `oldSelf` variable is the same type as `self`.\n\nTransition rules by default are applied only on UPDATE requests and are\nskipped if an old value could not be found.",
+                                    "maxLength": 4096,
+                                    "minLength": 1,
                                     "type": "string"
                                   }
                                 },
@@ -1578,6 +1823,7 @@
                                 "type": "object",
                                 "additionalProperties": false
                               },
+                              "maxItems": 100,
                               "type": "array",
                               "x-kubernetes-list-map-keys": [
                                 "rule"
@@ -1598,7 +1844,7 @@
                                   "additionalProperties": {
                                     "type": "string"
                                   },
-                                  "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
+                                  "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) variables.",
                                   "type": "object"
                                 }
                               },
@@ -1625,6 +1871,7 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "maxItems": 100,
                 "type": "array"
               },
               "definitionsConflict": {
@@ -1633,6 +1880,8 @@
               },
               "name": {
                 "description": "name is the name of the variable.",
+                "maxLength": 256,
+                "minLength": 1,
                 "type": "string"
               }
             },
@@ -1643,6 +1892,7 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 1000,
           "type": "array"
         }
       },

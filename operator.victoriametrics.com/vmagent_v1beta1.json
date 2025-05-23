@@ -16,6 +16,43 @@
       "description": "VMAgentSpec defines the desired state of VMAgent",
       "properties": {
         "aPIServerConfig": {
+          "description": "APIServerConfig allows specifying a host and auth methods to access apiserver.\nIf left empty, VMAgent is assumed to run inside of the cluster\nand will discover API servers automatically and use the pod's CA certificate\nand bearer token file at /var/run/secrets/kubernetes.io/serviceaccount/.\naPIServerConfig is deprecated use apiServerConfig instead",
+          "required": [
+            "host"
+          ],
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "additionalScrapeConfigs": {
+          "description": "AdditionalScrapeConfigs As scrape configs are appended, the user is responsible to make sure it\nis valid. Note that using this feature may expose the possibility to\nbreak upgrades of VMAgent. It is advised to review VMAgent release\nnotes to ensure that no incompatible scrape configs are going to break\nVMAgent after the upgrade.",
+          "properties": {
+            "key": {
+              "description": "The key of the secret to select from.  Must be a valid secret key.",
+              "type": "string"
+            },
+            "name": {
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            },
+            "optional": {
+              "description": "Specify whether the Secret or its key must be defined",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "affinity": {
+          "description": "Affinity If specified, the pod's scheduling constraints.",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "apiServerConfig": {
           "description": "APIServerConfig allows specifying a host and auth methods to access apiserver.\nIf left empty, VMAgent is assumed to run inside of the cluster\nand will discover API servers automatically and use the pod's CA certificate\nand bearer token file at /var/run/secrets/kubernetes.io/serviceaccount/.",
           "properties": {
             "authorization": {
@@ -132,7 +169,7 @@
               "description": "TLSConfig Config to use for accessing apiserver.",
               "properties": {
                 "ca": {
-                  "description": "Stuct containing the CA cert to use for the targets.",
+                  "description": "Struct containing the CA cert to use for the targets.",
                   "properties": {
                     "configMap": {
                       "description": "ConfigMap containing data to use for the targets.",
@@ -295,35 +332,6 @@
           ],
           "type": "object",
           "additionalProperties": false
-        },
-        "additionalScrapeConfigs": {
-          "description": "AdditionalScrapeConfigs As scrape configs are appended, the user is responsible to make sure it\nis valid. Note that using this feature may expose the possibility to\nbreak upgrades of VMAgent. It is advised to review VMAgent release\nnotes to ensure that no incompatible scrape configs are going to break\nVMAgent after the upgrade.",
-          "properties": {
-            "key": {
-              "description": "The key of the secret to select from.  Must be a valid secret key.",
-              "type": "string"
-            },
-            "name": {
-              "default": "",
-              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
-              "type": "string"
-            },
-            "optional": {
-              "description": "Specify whether the Secret or its key must be defined",
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "key"
-          ],
-          "type": "object",
-          "x-kubernetes-map-type": "atomic",
-          "additionalProperties": false
-        },
-        "affinity": {
-          "description": "Affinity If specified, the pod's scheduling constraints.",
-          "type": "object",
-          "x-kubernetes-preserve-unknown-fields": true
         },
         "arbitraryFSAccessThroughSMs": {
           "description": "ArbitraryFSAccessThroughSMs configures whether configuration\nbased on EndpointAuth can access arbitrary files on the file system\nof the VMAgent container e.g. bearer token files, basic auth, tls certs",
@@ -597,10 +605,11 @@
                           "type": "string"
                         },
                         "status": {
+                          "description": "Status is the status of the condition.\nCan be True, False, Unknown.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required",
                           "type": "string"
                         },
                         "type": {
-                          "description": "PersistentVolumeClaimConditionType defines the condition of PV claim.\nValid values are:\n  - \"Resizing\", \"FileSystemResizePending\"\n\nIf RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:\n  - \"ControllerResizeError\", \"NodeResizeError\"\n\nIf VolumeAttributesClass feature gate is enabled, then following additional values can be expected:\n  - \"ModifyVolumeError\", \"ModifyingVolume\"",
+                          "description": "Type is the type of the condition.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about",
                           "type": "string"
                         }
                       },
@@ -659,6 +668,30 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "configReloadAuthKeySecret": {
+          "description": "ConfigReloadAuthKeySecret defines optional secret reference authKey for /-/reload API requests.\nGiven secret reference will be added to the application and vm-config-reloader as volume\navailable since v0.57.0 version",
+          "properties": {
+            "key": {
+              "description": "The key of the secret to select from.  Must be a valid secret key.",
+              "type": "string"
+            },
+            "name": {
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            },
+            "optional": {
+              "description": "Specify whether the Secret or its key must be defined",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
         },
         "configReloaderExtraArgs": {
           "additionalProperties": {
@@ -748,6 +781,14 @@
           },
           "type": "array"
         },
+        "daemonSetMode": {
+          "description": "DaemonSetMode enables DaemonSet deployment mode instead of Deployment.\nSupports only VMPodScrape\n(available from v0.55.0).\nCannot be used with statefulMode",
+          "type": "boolean"
+        },
+        "disableAutomountServiceAccountToken": {
+          "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+          "type": "boolean"
+        },
         "disableSelfServiceScrape": {
           "description": "DisableSelfServiceScrape controls creation of VMServiceScrape by operator\nfor the application.\nHas priority over `VM_DISABLESELFSERVICESCRAPECREATION` operator env variable",
           "type": "boolean"
@@ -772,10 +813,11 @@
                 "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                 "properties": {
                   "name": {
-                    "description": "Required.",
+                    "description": "Name is this DNS resolver option's name.\nRequired.",
                     "type": "string"
                   },
                   "value": {
+                    "description": "Value is this DNS resolver option's value.",
                     "type": "string"
                   }
                 },
@@ -800,6 +842,10 @@
         "dnsPolicy": {
           "description": "DNSPolicy sets DNS policy for the pod",
           "type": "string"
+        },
+        "enableKubernetesAPISelectors": {
+          "description": "EnableKubernetesAPISelectors instructs vmagent to use CRD scrape objects spec.selectors for\nKubernetes API list and watch requests.\nhttps://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#list-and-watch-filtering\nIt could be useful to reduce Kubernetes API server resource usage for serving less than 100 CRD scrape objects in total.",
+          "type": "boolean"
         },
         "enforcedNamespaceLabel": {
           "description": "EnforcedNamespaceLabel enforces adding a namespace label of origin for each alert\nand metric that is user created. The label value will always be the namespace of the object that is\nbeing created.",
@@ -838,6 +884,55 @@
             ],
             "type": "object",
             "x-kubernetes-preserve-unknown-fields": true,
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "extraEnvsFrom": {
+          "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+          "items": {
+            "description": "EnvFromSource represents the source of a set of ConfigMaps",
+            "properties": {
+              "configMapRef": {
+                "description": "The ConfigMap to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the ConfigMap must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "prefix": {
+                "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                "type": "string"
+              },
+              "secretRef": {
+                "description": "The Secret to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
             "additionalProperties": false
           },
           "type": "array"
@@ -1946,8 +2041,8 @@
                 "type": "array"
               },
               "maxDiskUsage": {
-                "description": "MaxDiskUsage defines the maximum file-based buffer size in bytes for -remoteWrite.url",
-                "type": "string"
+                "description": "MaxDiskUsage defines the maximum file-based buffer size in bytes for the given remoteWrite\nIt overrides global configuration defined at remoteWriteSettings.maxDiskUsagePerURL",
+                "x-kubernetes-preserve-unknown-fields": true
               },
               "oauth2": {
                 "description": "OAuth2 defines auth configuration",
@@ -2042,12 +2137,20 @@
                     "description": "Parameters to append to the token URL",
                     "type": "object"
                   },
+                  "proxy_url": {
+                    "description": "The proxy URL for token_url connection\n( available from v0.55.0).\nIs only supported by Scrape objects family",
+                    "type": "string"
+                  },
                   "scopes": {
                     "description": "OAuth2 scopes used for the token request",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "tls_config": {
+                    "description": "TLSConfig for token_url connection\n( available from v0.55.0).\nIs only supported by Scrape objects family",
+                    "x-kubernetes-preserve-unknown-fields": true
                   },
                   "token_url": {
                     "description": "The URL to fetch the token from",
@@ -2109,6 +2212,10 @@
                     },
                     "type": "array"
                   },
+                  "enableWindows": {
+                    "description": "EnableWindows enables aggregating data in separate windows ( available from v0.54.0).",
+                    "type": "boolean"
+                  },
                   "ignoreFirstIntervals": {
                     "description": "IgnoreFirstIntervals instructs to ignore first interval",
                     "type": "integer"
@@ -2143,6 +2250,10 @@
                             "type": "string"
                           },
                           "type": "array"
+                        },
+                        "enable_windows": {
+                          "description": "EnableWindows enables aggregating data in separate windows",
+                          "type": "boolean"
                         },
                         "flush_on_shutdown": {
                           "description": "FlushOnShutdown defines whether to flush the aggregation state on process termination\nor config reload. Is `false` by default.\nIt is not recommended changing this setting, unless unfinished aggregations states\nare preferred to missing data points.",
@@ -2345,7 +2456,7 @@
                 "description": "TLSConfig describes tls configuration for remote write target",
                 "properties": {
                   "ca": {
-                    "description": "Stuct containing the CA cert to use for the targets.",
+                    "description": "Struct containing the CA cert to use for the targets.",
                     "properties": {
                       "configMap": {
                         "description": "ConfigMap containing data to use for the targets.",
@@ -2561,8 +2672,7 @@
             },
             "maxDiskUsagePerURL": {
               "description": "The maximum file-based buffer size in bytes at -remoteWrite.tmpDataPath",
-              "format": "int64",
-              "type": "integer"
+              "x-kubernetes-preserve-unknown-fields": true
             },
             "queues": {
               "description": "The number of concurrent queues",
@@ -3435,10 +3545,11 @@
                             "type": "string"
                           },
                           "status": {
+                            "description": "Status is the status of the condition.\nCan be True, False, Unknown.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required",
                             "type": "string"
                           },
                           "type": {
-                            "description": "PersistentVolumeClaimConditionType defines the condition of PV claim.\nValid values are:\n  - \"Resizing\", \"FileSystemResizePending\"\n\nIf RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:\n  - \"ControllerResizeError\", \"NodeResizeError\"\n\nIf VolumeAttributesClass feature gate is enabled, then following additional values can be expected:\n  - \"ModifyVolumeError\", \"ModifyingVolume\"",
+                            "description": "Type is the type of the condition.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about",
                             "type": "string"
                           }
                         },
@@ -3698,6 +3809,10 @@
               },
               "type": "array"
             },
+            "enableWindows": {
+              "description": "EnableWindows enables aggregating data in separate windows ( available from v0.54.0).",
+              "type": "boolean"
+            },
             "ignoreFirstIntervals": {
               "description": "IgnoreFirstIntervals instructs to ignore first interval",
               "type": "integer"
@@ -3732,6 +3847,10 @@
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "enable_windows": {
+                    "description": "EnableWindows enables aggregating data in separate windows",
+                    "type": "boolean"
                   },
                   "flush_on_shutdown": {
                     "description": "FlushOnShutdown defines whether to flush the aggregation state on process termination\nor config reload. Is `false` by default.\nIt is not recommended changing this setting, unless unfinished aggregations states\nare preferred to missing data points.",
@@ -4070,11 +4189,6 @@
     "status": {
       "description": "VMAgentStatus defines the observed state of VMAgent",
       "properties": {
-        "availableReplicas": {
-          "description": "deprecated and will be removed at v0.52.0",
-          "format": "int32",
-          "type": "integer"
-        },
         "conditions": {
           "description": "Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"",
           "items": {
@@ -4161,19 +4275,9 @@
           "format": "int32",
           "type": "integer"
         },
-        "unavailableReplicas": {
-          "description": "deprecated and will be removed at v0.52.0",
-          "format": "int32",
-          "type": "integer"
-        },
         "updateStatus": {
           "description": "UpdateStatus defines a status for update rollout",
           "type": "string"
-        },
-        "updatedReplicas": {
-          "description": "deprecated and will be removed at v0.52.0",
-          "format": "int32",
-          "type": "integer"
         }
       },
       "type": "object",

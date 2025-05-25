@@ -1,5 +1,5 @@
 {
-  "description": "DockerCluster is the Schema for the dockerclusters API.",
+  "description": "DevCluster is the schema for the dev cluster infrastructure API.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,10 +13,78 @@
       "type": "object"
     },
     "spec": {
-      "description": "DockerClusterSpec defines the desired state of DockerCluster.",
+      "description": "DevClusterSpec defines the desired state of the DevCluster infrastructure.",
       "properties": {
+        "backend": {
+          "description": "backend defines backends for a DevCluster.",
+          "properties": {
+            "docker": {
+              "description": "docker defines a backend for a DevCluster using docker containers.",
+              "properties": {
+                "failureDomains": {
+                  "additionalProperties": {
+                    "description": "FailureDomainSpec is the Schema for Cluster API failure domains.\nIt allows controllers to understand how many failure domains a cluster can optionally span across.",
+                    "properties": {
+                      "attributes": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "attributes is a free form map of attributes an infrastructure provider might use or require.",
+                        "type": "object"
+                      },
+                      "controlPlane": {
+                        "description": "controlPlane determines if this failure domain is suitable for use by control plane machines.",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "description": "failureDomains are usually not defined in the spec.\nThe docker provider is special since failure domains don't mean anything in a local docker environment.\nInstead, the docker cluster controller will simply copy these into the Status and allow the Cluster API\ncontrollers to do what they will with the defined failure domains.",
+                  "type": "object"
+                },
+                "loadBalancer": {
+                  "description": "loadBalancer allows defining configurations for the cluster load balancer.",
+                  "properties": {
+                    "customHAProxyConfigTemplateRef": {
+                      "description": "CustomHAProxyConfigTemplateRef allows you to replace the default HAProxy config file.\nThis field is a reference to a config map that contains the configuration template. The key of the config map should be equal to 'value'.\nThe content of the config map will be processed and will replace the default HAProxy config file. Please use it with caution, as there are\nno checks to ensure the validity of the configuration. This template will support the following variables that will be passed by the controller:\n$IPv6 (bool) indicates if the cluster is IPv6, $FrontendControlPlanePort (string) indicates the frontend control plane port,\n$BackendControlPlanePort (string) indicates the backend control plane port, $BackendServers (map[string]string) indicates the backend server\nwhere the key is the server name and the value is the address. This map is dynamic and is updated every time a new control plane\nnode is added or removed. The template will also support the JoinHostPort function to join the host and port of the backend server.",
+                      "properties": {
+                        "name": {
+                          "default": "",
+                          "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "imageRepository": {
+                      "description": "ImageRepository sets the container registry to pull the haproxy image from.\nif not set, \"kindest\" will be used instead.",
+                      "type": "string"
+                    },
+                    "imageTag": {
+                      "description": "ImageTag allows to specify a tag for the haproxy image.\nif not set, \"v20210715-a6da3463\" will be used instead.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "inMemory": {
+              "description": "inMemory defines a backend for a DevCluster that runs in memory.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "controlPlaneEndpoint": {
-          "description": "ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.",
+          "description": "controlPlaneEndpoint represents the endpoint used to communicate with the control plane.",
           "properties": {
             "host": {
               "description": "Host is the hostname on which the API server is serving.",
@@ -33,66 +101,19 @@
           ],
           "type": "object",
           "additionalProperties": false
-        },
-        "failureDomains": {
-          "additionalProperties": {
-            "description": "FailureDomainSpec is the Schema for Cluster API failure domains.\nIt allows controllers to understand how many failure domains a cluster can optionally span across.",
-            "properties": {
-              "attributes": {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "description": "attributes is a free form map of attributes an infrastructure provider might use or require.",
-                "type": "object"
-              },
-              "controlPlane": {
-                "description": "controlPlane determines if this failure domain is suitable for use by control plane machines.",
-                "type": "boolean"
-              }
-            },
-            "type": "object",
-            "additionalProperties": false
-          },
-          "description": "FailureDomains are usually not defined in the spec.\nThe docker provider is special since failure domains don't mean anything in a local docker environment.\nInstead, the docker cluster controller will simply copy these into the Status and allow the Cluster API\ncontrollers to do what they will with the defined failure domains.",
-          "type": "object"
-        },
-        "loadBalancer": {
-          "description": "LoadBalancer allows defining configurations for the cluster load balancer.",
-          "properties": {
-            "customHAProxyConfigTemplateRef": {
-              "description": "CustomHAProxyConfigTemplateRef allows you to replace the default HAProxy config file.\nThis field is a reference to a config map that contains the configuration template. The key of the config map should be equal to 'value'.\nThe content of the config map will be processed and will replace the default HAProxy config file. Please use it with caution, as there are\nno checks to ensure the validity of the configuration. This template will support the following variables that will be passed by the controller:\n$IPv6 (bool) indicates if the cluster is IPv6, $FrontendControlPlanePort (string) indicates the frontend control plane port,\n$BackendControlPlanePort (string) indicates the backend control plane port, $BackendServers (map[string]string) indicates the backend server\nwhere the key is the server name and the value is the address. This map is dynamic and is updated every time a new control plane\nnode is added or removed. The template will also support the JoinHostPort function to join the host and port of the backend server.",
-              "properties": {
-                "name": {
-                  "default": "",
-                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
-                  "type": "string"
-                }
-              },
-              "type": "object",
-              "x-kubernetes-map-type": "atomic",
-              "additionalProperties": false
-            },
-            "imageRepository": {
-              "description": "ImageRepository sets the container registry to pull the haproxy image from.\nif not set, \"kindest\" will be used instead.",
-              "type": "string"
-            },
-            "imageTag": {
-              "description": "ImageTag allows to specify a tag for the haproxy image.\nif not set, \"v20210715-a6da3463\" will be used instead.",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
         }
       },
+      "required": [
+        "backend"
+      ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "DockerClusterStatus defines the observed state of DockerCluster.",
+      "description": "DevClusterStatus defines the observed state of the DevCluster.",
       "properties": {
         "conditions": {
-          "description": "Conditions defines current service state of the DockerCluster.",
+          "description": "conditions defines current service state of the DevCluster.",
           "items": {
             "description": "Condition defines an observation of a Cluster API resource operational state.",
             "properties": {
@@ -158,18 +179,18 @@
             "type": "object",
             "additionalProperties": false
           },
-          "description": "FailureDomains don't mean much in CAPD since it's all local, but we can see how the rest of cluster API\nwill use this if we populate it.",
+          "description": "failureDomains don't mean much in CAPD since it's all local, but we can see how the rest of cluster API\nwill use this if we populate it.",
           "type": "object"
         },
         "ready": {
-          "description": "Ready denotes that the docker cluster (infrastructure) is ready.",
+          "description": "ready denotes that the dev cluster infrastructure is ready.",
           "type": "boolean"
         },
         "v1beta2": {
-          "description": "v1beta2 groups all the fields that will be added or modified in DockerCluster's's status with the V1Beta2 version.",
+          "description": "v1beta2 groups all the fields that will be added or modified in DevCluster's status with the V1Beta2 version.",
           "properties": {
             "conditions": {
-              "description": "conditions represents the observations of a DockerCluster's current state.\nKnown condition types are Ready, LoadBalancerAvailable, Deleting, Paused.",
+              "description": "conditions represents the observations of a DevCluster's current state.",
               "items": {
                 "description": "Condition contains details for one aspect of the current state of this API Resource.",
                 "properties": {

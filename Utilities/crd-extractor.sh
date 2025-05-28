@@ -57,7 +57,8 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 # Create final schemas directory
-SCHEMAS_DIR=$HOME/.datree/crdSchemas
+# Use current directory if OUTPUT_DIR is set, otherwise use default
+SCHEMAS_DIR=${OUTPUT_DIR:-$HOME/.datree/crdSchemas}
 mkdir -p "$SCHEMAS_DIR"
 cd "$SCHEMAS_DIR"
 
@@ -118,9 +119,10 @@ NC='\033[0m' # No Color
 
 if [ $conversionResult == 0 ]; then
     printf "${GREEN}Successfully converted $FETCHED_CRDS CRDs to JSON schema${NC}\n"
+    printf "Schemas saved to: ${CYAN}$SCHEMAS_DIR${NC}\n"
 
     printf "\nTo validate a CR using various tools, run the relevant command:\n"
     printf "\n- ${CYAN}datree:${NC}\n\$ datree test /path/to/file\n"
-    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$HOME/.datree/crdSchemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
-    printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$HOME/.datree/crdSchemas\" /path/to/file\n\n"
+    printf "\n- ${CYAN}kubeconform:${NC}\n\$ kubeconform -summary -output json -schema-location default -schema-location '$SCHEMAS_DIR/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' /path/to/file\n"
+    printf "\n- ${CYAN}kubeval:${NC}\n\$ kubeval --additional-schema-locations file:\"$SCHEMAS_DIR\" /path/to/file\n\n"
 fi

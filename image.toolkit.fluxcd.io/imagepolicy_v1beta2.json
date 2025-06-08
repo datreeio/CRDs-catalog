@@ -15,6 +15,16 @@
     "spec": {
       "description": "ImagePolicySpec defines the parameters for calculating the\nImagePolicy.",
       "properties": {
+        "digestReflectionPolicy": {
+          "default": "Never",
+          "description": "DigestReflectionPolicy governs the setting of the `.status.latestRef.digest` field.\n\nNever: The digest field will always be set to the empty string.\n\nIfNotPresent: The digest field will be set to the digest of the elected\nlatest image if the field is empty and the image did not change.\n\nAlways: The digest field will always be set to the digest of the elected\nlatest image.\n\nDefault: Never.",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ],
+          "type": "string"
+        },
         "filterTags": {
           "description": "FilterTags enables filtering for only a subset of tags based on a set of\nrules. If no rules are provided, all the tags from the repository will be\nordered and compared.",
           "properties": {
@@ -47,6 +57,11 @@
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "interval": {
+          "description": "Interval is the length of time to wait between\nrefreshing the digest of the latest tag when the\nreflection policy is set to \"Always\".\n\nDefaults to 10m.",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
+          "type": "string"
         },
         "policy": {
           "description": "Policy gives the particulars of the policy to be followed in\nselecting the most recent image",
@@ -107,6 +122,16 @@
         "policy"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "spec.interval is only accepted when spec.digestReflectionPolicy is set to 'Always'",
+          "rule": "!has(self.interval) || (has(self.digestReflectionPolicy) && self.digestReflectionPolicy == 'Always')"
+        },
+        {
+          "message": "spec.interval must be set when spec.digestReflectionPolicy is set to 'Always'",
+          "rule": "has(self.interval) || !has(self.digestReflectionPolicy) || self.digestReflectionPolicy != 'Always'"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
@@ -171,16 +196,62 @@
           "type": "array"
         },
         "latestImage": {
-          "description": "LatestImage gives the first in the list of images scanned by\nthe image repository, when filtered and ordered according to\nthe policy.",
+          "description": "LatestImage gives the first in the list of images scanned by\nthe image repository, when filtered and ordered according to\nthe policy.\n\nDeprecated: Replaced by the composite \"latestRef\" field.",
           "type": "string"
+        },
+        "latestRef": {
+          "description": "LatestRef gives the first in the list of images scanned by\nthe image repository, when filtered and ordered according\nto the policy.",
+          "properties": {
+            "digest": {
+              "description": "Digest is the image's digest.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name is the bare image's name.",
+              "type": "string"
+            },
+            "tag": {
+              "description": "Tag is the image's tag.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "tag"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "observedGeneration": {
           "format": "int64",
           "type": "integer"
         },
         "observedPreviousImage": {
-          "description": "ObservedPreviousImage is the observed previous LatestImage. It is used\nto keep track of the previous and current images.",
+          "description": "ObservedPreviousImage is the observed previous LatestImage. It is used\nto keep track of the previous and current images.\n\nDeprecated: Replaced by the composite \"observedPreviousRef\" field.",
           "type": "string"
+        },
+        "observedPreviousRef": {
+          "description": "ObservedPreviousRef is the observed previous LatestRef. It is used\nto keep track of the previous and current images.",
+          "properties": {
+            "digest": {
+              "description": "Digest is the image's digest.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name is the bare image's name.",
+              "type": "string"
+            },
+            "tag": {
+              "description": "Tag is the image's tag.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "tag"
+          ],
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "type": "object",

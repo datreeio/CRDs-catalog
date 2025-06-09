@@ -40,7 +40,7 @@
                     "description": "Hostname defines the FQDN hostname of the backend endpoint.",
                     "maxLength": 253,
                     "minLength": 1,
-                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9]))*$",
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
                     "type": "string"
                   },
                   "port": {
@@ -87,8 +87,14 @@
                 "description": "Unix defines the unix domain socket endpoint",
                 "properties": {
                   "path": {
-                    "description": "Path defines the unix domain socket path of the backend endpoint.",
-                    "type": "string"
+                    "description": "Path defines the unix domain socket path of the backend endpoint.\nThe path length must not exceed 108 characters.",
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "unix domain socket path must not exceed 108 characters",
+                        "rule": "size(self) <= 108"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -96,6 +102,10 @@
                 ],
                 "type": "object",
                 "additionalProperties": false
+              },
+              "zone": {
+                "description": "Zone defines the service zone of the backend endpoint.",
+                "type": "string"
               }
             },
             "type": "object",
@@ -111,7 +121,7 @@
             ],
             "additionalProperties": false
           },
-          "maxItems": 4,
+          "maxItems": 64,
           "minItems": 1,
           "type": "array",
           "x-kubernetes-validations": [
@@ -124,9 +134,89 @@
         "fallback": {
           "description": "Fallback indicates whether the backend is designated as a fallback.\nIt is highly recommended to configure active or passive health checks to ensure that failover can be detected\nwhen the active backends become unhealthy and to automatically readjust once the primary backends are healthy again.\nThe overprovisioning factor is set to 1.4, meaning the fallback backends will only start receiving traffic when\nthe health of the active backends falls below 72%.",
           "type": "boolean"
+        },
+        "tls": {
+          "description": "TLS defines the TLS settings for the backend.\nOnly supported for DynamicResolver backends.",
+          "properties": {
+            "caCertificateRefs": {
+              "description": "CACertificateRefs contains one or more references to Kubernetes objects that\ncontain TLS certificates of the Certificate Authorities that can be used\nas a trust anchor to validate the certificates presented by the backend.\n\nA single reference to a Kubernetes ConfigMap or a Kubernetes Secret,\nwith the CA certificate in a key named `ca.crt` is currently supported.\n\nIf CACertificateRefs is empty or unspecified, then WellKnownCACertificates must be\nspecified. Only one of CACertificateRefs or WellKnownCACertificates may be specified,\nnot both.\n\nOnly used for DynamicResolver backends.",
+              "items": {
+                "description": "LocalObjectReference identifies an API object within the namespace of the\nreferrer.\nThe API object must be valid in the cluster; the Group and Kind must\nbe registered in the cluster for this reference to be valid.\n\nReferences to objects with invalid Group and Kind are not valid, and must\nbe rejected by the implementation, with appropriate Conditions set\non the containing object.",
+                "properties": {
+                  "group": {
+                    "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "group",
+                  "kind",
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 8,
+              "type": "array"
+            },
+            "insecureSkipVerify": {
+              "default": false,
+              "description": "InsecureSkipVerify indicates whether the upstream's certificate verification\nshould be skipped. Defaults to \"false\".",
+              "type": "boolean"
+            },
+            "wellKnownCACertificates": {
+              "description": "WellKnownCACertificates specifies whether system CA certificates may be used in\nthe TLS handshake between the gateway and backend pod.\n\nIf WellKnownCACertificates is unspecified or empty (\"\"), then CACertificateRefs\nmust be specified with at least one entry for a valid configuration. Only one of\nCACertificateRefs or WellKnownCACertificates may be specified, not both.\n\nOnly used for DynamicResolver backends.",
+              "enum": [
+                "System"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "must not contain both CACertificateRefs and WellKnownCACertificates",
+              "rule": "!(has(self.caCertificateRefs) && size(self.caCertificateRefs) > 0 && has(self.wellKnownCACertificates) && self.wellKnownCACertificates != \"\")"
+            },
+            {
+              "message": "must specify either CACertificateRefs or WellKnownCACertificates",
+              "rule": "(has(self.caCertificateRefs) && size(self.caCertificateRefs) > 0 || has(self.wellKnownCACertificates) && self.wellKnownCACertificates != \"\")"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "type": {
+          "default": "Endpoints",
+          "description": "Type defines the type of the backend. Defaults to \"Endpoints\"",
+          "enum": [
+            "Endpoints",
+            "DynamicResolver"
+          ],
+          "type": "string"
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "DynamicResolver type cannot have endpoints specified",
+          "rule": "self.type != 'DynamicResolver' || !has(self.endpoints)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

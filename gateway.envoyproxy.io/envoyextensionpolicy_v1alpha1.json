@@ -16,7 +16,7 @@
       "description": "Spec defines the desired state of EnvoyExtensionPolicy.",
       "properties": {
         "extProc": {
-          "description": "ExtProc is an ordered list of external processing filters\nthat should added to the envoy filter chain",
+          "description": "ExtProc is an ordered list of external processing filters\nthat should be added to the envoy filter chain",
           "items": {
             "description": "ExtProc defines the configuration for External Processing filter.",
             "properties": {
@@ -175,6 +175,21 @@
                         "maximum": 4294967295,
                         "minimum": 0,
                         "type": "integer"
+                      },
+                      "perEndpoint": {
+                        "description": "PerEndpoint defines Circuit Breakers that will apply per-endpoint for an upstream cluster",
+                        "properties": {
+                          "maxConnections": {
+                            "default": 1024,
+                            "description": "MaxConnections configures the maximum number of connections that Envoy will establish per-endpoint to the referenced backend defined within a xRoute rule.",
+                            "format": "int64",
+                            "maximum": 4294967295,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
                       }
                     },
                     "type": "object",
@@ -232,6 +247,17 @@
                     "properties": {
                       "dnsRefreshRate": {
                         "description": "DNSRefreshRate specifies the rate at which DNS records should be refreshed.\nDefaults to 30 seconds.",
+                        "type": "string"
+                      },
+                      "lookupFamily": {
+                        "description": "LookupFamily determines how Envoy would resolve DNS for Routes where the backend is specified as a fully qualified domain name (FQDN).\nIf set, this configuration overrides other defaults.",
+                        "enum": [
+                          "IPv4",
+                          "IPv6",
+                          "IPv4Preferred",
+                          "IPv6Preferred",
+                          "IPv4AndIPv6"
+                        ],
                         "type": "string"
                       },
                       "respectDnsTtl": {
@@ -326,6 +352,13 @@
                                   "type": "integer"
                                 },
                                 "type": "array"
+                              },
+                              "hostname": {
+                                "description": "Hostname defines the HTTP host that will be requested during health checking.\nDefault: HTTPRoute or GRPCRoute hostname.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                                "type": "string"
                               },
                               "method": {
                                 "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
@@ -504,6 +537,13 @@
                           }
                         ],
                         "additionalProperties": false
+                      },
+                      "panicThreshold": {
+                        "description": "When number of unhealthy endpoints for a backend reaches this threshold\nEnvoy will disregard health status and balance across all endpoints.\nIt's designed to prevent a situation in which host failures cascade throughout the cluster\nas load increases. If not set, the default value is 50%. To disable panic mode, set value to `0`.",
+                        "format": "int32",
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer"
                       },
                       "passive": {
                         "description": "Passive passive check configuration",
@@ -912,18 +952,59 @@
                 "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                 "type": "string"
               },
+              "metadata": {
+                "description": "Metadata defines options related to the sending and receiving of dynamic metadata.\nThese options define which metadata namespaces would be sent to the processor and which dynamic metadata\nnamespaces the processor would be permitted to emit metadata to.\nUsers can specify custom namespaces or well-known envoy metadata namespace (such as envoy.filters.http.ext_authz)\ndocumented here: https://www.envoyproxy.io/docs/envoy/latest/configuration/advanced/well_known_dynamic_metadata#well-known-dynamic-metadata\nDefault: no metadata context is sent or received from the external processor",
+                "properties": {
+                  "accessibleNamespaces": {
+                    "description": "AccessibleNamespaces are metadata namespaces that are sent to the external processor as context",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "writableNamespaces": {
+                    "description": "WritableNamespaces are metadata namespaces that the external processor can write to",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "type": "array",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "writableNamespaces cannot contain well-known Envoy HTTP filter namespaces",
+                        "rule": "self.all(f, !f.startsWith('envoy.filters.http'))"
+                      }
+                    ]
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "processingMode": {
                 "description": "ProcessingMode defines how request and response body is processed\nDefault: header and body are not sent to the external processor",
                 "properties": {
+                  "allowModeOverride": {
+                    "description": "AllowModeOverride allows the external processor to override the processing mode set via the\n`mode_override` field in the gRPC response message. This defaults to false.",
+                    "type": "boolean"
+                  },
                   "request": {
                     "description": "Defines processing mode for requests. If present, request headers are sent. Request body is processed according\nto the specified mode.",
                     "properties": {
+                      "attributes": {
+                        "description": "Defines which attributes are sent to the external processor. Envoy Gateway currently\nsupports only the following attribute prefixes: connection, source, destination,\nrequest, response, upstream and xds.route.\nhttps://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes",
+                        "items": {
+                          "pattern": "^(connection\\.|source\\.|destination\\.|request\\.|response\\.|upstream\\.|xds\\.route_)[a-z_1-9]*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "body": {
                         "description": "Defines body processing mode",
                         "enum": [
                           "Streamed",
                           "Buffered",
-                          "BufferedPartial"
+                          "BufferedPartial",
+                          "FullDuplexStreamed"
                         ],
                         "type": "string"
                       }
@@ -934,12 +1015,21 @@
                   "response": {
                     "description": "Defines processing mode for responses. If present, response headers are sent. Response body is processed according\nto the specified mode.",
                     "properties": {
+                      "attributes": {
+                        "description": "Defines which attributes are sent to the external processor. Envoy Gateway currently\nsupports only the following attribute prefixes: connection, source, destination,\nrequest, response, upstream and xds.route.\nhttps://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes",
+                        "items": {
+                          "pattern": "^(connection\\.|source\\.|destination\\.|request\\.|response\\.|upstream\\.|xds\\.route_)[a-z_1-9]*$",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "body": {
                         "description": "Defines body processing mode",
                         "enum": [
                           "Streamed",
                           "Buffered",
-                          "BufferedPartial"
+                          "BufferedPartial",
+                          "FullDuplexStreamed"
                         ],
                         "type": "string"
                       }
@@ -965,6 +1055,77 @@
               {
                 "message": "BackendRefs only supports Core and gateway.envoyproxy.io group.",
                 "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'gateway.envoyproxy.io')) : true"
+              }
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array"
+        },
+        "lua": {
+          "description": "Lua is an ordered list of Lua filters\nthat should be added to the envoy filter chain",
+          "items": {
+            "description": "Lua defines a Lua extension\nOnly one of Inline or ValueRef must be set",
+            "properties": {
+              "inline": {
+                "description": "Inline contains the source code as an inline string.",
+                "type": "string"
+              },
+              "type": {
+                "default": "Inline",
+                "description": "Type is the type of method to use to read the Lua value.\nValid values are Inline and ValueRef, default is Inline.",
+                "enum": [
+                  "Inline",
+                  "ValueRef"
+                ],
+                "type": "string"
+              },
+              "valueRef": {
+                "description": "ValueRef has the source code specified as a local object reference.\nOnly a reference to ConfigMap is supported.\nThe value of key `lua` in the ConfigMap will be used.\nIf the key is not found, the first value in the ConfigMap will be used.",
+                "properties": {
+                  "group": {
+                    "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "group",
+                  "kind",
+                  "name"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "Only a reference to an object of kind ConfigMap belonging to default v1 API group is supported.",
+                    "rule": "self.kind == 'ConfigMap' && (self.group == 'v1' || self.group == '')"
+                  }
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "Exactly one of inline or valueRef must be set with correct type.",
+                "rule": "(self.type == 'Inline' && has(self.inline) && !has(self.valueRef)) || (self.type == 'ValueRef' && !has(self.inline) && has(self.valueRef))"
               }
             ],
             "additionalProperties": false
@@ -1070,6 +1231,38 @@
                 "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
                 "type": "string"
               },
+              "matchExpressions": {
+                "description": "MatchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                "items": {
+                  "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                  "properties": {
+                    "key": {
+                      "description": "key is the label key that the selector applies to.",
+                      "type": "string"
+                    },
+                    "operator": {
+                      "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                      "type": "string"
+                    },
+                    "values": {
+                      "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "operator"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
+              },
               "matchLabels": {
                 "additionalProperties": {
                   "type": "string"
@@ -1079,8 +1272,7 @@
               }
             },
             "required": [
-              "kind",
-              "matchLabels"
+              "kind"
             ],
             "type": "object",
             "x-kubernetes-validations": [
@@ -1107,6 +1299,54 @@
                       "sha256": {
                         "description": "SHA256 checksum that will be used to verify the Wasm code.\n\nIf not specified, Envoy Gateway will not verify the downloaded Wasm code.\nkubebuilder:validation:Pattern=`^[a-f0-9]{64}$`",
                         "type": "string"
+                      },
+                      "tls": {
+                        "description": "TLS configuration when connecting to the Wasm code source.",
+                        "properties": {
+                          "caCertificateRef": {
+                            "description": "CACertificateRef contains a references to\nKubernetes objects that contain TLS certificates of\nthe Certificate Authorities that can be used\nas a trust anchor to validate the certificates presented by the Wasm code source.\n\nKubernetes ConfigMap and Kubernetes Secret are supported.\nNote: The ConfigMap or Secret must be in the same namespace as the EnvoyExtensionPolicy.",
+                            "properties": {
+                              "group": {
+                                "default": "",
+                                "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                                "maxLength": 253,
+                                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                                "type": "string"
+                              },
+                              "kind": {
+                                "default": "Secret",
+                                "description": "Kind is kind of the referent. For example \"Secret\".",
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "Name is the name of the referent.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "caCertificateRef"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
                       },
                       "url": {
                         "description": "URL is the URL containing the Wasm code.",
@@ -1171,6 +1411,54 @@
                         "description": "SHA256 checksum that will be used to verify the OCI image.\n\nIt must match the digest of the OCI image.\n\nIf not specified, Envoy Gateway will not verify the downloaded OCI image.\nkubebuilder:validation:Pattern=`^[a-f0-9]{64}$`",
                         "type": "string"
                       },
+                      "tls": {
+                        "description": "TLS configuration when connecting to the Wasm code source.",
+                        "properties": {
+                          "caCertificateRef": {
+                            "description": "CACertificateRef contains a references to\nKubernetes objects that contain TLS certificates of\nthe Certificate Authorities that can be used\nas a trust anchor to validate the certificates presented by the Wasm code source.\n\nKubernetes ConfigMap and Kubernetes Secret are supported.\nNote: The ConfigMap or Secret must be in the same namespace as the EnvoyExtensionPolicy.",
+                            "properties": {
+                              "group": {
+                                "default": "",
+                                "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                                "maxLength": 253,
+                                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                                "type": "string"
+                              },
+                              "kind": {
+                                "default": "Secret",
+                                "description": "Kind is kind of the referent. For example \"Secret\".",
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "Name is the name of the referent.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "caCertificateRef"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "url": {
                         "description": "URL is the URL of the OCI image.\nURL can be in the format of `registry/image:tag` or `registry/image@sha256:digest`.",
                         "type": "string"
@@ -1229,6 +1517,20 @@
               "config": {
                 "description": "Config is the configuration for the Wasm extension.\nThis configuration will be passed as a JSON string to the Wasm extension.",
                 "x-kubernetes-preserve-unknown-fields": true
+              },
+              "env": {
+                "description": "Env configures the environment for the Wasm extension",
+                "properties": {
+                  "hostKeys": {
+                    "description": "HostKeys is a list of keys for environment variables from the host envoy process\nthat should be passed into the Wasm VM. This is useful for passing secrets to to Wasm extensions.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
               },
               "failOpen": {
                 "default": false,

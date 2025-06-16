@@ -10,139 +10,9 @@
     "metadata": {
       "type": "object"
     },
-    "status": {
-      "description": "RedisEnterpriseActiveActiveDatabaseStatus defines the observed state of RedisEnterpriseActiveActiveDatabase",
-      "properties": {
-        "status": {
-          "description": "The status of the active active database.",
-          "type": "string"
-        },
-        "specStatus": {
-          "description": "Whether the desired specification is valid",
-          "type": "string"
-        },
-        "linkedRedbs": {
-          "description": "The linked REDBs.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "participatingClusters": {
-          "description": "The list of instances/ clusters statuses.",
-          "items": {
-            "description": "Status of participating cluster.",
-            "properties": {
-              "name": {
-                "description": "The name of the remote cluster CR that is linked.",
-                "type": "string"
-              },
-              "id": {
-                "description": "The corresponding ID of the instance in the active-active database.",
-                "format": "int64",
-                "type": "integer"
-              },
-              "replicationStatus": {
-                "description": "The replication status of the participating cluster",
-                "enum": [
-                  "up",
-                  "down"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ],
-            "type": "object",
-            "additionalProperties": false
-          },
-          "type": "array"
-        },
-        "guid": {
-          "description": "The active-active database corresponding GUID.",
-          "type": "string"
-        },
-        "lastTaskUid": {
-          "description": "The last active-active database task UID.",
-          "type": "string"
-        },
-        "redisEnterpriseCluster": {
-          "description": "The Redis Enterprise Cluster Object this Resource is associated with",
-          "type": "string"
-        },
-        "replicationStatus": {
-          "description": "The overall replication status",
-          "enum": [
-            "up",
-            "down"
-          ],
-          "type": "string"
-        },
-        "secretsStatus": {
-          "description": "The status of the secrets",
-          "items": {
-            "description": "Status of secrets.",
-            "properties": {
-              "name": {
-                "description": "The name of the secret.",
-                "type": "string"
-              },
-              "status": {
-                "description": "The status of the secret.",
-                "enum": [
-                  "Valid",
-                  "Invalid"
-                ],
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ],
-            "type": "object",
-            "additionalProperties": false
-          },
-          "type": "array"
-        }
-      },
-      "type": "object",
-      "additionalProperties": false
-    },
     "spec": {
       "description": "RedisEnterpriseActiveActiveDatabaseSpec defines the desired state of RedisEnterpriseActiveActiveDatabase",
       "properties": {
-        "redisEnterpriseCluster": {
-          "description": "Connection to Redis Enterprise Cluster",
-          "properties": {
-            "name": {
-              "description": "The name of the Redis Enterprise Cluster where the database should be stored.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name"
-          ],
-          "type": "object",
-          "additionalProperties": false
-        },
-        "participatingClusters": {
-          "description": "The list of instances/ clusters specifications and configurations.",
-          "items": {
-            "properties": {
-              "name": {
-                "description": "The name of the remote cluster CR to link.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ],
-            "type": "object",
-            "additionalProperties": false
-          },
-          "type": "array"
-        },
         "globalConfigurations": {
           "description": "The Active-Active database global configurations, contains the global properties for each of the participating clusters/ instances databases within the Active-Active database.",
           "properties": {
@@ -166,7 +36,7 @@
               "additionalProperties": false
             },
             "alertSettings": {
-              "description": "Settings for database alerts",
+              "description": "Settings for database alerts. Note - Alert settings are not supported for Active-Active database.",
               "properties": {
                 "bdb_backup_delayed": {
                   "description": "Periodic backup has been delayed for longer than specified threshold value [minutes]",
@@ -628,24 +498,20 @@
               "type": "string"
             },
             "modulesList": {
-              "description": "List of modules associated with database. Note - For Active-Active databases this feature is currently in preview. For this feature to take effect for Active-Active databases, set a boolean environment variable with the name \"ENABLE_ALPHA_FEATURES\" to True. This variable can be set via the redis-enterprise-operator pod spec, or through the operator-environment-config Config Map.",
+              "description": "List of modules associated with the database. The list of valid modules for the specific cluster can be retrieved from the status of the REC object. Use the \"name\" and \"versions\" fields for the specific module configuration. If specifying an explicit version for a module, automatic modules versions upgrade must be disabled by setting the '.upgradeSpec.upgradeModulesToLatest' field in the REC to 'false'. Note that the option to specify module versions is deprecated, and will be removed in future releases.",
               "items": {
-                "description": "Redis Enterprise Module: https://redislabs.com/redis-enterprise/modules/",
+                "description": "Redis Enterprise module (see https://redis.io/docs/latest/develop/reference/modules/)",
                 "properties": {
                   "config": {
-                    "description": "Module command line arguments e.g. VKEY_MAX_ENTITY_COUNT 30",
+                    "description": "Module command line arguments e.g. VKEY_MAX_ENTITY_COUNT 30 30",
                     "type": "string"
                   },
                   "name": {
-                    "description": "The module's name e.g \"ft\" for redissearch",
-                    "type": "string"
-                  },
-                  "uid": {
-                    "description": "Module's uid - do not set, for system use only nolint:staticcheck // custom json tag unknown to the linter",
+                    "description": "The name of the module, e.g. \"search\" or \"ReJSON\". The complete list of modules available in the cluster can be retrieved from the '.status.modules' field in the REC.",
                     "type": "string"
                   },
                   "version": {
-                    "description": "Module's semantic version e.g \"1.6.12\" - optional only in REDB, must be set in REAADB",
+                    "description": "The semantic version of the module, e.g. '1.6.12'. Optional for REDB, must be set for REAADB. Note that this field is deprecated, and will be removed in future releases.",
                     "type": "string"
                   }
                 },
@@ -696,22 +562,8 @@
               "additionalProperties": false
             },
             "redisVersion": {
-              "description": "Redis OSS version. Version can be specified via <major.minor> prefix, or via channels - for existing databases - Upgrade Redis OSS version. For new databases - the version which the database will be created with. If set to 'major' - will always upgrade to the most recent major Redis version. If set to 'latest' - will always upgrade to the most recent Redis version. Depends on 'redisUpgradePolicy' - if you want to set the value to 'latest' for some databases, you must set redisUpgradePolicy on the cluster before. Possible values are 'major' or 'latest' When using upgrade - make sure to backup the database before. This value is used only for database type 'redis'",
+              "description": "Redis OSS version. Version can be specified via <major.minor> prefix, or via channels - for existing databases - Upgrade Redis OSS version. For new databases - the version which the database will be created with. If set to 'major' - will always upgrade to the most recent major Redis version. If set to 'latest' - will always upgrade to the most recent Redis version. Depends on 'redisUpgradePolicy' - if you want to set the value to 'latest' for some databases, you must set redisUpgradePolicy on the cluster before. Possible values are 'major' or 'latest' When using upgrade - make sure to backup the database before. This value is used only for database type 'redis'. Note - Specifying Redis version is currently not supported for Active-Active database.",
               "type": "string"
-            },
-            "upgradeSpec": {
-              "description": "Specifications for DB upgrade.",
-              "properties": {
-                "upgradeModulesToLatest": {
-                  "description": "Upgrades the modules to the latest version that supportes the DB version during a DB upgrade action, to upgrade the DB version view the 'redisVersion' field. Note - This field is currently not supported for Active-Active databases.",
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "upgradeModulesToLatest"
-              ],
-              "type": "object",
-              "additionalProperties": false
             },
             "replicaSources": {
               "description": "What databases to replicate from",
@@ -791,13 +643,13 @@
               },
               "type": "array"
             },
-            "shardingEnabled": {
-              "description": "Toggles database sharding for REAADBs (Active Active databases) and enabled by default. This field is blocked for REDB (non-Active Active databases) and sharding is toggled via the shardCount field - when shardCount is 1 this is disabled otherwise enabled.",
-              "type": "boolean"
-            },
             "shardCount": {
               "description": "Number of database server-side shards",
               "type": "integer"
+            },
+            "shardingEnabled": {
+              "description": "Toggles database sharding for REAADBs (Active Active databases) and enabled by default. This field is blocked for REDB (non-Active Active databases) and sharding is toggled via the shardCount field - when shardCount is 1 this is disabled otherwise enabled.",
+              "type": "boolean"
             },
             "shardsPlacement": {
               "description": "Control the density of shards - should they reside on as few or as many nodes as possible. Available options are \"dense\" or \"sparse\". If left unset, defaults to \"dense\".",
@@ -819,8 +671,61 @@
                 "memcached"
               ],
               "type": "string"
+            },
+            "upgradeSpec": {
+              "description": "Specifications for DB upgrade.",
+              "properties": {
+                "upgradeModulesToLatest": {
+                  "description": "Upgrades the modules to the latest version that supports the DB version during a DB upgrade action, to upgrade the DB version view the 'redisVersion' field. Note - This field is currently not supported for Active-Active databases.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "upgradeModulesToLatest"
+              ],
+              "type": "object",
+              "additionalProperties": false
             }
           },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "participatingClusters": {
+          "description": "The list of instances/ clusters specifications and configurations.",
+          "items": {
+            "properties": {
+              "externalReplicationPort": {
+                "description": "The desired replication endpoint's port number for users who utilize LoadBalancers for sync between AA replicas and need to provide the specific port number that the LoadBalancer listens to.",
+                "type": "integer"
+              },
+              "name": {
+                "description": "The name of the remote cluster CR to link.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace in which the REAADB object will be deployed to within the corresponding participating cluster. The user must ensure that the Redis Enterprise operator is configured to watch this namespace in the corresponding cluster, and the required RBAC configuration is properly set up. See https://redis.io/docs/latest/operate/kubernetes/re-clusters/multi-namespace/ for more information how to set up multiple namespaces. If no namespace is specified, then the REAADB is deployed to the REC's namespace in the corresponding cluster.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "redisEnterpriseCluster": {
+          "description": "Connection to Redis Enterprise Cluster",
+          "properties": {
+            "name": {
+              "description": "The name of the Redis Enterprise Cluster where the database should be stored.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
           "type": "object",
           "additionalProperties": false
         }
@@ -828,6 +733,110 @@
       "required": [
         "participatingClusters"
       ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "RedisEnterpriseActiveActiveDatabaseStatus defines the observed state of RedisEnterpriseActiveActiveDatabase",
+      "properties": {
+        "clusterCertificatesGeneration": {
+          "description": "Versions of the cluster's Proxy and Syncer certificates. In Active-Active databases, these are used to detect updates to the certificates, and trigger synchronization across the participating clusters. .",
+          "format": "int64",
+          "type": "integer"
+        },
+        "guid": {
+          "description": "The active-active database corresponding GUID.",
+          "type": "string"
+        },
+        "lastTaskUid": {
+          "description": "The last active-active database task UID.",
+          "type": "string"
+        },
+        "linkedRedbs": {
+          "description": "The linked REDBs.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "participatingClusters": {
+          "description": "The list of instances/ clusters statuses.",
+          "items": {
+            "description": "Status of participating cluster.",
+            "properties": {
+              "id": {
+                "description": "The corresponding ID of the instance in the active-active database.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "name": {
+                "description": "The name of the remote cluster CR that is linked.",
+                "type": "string"
+              },
+              "replicationStatus": {
+                "description": "The replication status of the participating cluster",
+                "enum": [
+                  "up",
+                  "down"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "redisEnterpriseCluster": {
+          "description": "The Redis Enterprise Cluster Object this Resource is associated with",
+          "type": "string"
+        },
+        "replicationStatus": {
+          "description": "The overall replication status",
+          "enum": [
+            "up",
+            "down"
+          ],
+          "type": "string"
+        },
+        "secretsStatus": {
+          "description": "The status of the secrets",
+          "items": {
+            "description": "Status of secrets.",
+            "properties": {
+              "name": {
+                "description": "The name of the secret.",
+                "type": "string"
+              },
+              "status": {
+                "description": "The status of the secret.",
+                "enum": [
+                  "Valid",
+                  "Invalid"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "specStatus": {
+          "description": "Whether the desired specification is valid",
+          "type": "string"
+        },
+        "status": {
+          "description": "The status of the active active database.",
+          "type": "string"
+        }
+      },
       "type": "object",
       "additionalProperties": false
     }

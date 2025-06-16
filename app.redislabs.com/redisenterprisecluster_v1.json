@@ -501,6 +501,10 @@
               "description": "The maximum TTL of cached entries.",
               "type": "integer"
             },
+            "directoryTimeoutSeconds": {
+              "description": "The connection timeout to the LDAP server when authenticating a user, in seconds",
+              "type": "integer"
+            },
             "enabledForControlPlane": {
               "description": "Whether to enable LDAP for control plane access. Disabled by default.",
               "type": "boolean"
@@ -847,10 +851,6 @@
           },
           "type": "object",
           "additionalProperties": false
-        },
-        "podSecurityPolicyName": {
-          "description": "DEPRECATED PodSecurityPolicy support is removed in Kubernetes v1.25 and the use of this field is invalid for use when running on Kubernetes v1.25+. Future versions of the RedisEnterpriseCluster API will remove support for this field altogether. For migration instructions, see https://kubernetes.io/docs/tasks/configure-pod-container/migrate-from-psp/ \n Name of pod security policy to use on pods",
-          "type": "string"
         },
         "podStartingPolicy": {
           "description": "Mitigation setting for STS pods stuck in \"ContainerCreating\"",
@@ -5227,7 +5227,7 @@
             "pdnsServer": {
               "properties": {
                 "operatingMode": {
-                  "description": "Whether to enable/disable the pdns server",
+                  "description": "Deprecated: The PDNS Server is now disabled by the operator. This field will be ignored.",
                   "enum": [
                     "enabled",
                     "disabled"
@@ -5449,6 +5449,38 @@
           "description": "Whether databases will turn on RESP3 compatibility upon database upgrade. Note - Deleting this property after explicitly setting its value shall have no effect. Please view the corresponding field in RS doc for more info.",
           "type": "boolean"
         },
+        "securityContext": {
+          "description": "The security configuration that will be applied to RS pods.",
+          "properties": {
+            "readOnlyRootFilesystemPolicy": {
+              "description": "Policy controlling whether to enable read-only root filesystem for the Redis Enterprise software containers. Note that certain filesystem paths remain writable through mounted volumes to ensure proper functionality.",
+              "properties": {
+                "enabled": {
+                  "description": "Whether to enable read-only root filesystem for the Redis Enterprise software containers. Default is false.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "resourceLimits": {
+              "description": "Settings pertaining to resource limits management by the Redis Enterprise Node container.",
+              "properties": {
+                "allowAutoAdjustment": {
+                  "description": "Allow Redis Enterprise to adjust resource limits, like max open file descriptors, of its data plane processes. When this option is enabled, the SYS_RESOURCE capability is added to the Redis Enterprise pods, and their allowPrivilegeEscalation field is set. Turned off by default.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "serviceAccountName": {
           "description": "Name of the service account to use",
           "type": "string"
@@ -5486,6 +5518,14 @@
         "servicesRiggerSpec": {
           "description": "Specification for service rigger",
           "properties": {
+            "databaseServicePortPolicy": {
+              "description": "databaseServicePortPolicy instructs how to determine the service ports for REDB services. Defaults to DatabasePortForward, if not specified otherwise. DatabasePortForward - The service port will be the same as the database port. RedisDefaultPort - The service port will be the default Redis port (6379).",
+              "enum": [
+                "DatabasePortForward",
+                "RedisDefaultPort"
+              ],
+              "type": "string"
+            },
             "databaseServiceType": {
               "description": "Service types for access to databases. should be a comma separated list. The possible values are cluster_ip, headless and load_balancer.",
               "type": "string"
@@ -10810,6 +10850,107 @@
           "type": "object",
           "additionalProperties": false
         },
+        "usageMeter": {
+          "description": "The configuration of the usage meter.",
+          "properties": {
+            "callHomeClient": {
+              "properties": {
+                "disabled": {
+                  "description": "Whether to disable the call home client. Enabled by default.",
+                  "type": "boolean"
+                },
+                "imageSpec": {
+                  "description": "Image specification",
+                  "properties": {
+                    "digestHash": {
+                      "description": "The digest hash of the container image to pull. When specified, the container image is pulled according to the digest hash instead of the image tag. The versionTag field must also be specified with the image tag matching this digest hash. Note: This field is only supported for OLM deployments.",
+                      "type": "string"
+                    },
+                    "imagePullPolicy": {
+                      "description": "The image pull policy to be applied to the container image. One of Always, Never, IfNotPresent.",
+                      "type": "string"
+                    },
+                    "repository": {
+                      "description": "The repository (name) of the container image to be deployed.",
+                      "type": "string"
+                    },
+                    "versionTag": {
+                      "description": "The tag of the container image to be deployed.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "description": "Compute resource requirements for Call Home Client pod",
+                  "properties": {
+                    "claims": {
+                      "description": "Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. \n This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. \n This field is immutable. It can only be set for containers.",
+                      "items": {
+                        "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                        "properties": {
+                          "name": {
+                            "description": "Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    },
+                    "limits": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                      "type": "object"
+                    },
+                    "requests": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "username": {
           "description": "Username for the admin user of Redis Enterprise",
           "type": "string"
@@ -11811,6 +11952,22 @@
           },
           "type": "array"
         },
+        "certificatesStatus": {
+          "description": "Stores information about cluster certificates and their update process. In Active-Active databases, this is used to detect updates to the certificates, and trigger synchronization across the participating clusters.",
+          "properties": {
+            "generation": {
+              "description": "Generation stores the version of the cluster's Proxy and Syncer certificate secrets. In Active-Active databases, when a user updates the proxy or syncer certificate, a crdb-update command needs to be triggered to avoid potential sync issues. This helps the REAADB controller detect a change in a certificate and trigger a crdb-update. The version of the cluster's Proxy certificate secret.",
+              "format": "int64",
+              "type": "integer"
+            },
+            "updateStatus": {
+              "description": "The status of the cluster's certificates update",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "ingressOrRouteMethodStatus": {
           "description": "The ingressOrRouteSpec/ActiveActive spec method that exist",
           "type": "string"
@@ -11823,11 +11980,41 @@
             "expirationDate": {
               "type": "string"
             },
+            "features": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "flashShards": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "flashShardsLimit": {
+              "format": "int32",
+              "nullable": true,
+              "type": "integer"
+            },
             "licenseState": {
               "type": "string"
             },
+            "owner": {
+              "type": "string"
+            },
+            "ramShards": {
+              "format": "int32",
+              "type": "integer"
+            },
+            "ramShardsLimit": {
+              "format": "int32",
+              "nullable": true,
+              "type": "integer"
+            },
             "shardsLimit": {
               "type": "integer"
+            },
+            "shardsUsage": {
+              "type": "string"
             }
           },
           "type": "object",

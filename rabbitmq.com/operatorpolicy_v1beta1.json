@@ -1,5 +1,5 @@
 {
-  "description": "Queue is the Schema for the queues API",
+  "description": "OperatorPolicy is the Schema for the operator policies API",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,44 +13,39 @@
       "type": "object"
     },
     "spec": {
-      "description": "QueueSpec defines the desired state of Queue",
+      "description": "OperatorPolicySpec defines the desired state of OperatorPolicy\nhttps://www.rabbitmq.com/parameters.html#operator-policies",
       "properties": {
-        "arguments": {
-          "description": "Queue arguments in the format of KEY: VALUE. e.g. x-delivery-limit: 10000.\nConfiguring queues through arguments is not recommended because they cannot be updated once set; we recommend configuring queues through policies instead.",
-          "type": "object",
-          "x-kubernetes-preserve-unknown-fields": true
-        },
-        "autoDelete": {
-          "description": "when set to true, queues that have had at least one consumer before are deleted after the last consumer unsubscribes.",
-          "type": "boolean"
-        },
-        "deleteIfEmpty": {
-          "description": "when set to true, queues are deleted only if empty.",
-          "type": "boolean"
-        },
-        "deleteIfUnused": {
-          "description": "when set to true, queues are delete only if they have no consumer.",
-          "type": "boolean"
-        },
-        "deletionPolicy": {
-          "default": "delete",
-          "description": "DeletionPolicy defines the behavior of queue in the RabbitMQ cluster when the corresponding custom resource is deleted.\nCan be set to 'delete' or 'retain'. Default is 'delete'.",
+        "applyTo": {
+          "default": "queues",
+          "description": "What this operator policy applies to: 'queues', 'classic_queues', 'quorum_queues', 'streams'.\nDefault to 'queues'.",
           "enum": [
-            "delete",
-            "retain"
+            "queues",
+            "classic_queues",
+            "quorum_queues",
+            "streams"
           ],
           "type": "string"
         },
-        "durable": {
-          "description": "When set to false queues does not survive server restart.",
-          "type": "boolean"
+        "definition": {
+          "description": "OperatorPolicy definition. Required property.",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
         },
         "name": {
-          "description": "Name of the queue; required property.",
+          "description": "Required property; cannot be updated",
           "type": "string"
         },
+        "pattern": {
+          "description": "Regular expression pattern used to match queues, e.g. \"^my-queue$\".\nRequired property.",
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "description": "Default to '0'.\nIn the event that more than one operator policy can match a given queue, the operator policy with the greatest priority applies.",
+          "type": "integer"
+        },
         "rabbitmqClusterReference": {
-          "description": "Reference to the RabbitmqCluster that the queue will be created in.\nRequired property.",
+          "description": "Reference to the RabbitmqCluster that the operator policy will be created in.\nRequired property.",
           "properties": {
             "connectionSecret": {
               "description": "Secret contains the http management uri for the RabbitMQ cluster.\nThe Secret must contain the key `uri`, `username` and `password` or operator will error.\nHave to set either name or connectionSecret, but not both.",
@@ -77,24 +72,23 @@
           "type": "object",
           "additionalProperties": false
         },
-        "type": {
-          "type": "string"
-        },
         "vhost": {
           "default": "/",
-          "description": "Default to vhost '/'",
+          "description": "Default to vhost '/'; cannot be updated",
           "type": "string"
         }
       },
       "required": [
+        "definition",
         "name",
+        "pattern",
         "rabbitmqClusterReference"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "QueueStatus defines the observed state of Queue",
+      "description": "OperatorPolicyStatus defines the observed state of OperatorPolicy",
       "properties": {
         "conditions": {
           "items": {
@@ -131,7 +125,7 @@
           "type": "array"
         },
         "observedGeneration": {
-          "description": "observedGeneration is the most recent successful generation observed for this Queue. It corresponds to the\nQueue's generation, which is updated on mutation by the API Server.",
+          "description": "observedGeneration is the most recent successful generation observed for this OperatorPolicy. It corresponds to the\nOperatorPolicy's generation, which is updated on mutation by the API Server.",
           "format": "int64",
           "type": "integer"
         }

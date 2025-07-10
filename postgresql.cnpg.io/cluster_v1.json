@@ -959,10 +959,10 @@
                       "type": "array"
                     },
                     "compression": {
-                      "description": "Compress a backup file (a tar file per tablespace) while streaming it\nto the object store. Available options are empty string (no\ncompression, default), `gzip`, `bzip2` or `snappy`.",
+                      "description": "Compress a backup file (a tar file per tablespace) while streaming it\nto the object store. Available options are empty string (no\ncompression, default), `gzip`, `bzip2`, and `snappy`.",
                       "enum": [
-                        "gzip",
                         "bzip2",
+                        "gzip",
                         "snappy"
                       ],
                       "type": "string"
@@ -1163,11 +1163,14 @@
                       "type": "array"
                     },
                     "compression": {
-                      "description": "Compress a WAL file before sending it to the object store. Available\noptions are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.",
+                      "description": "Compress a WAL file before sending it to the object store. Available\noptions are empty string (no compression, default), `gzip`, `bzip2`,\n`lz4`, `snappy`, `xz`, and `zstd`.",
                       "enum": [
-                        "gzip",
                         "bzip2",
-                        "snappy"
+                        "gzip",
+                        "lz4",
+                        "snappy",
+                        "xz",
+                        "zstd"
                       ],
                       "type": "string"
                     },
@@ -2420,10 +2423,10 @@
                         "type": "array"
                       },
                       "compression": {
-                        "description": "Compress a backup file (a tar file per tablespace) while streaming it\nto the object store. Available options are empty string (no\ncompression, default), `gzip`, `bzip2` or `snappy`.",
+                        "description": "Compress a backup file (a tar file per tablespace) while streaming it\nto the object store. Available options are empty string (no\ncompression, default), `gzip`, `bzip2`, and `snappy`.",
                         "enum": [
-                          "gzip",
                           "bzip2",
+                          "gzip",
                           "snappy"
                         ],
                         "type": "string"
@@ -2624,11 +2627,14 @@
                         "type": "array"
                       },
                       "compression": {
-                        "description": "Compress a WAL file before sending it to the object store. Available\noptions are empty string (no compression, default), `gzip`, `bzip2` or `snappy`.",
+                        "description": "Compress a WAL file before sending it to the object store. Available\noptions are empty string (no compression, default), `gzip`, `bzip2`,\n`lz4`, `snappy`, `xz`, and `zstd`.",
                         "enum": [
-                          "gzip",
                           "bzip2",
-                          "snappy"
+                          "gzip",
+                          "lz4",
+                          "snappy",
+                          "xz",
+                          "zstd"
                         ],
                         "type": "string"
                       },
@@ -2829,13 +2835,7 @@
             },
             "major": {
               "description": "The major version of PostgreSQL we want to use from the ImageCatalog",
-              "type": "integer",
-              "x-kubernetes-validations": [
-                {
-                  "message": "Major is immutable",
-                  "rule": "self == oldSelf"
-                }
-              ]
+              "type": "integer"
             },
             "name": {
               "description": "Name is the name of resource being referenced",
@@ -3736,7 +3736,6 @@
               "description": "Configuration of the PostgreSQL synchronous replication feature",
               "properties": {
                 "dataDurability": {
-                  "default": "required",
                   "description": "If set to \"required\", data durability is strictly enforced. Write operations\nwith synchronous commit settings (`on`, `remote_write`, or `remote_apply`) will\nblock if there are insufficient healthy replicas, ensuring data persistence.\nIf set to \"preferred\", data durability is maintained when healthy replicas\nare available, but the required number of instances will adjust dynamically\nif replicas become unavailable. This setting relaxes strict durability enforcement\nto allow for operational continuity. This setting is only applicable if both\n`standbyNamesPre` and `standbyNamesPost` are unset (empty).",
                   "enum": [
                     "required",
@@ -3873,6 +3872,19 @@
                   "format": "int32",
                   "type": "integer"
                 },
+                "maximumLag": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "Lag limit. Used only for `streaming` strategy",
+                  "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                  "x-kubernetes-int-or-string": true
+                },
                 "periodSeconds": {
                   "description": "How often (in seconds) to perform the probe.\nDefault to 10 seconds. Minimum value is 1.",
                   "format": "int32",
@@ -3892,6 +3904,15 @@
                   "description": "Number of seconds after which the probe times out.\nDefaults to 1 second. Minimum value is 1.\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
                   "format": "int32",
                   "type": "integer"
+                },
+                "type": {
+                  "description": "The probe strategy",
+                  "enum": [
+                    "pg_isready",
+                    "streaming",
+                    "query"
+                  ],
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -3910,6 +3931,19 @@
                   "format": "int32",
                   "type": "integer"
                 },
+                "maximumLag": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "description": "Lag limit. Used only for `streaming` strategy",
+                  "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                  "x-kubernetes-int-or-string": true
+                },
                 "periodSeconds": {
                   "description": "How often (in seconds) to perform the probe.\nDefault to 10 seconds. Minimum value is 1.",
                   "format": "int32",
@@ -3929,6 +3963,15 @@
                   "description": "Number of seconds after which the probe times out.\nDefaults to 1 second. Minimum value is 1.\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
                   "format": "int32",
                   "type": "integer"
+                },
+                "type": {
+                  "description": "The probe strategy",
+                  "enum": [
+                    "pg_isready",
+                    "streaming",
+                    "query"
+                  ],
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -5222,10 +5265,6 @@
           },
           "type": "array"
         },
-        "azurePVCUpdateEnabled": {
-          "description": "AzurePVCUpdateEnabled shows if the PVC online upgrade is enabled for this cluster",
-          "type": "boolean"
-        },
         "certificates": {
           "description": "The configuration for the CA and related certificates, initialized with defaults.",
           "properties": {
@@ -5409,6 +5448,10 @@
           "additionalProperties": {
             "description": "InstanceReportedState describes the last reported state of an instance during a reconciliation loop",
             "properties": {
+              "ip": {
+                "description": "IP address of the instance",
+                "type": "string"
+              },
               "isPrimary": {
                 "description": "indicates if an instance is the primary one",
                 "type": "boolean"
@@ -5516,6 +5559,25 @@
         "onlineUpdateEnabled": {
           "description": "OnlineUpdateEnabled shows if the online upgrade is enabled inside the cluster",
           "type": "boolean"
+        },
+        "pgDataImageInfo": {
+          "description": "PGDataImageInfo contains the details of the latest image that has run on the current data directory.",
+          "properties": {
+            "image": {
+              "description": "Image is the image name",
+              "type": "string"
+            },
+            "majorVersion": {
+              "description": "MajorVersion is the major version of the image",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "image",
+            "majorVersion"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "phase": {
           "description": "Current phase of the cluster",

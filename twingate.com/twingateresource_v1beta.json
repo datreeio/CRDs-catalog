@@ -1,0 +1,217 @@
+{
+  "type": "object",
+  "description": "TwingateResource represents a resource in Twingate.",
+  "required": [
+    "spec"
+  ],
+  "properties": {
+    "spec": {
+      "type": "object",
+      "description": "TwingateResourceSpec defines the desired state of TwingateResource",
+      "x-kubernetes-validations": [
+        {
+          "rule": "(self.isBrowserShortcutEnabled && !(self.address.contains('*') || self.address.contains('?'))) || (self.isBrowserShortcutEnabled == false)",
+          "message": "if isBrowserShortcutEnabled is set to true, then address can't be wildcard"
+        },
+        {
+          "rule": "(self.type == \"Network\" && !has(self.proxy)) || (self.type == \"Kubernetes\" && has(self.proxy))",
+          "message": "proxy should be set for Kubernetes Resource"
+        },
+        {
+          "rule": "(self.isBrowserShortcutEnabled && self.type == \"Network\") || (self.isBrowserShortcutEnabled == false)",
+          "message": "isBrowserShortcutEnabled cannot be set to true for Kubernetes Resource"
+        }
+      ],
+      "required": [
+        "name",
+        "address"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "nullable": true
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the resource."
+        },
+        "address": {
+          "type": "string",
+          "description": "Address of the resource."
+        },
+        "alias": {
+          "type": "string",
+          "nullable": true,
+          "description": "Alias of the resource."
+        },
+        "isBrowserShortcutEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "isBrowserShortcutEnabled specifies whether the resource will display a browser shortcut in the Twingate client."
+        },
+        "securityPolicyId": {
+          "type": "string",
+          "nullable": true,
+          "pattern": "^[-A-Za-z0-9+/]*={0,3}$"
+        },
+        "isVisible": {
+          "type": "boolean",
+          "default": true,
+          "description": "isVisible specifies whether the resource will display in the main resources list in the Twingate client."
+        },
+        "protocols": {
+          "type": "object",
+          "nullable": true,
+          "description": "protocols specifies the resource's protocol policies.",
+          "properties": {
+            "allowIcmp": {
+              "type": "boolean",
+              "nullable": true,
+              "description": "allowIcmp specifies whether the resource will allow ICMP traffic."
+            },
+            "tcp": {
+              "type": "object",
+              "nullable": true,
+              "description": "tcp specifies the resource's TCP protocol policy.",
+              "x-kubernetes-validations": [
+                {
+                  "rule": "(self.policy == \"ALLOW_ALL\" && size(self.ports) == 0) || (self.policy == \"RESTRICTED\")",
+                  "message": "Can't specify port ranges for ALLOW_ALL policy."
+                }
+              ],
+              "properties": {
+                "policy": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "ALLOW_ALL",
+                    "RESTRICTED"
+                  ]
+                },
+                "ports": {
+                  "type": "array",
+                  "default": [],
+                  "items": {
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "rule": "(self.start <= self.end)",
+                        "message": "Start port value must be less or equal to end port value"
+                      }
+                    ],
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "end": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "udp": {
+              "type": "object",
+              "nullable": true,
+              "description": "udp specifies the resource's UDP protocol policy.",
+              "x-kubernetes-validations": [
+                {
+                  "rule": "(self.policy == \"ALLOW_ALL\" && size(self.ports) == 0) || (self.policy == \"RESTRICTED\")",
+                  "message": "Can't specify port ranges for ALLOW_ALL policy."
+                }
+              ],
+              "properties": {
+                "policy": {
+                  "type": "string",
+                  "nullable": true,
+                  "enum": [
+                    "ALLOW_ALL",
+                    "RESTRICTED"
+                  ]
+                },
+                "ports": {
+                  "type": "array",
+                  "default": [],
+                  "items": {
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "rule": "(self.start <= self.end)",
+                        "message": "Start port value must be less or equal to end port value"
+                      }
+                    ],
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "end": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "syncLabels": {
+          "type": "boolean",
+          "default": true,
+          "description": "syncLabels specifies whether the resource should sync the metadata labels as resource tags in the Twingate client."
+        },
+        "type": {
+          "type": "string",
+          "description": "The resource type",
+          "default": "Network",
+          "enum": [
+            "Network",
+            "Kubernetes"
+          ],
+          "x-kubernetes-validations": [
+            {
+              "rule": "self == oldSelf",
+              "message": "Resource type is immutable"
+            }
+          ]
+        },
+        "proxy": {
+          "type": "object",
+          "required": [
+            "address",
+            "certificateAuthorityCert"
+          ],
+          "properties": {
+            "address": {
+              "type": "string",
+              "description": "Address of the proxy."
+            },
+            "certificateAuthorityCert": {
+              "type": "string",
+              "description": "Base64-encoded certificate of the Certificate Authority issuing the proxy's TLS certificate."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "x-kubernetes-preserve-unknown-fields": true
+    }
+  }
+}

@@ -43,12 +43,28 @@
               "description": "XForwardedForSettings provides configuration for using X-Forwarded-For headers for determining the client IP address.",
               "properties": {
                 "numTrustedHops": {
-                  "description": "NumTrustedHops controls the number of additional ingress proxy hops from the right side of XFF HTTP\nheaders to trust when determining the origin client's IP address.\nRefer to https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/headers#x-forwarded-for\nfor more details.",
+                  "description": "NumTrustedHops controls the number of additional ingress proxy hops from the right side of XFF HTTP\nheaders to trust when determining the origin client's IP address.\nOnly one of NumTrustedHops and TrustedCIDRs must be set.",
                   "format": "int32",
                   "type": "integer"
+                },
+                "trustedCIDRs": {
+                  "description": "TrustedCIDRs is a list of CIDR ranges to trust when evaluating\nthe remote IP address to determine the original client\u2019s IP address.\nWhen the remote IP address matches a trusted CIDR and the x-forwarded-for header was sent,\neach entry in the x-forwarded-for header is evaluated from right to left\nand the first public non-trusted address is used as the original client address.\nIf all addresses in x-forwarded-for are within the trusted list, the first (leftmost) entry is used.\nOnly one of NumTrustedHops and TrustedCIDRs must be set.",
+                  "items": {
+                    "description": "CIDR defines a CIDR Address range.\nA CIDR can be an IPv4 address range such as \"192.168.1.0/24\" or an IPv6 address range such as \"2001:0db8:11a3:09d7::/64\".",
+                    "pattern": "((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\\/([0-9]+))",
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "only one of numTrustedHops or trustedCIDRs must be set",
+                  "rule": "(has(self.numTrustedHops) && !has(self.trustedCIDRs)) || (!has(self.numTrustedHops) && has(self.trustedCIDRs))"
+                }
+              ],
               "additionalProperties": false
             }
           },
@@ -149,7 +165,7 @@
                     "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
                     "properties": {
                       "name": {
-                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
                         "maxLength": 256,
                         "minLength": 1,
                         "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
@@ -191,7 +207,7 @@
                     "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
                     "properties": {
                       "name": {
-                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
                         "maxLength": 256,
                         "minLength": 1,
                         "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
@@ -227,8 +243,18 @@
               "type": "boolean"
             },
             "preserveXRequestID": {
-              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nIt defaults to false.",
+              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nDefaults to false and cannot be combined with RequestID.\nDeprecated: use RequestID=Preserve instead",
               "type": "boolean"
+            },
+            "requestID": {
+              "description": "RequestID configures Envoy's behavior for handling the `X-Request-ID` header.\nDefaults to `Generate` and builds the `X-Request-ID` for every request and ignores pre-existing values from the edge.\n(An \"edge request\" refers to a request from an external client to the Envoy entrypoint.)",
+              "enum": [
+                "PreserveOrGenerate",
+                "Preserve",
+                "Generate",
+                "Disable"
+              ],
+              "type": "string"
             },
             "withUnderscoresAction": {
               "description": "WithUnderscoresAction configures the action to take when an HTTP header with underscores\nis encountered. The default action is to reject the request.",
@@ -281,6 +307,12 @@
             }
           },
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "preserveXRequestID and requestID cannot both be set.",
+              "rule": "!(has(self.preserveXRequestID) && has(self.requestID))"
+            }
+          ],
           "additionalProperties": false
         },
         "healthCheck": {
@@ -506,6 +538,38 @@
                 "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
                 "type": "string"
               },
+              "matchExpressions": {
+                "description": "MatchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                "items": {
+                  "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                  "properties": {
+                    "key": {
+                      "description": "key is the label key that the selector applies to.",
+                      "type": "string"
+                    },
+                    "operator": {
+                      "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                      "type": "string"
+                    },
+                    "values": {
+                      "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "operator"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
+              },
               "matchLabels": {
                 "additionalProperties": {
                   "type": "string"
@@ -515,8 +579,7 @@
               }
             },
             "required": [
-              "kind",
-              "matchLabels"
+              "kind"
             ],
             "type": "object",
             "x-kubernetes-validations": [
@@ -591,7 +654,7 @@
           "description": "TLS settings configure TLS termination settings with the downstream client.",
           "properties": {
             "alpnProtocols": {
-              "description": "ALPNProtocols supplies the list of ALPN protocols that should be\nexposed by the listener. By default h2 and http/1.1 are enabled.\nSupported values are:\n- http/1.0\n- http/1.1\n- h2",
+              "description": "ALPNProtocols supplies the list of ALPN protocols that should be\nexposed by the listener or used by the proxy to connect to the backend.\nDefaults:\n1. HTTPS Routes: h2 and http/1.1 are enabled in listener context.\n2. Other Routes: ALPN is disabled.\n3. Backends: proxy uses the appropriate ALPN options for the backend protocol.\nWhen an empty list is provided, the ALPN TLS extension is disabled.\nSupported values are:\n- http/1.0\n- http/1.1\n- h2",
               "items": {
                 "description": "ALPNProtocol specifies the protocol to be negotiated using ALPN",
                 "enum": [

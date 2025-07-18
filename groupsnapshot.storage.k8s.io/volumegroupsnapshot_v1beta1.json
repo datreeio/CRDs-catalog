@@ -1,0 +1,160 @@
+{
+  "description": "VolumeGroupSnapshot is a user's request for creating either a point-in-time\ngroup snapshot or binding to a pre-existing group snapshot.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the desired characteristics of a group snapshot requested by a user.\nRequired.",
+      "properties": {
+        "source": {
+          "description": "Source specifies where a group snapshot will be created from.\nThis field is immutable after creation.\nRequired.",
+          "properties": {
+            "selector": {
+              "description": "Selector is a label query over persistent volume claims that are to be\ngrouped together for snapshotting.\nThis labelSelector will be used to match the label added to a PVC.\nIf the label is added or removed to a volume after a group snapshot\nis created, the existing group snapshots won't be modified.\nOnce a VolumeGroupSnapshotContent is created and the sidecar starts to process\nit, the volume list will not change with retries.",
+              "properties": {
+                "matchExpressions": {
+                  "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                  "items": {
+                    "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                    "properties": {
+                      "key": {
+                        "description": "key is the label key that the selector applies to.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "operator"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "x-kubernetes-validations": [
+                {
+                  "message": "selector is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "volumeGroupSnapshotContentName": {
+              "description": "VolumeGroupSnapshotContentName specifies the name of a pre-existing VolumeGroupSnapshotContent\nobject representing an existing volume group snapshot.\nThis field should be set if the volume group snapshot already exists and\nonly needs a representation in Kubernetes.\nThis field is immutable.",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "volumeGroupSnapshotContentName is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "selector is required once set",
+              "rule": "!has(oldSelf.selector) || has(self.selector)"
+            },
+            {
+              "message": "volumeGroupSnapshotContentName is required once set",
+              "rule": "!has(oldSelf.volumeGroupSnapshotContentName) || has(self.volumeGroupSnapshotContentName)"
+            },
+            {
+              "message": "exactly one of selector and volumeGroupSnapshotContentName must be set",
+              "rule": "(has(self.selector) && !has(self.volumeGroupSnapshotContentName)) || (!has(self.selector) && has(self.volumeGroupSnapshotContentName))"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "volumeGroupSnapshotClassName": {
+          "description": "VolumeGroupSnapshotClassName is the name of the VolumeGroupSnapshotClass\nrequested by the VolumeGroupSnapshot.\nVolumeGroupSnapshotClassName may be left nil to indicate that the default\nclass will be used.\nEmpty string is not allowed for this field.",
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "volumeGroupSnapshotClassName must not be the empty string when set",
+              "rule": "size(self) > 0"
+            }
+          ]
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status represents the current information of a group snapshot.\nConsumers must verify binding between VolumeGroupSnapshot and\nVolumeGroupSnapshotContent objects is successful (by validating that both\nVolumeGroupSnapshot and VolumeGroupSnapshotContent point to each other) before\nusing this object.",
+      "properties": {
+        "boundVolumeGroupSnapshotContentName": {
+          "description": "BoundVolumeGroupSnapshotContentName is the name of the VolumeGroupSnapshotContent\nobject to which this VolumeGroupSnapshot object intends to bind to.\nIf not specified, it indicates that the VolumeGroupSnapshot object has not\nbeen successfully bound to a VolumeGroupSnapshotContent object yet.\nNOTE: To avoid possible security issues, consumers must verify binding between\nVolumeGroupSnapshot and VolumeGroupSnapshotContent objects is successful\n(by validating that both VolumeGroupSnapshot and VolumeGroupSnapshotContent\npoint at each other) before using this object.",
+          "type": "string"
+        },
+        "creationTime": {
+          "description": "CreationTime is the timestamp when the point-in-time group snapshot is taken\nby the underlying storage system.\nIf not specified, it may indicate that the creation time of the group snapshot\nis unknown.\nThe format of this field is a Unix nanoseconds time encoded as an int64.\nOn Unix, the command date +%s%N returns the current time in nanoseconds\nsince 1970-01-01 00:00:00 UTC.\nThis field is updated based on the CreationTime field in VolumeGroupSnapshotContentStatus",
+          "format": "date-time",
+          "type": "string"
+        },
+        "error": {
+          "description": "Error is the last observed error during group snapshot creation, if any.\nThis field could be helpful to upper level controllers (i.e., application\ncontroller) to decide whether they should continue on waiting for the group\nsnapshot to be created based on the type of error reported.\nThe snapshot controller will keep retrying when an error occurs during the\ngroup snapshot creation. Upon success, this error field will be cleared.",
+          "properties": {
+            "message": {
+              "description": "message is a string detailing the encountered error during snapshot\ncreation if specified.\nNOTE: message may be logged, and it should not contain sensitive\ninformation.",
+              "type": "string"
+            },
+            "time": {
+              "description": "time is the timestamp when the error was encountered.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "readyToUse": {
+          "description": "ReadyToUse indicates if all the individual snapshots in the group are ready\nto be used to restore a group of volumes.\nReadyToUse becomes true when ReadyToUse of all individual snapshots become true.\nIf not specified, it means the readiness of a group snapshot is unknown.",
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

@@ -21,7 +21,7 @@
           "x-kubernetes-preserve-unknown-fields": true
         },
         "configMaps": {
-          "description": "ConfigMaps is a list of ConfigMaps in the same namespace as the VMSingle\nobject, which shall be mounted into the VMSingle Pods.",
+          "description": "ConfigMaps is a list of ConfigMaps in the same namespace as the Application\nobject, which shall be mounted into the Application container\nat /etc/vm/configs/CONFIGMAP_NAME folder",
           "items": {
             "type": "string"
           },
@@ -38,6 +38,14 @@
             "x-kubernetes-preserve-unknown-fields": true
           },
           "type": "array"
+        },
+        "disableAutomountServiceAccountToken": {
+          "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+          "type": "boolean"
+        },
+        "disableSelfServiceScrape": {
+          "description": "DisableSelfServiceScrape controls creation of VMServiceScrape by operator\nfor the application.\nHas priority over `VM_DISABLESELFSERVICESCRAPECREATION` operator env variable",
+          "type": "boolean"
         },
         "dnsConfig": {
           "description": "Specifies the DNS parameters of a pod.\nParameters specified here will be merged to the generated DNS\nconfiguration based on DNSPolicy.",
@@ -59,10 +67,11 @@
                 "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                 "properties": {
                   "name": {
-                    "description": "Required.",
+                    "description": "Name is this DNS resolver option's name.\nRequired.",
                     "type": "string"
                   },
                   "value": {
+                    "description": "Value is this DNS resolver option's value.",
                     "type": "string"
                   }
                 },
@@ -92,11 +101,11 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "ExtraArgs that will be passed to  VMSingle pod\nfor example remoteWrite.tmpDataPath: /tmp",
+          "description": "ExtraArgs that will be passed to the application container\nfor example remoteWrite.tmpDataPath: /tmp",
           "type": "object"
         },
         "extraEnvs": {
-          "description": "ExtraEnvs that will be added to VMSingle pod",
+          "description": "ExtraEnvs that will be passed to the application container",
           "items": {
             "description": "EnvVar represents an environment variable present in a Container.",
             "properties": {
@@ -114,6 +123,81 @@
             ],
             "type": "object",
             "x-kubernetes-preserve-unknown-fields": true,
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "extraEnvsFrom": {
+          "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+          "items": {
+            "description": "EnvFromSource represents the source of a set of ConfigMaps",
+            "properties": {
+              "configMapRef": {
+                "description": "The ConfigMap to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the ConfigMap must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "prefix": {
+                "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                "type": "string"
+              },
+              "secretRef": {
+                "description": "The Secret to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "host_aliases": {
+          "description": "HostAliasesUnderScore provides mapping for ip and hostname,\nthat would be propagated to pod,\ncannot be used with HostNetwork.\nHas Priority over hostAliases field",
+          "items": {
+            "description": "HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the\npod's hosts file.",
+            "properties": {
+              "hostnames": {
+                "description": "Hostnames for the above IP address.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
+              },
+              "ip": {
+                "description": "IP address of the host file entry.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ip"
+            ],
+            "type": "object",
             "additionalProperties": false
           },
           "type": "array"
@@ -149,7 +233,7 @@
           "type": "boolean"
         },
         "image": {
-          "description": "Image - docker image settings for VMSingle\nif no specified operator uses default config version",
+          "description": "Image - docker image settings\nif no specified operator uses default version from operator config",
           "properties": {
             "pullPolicy": {
               "description": "PullPolicy describes how to pull docker image",
@@ -174,7 +258,7 @@
             "properties": {
               "name": {
                 "default": "",
-                "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                 "type": "string"
               }
             },
@@ -185,7 +269,7 @@
           "type": "array"
         },
         "initContainers": {
-          "description": "InitContainers allows adding initContainers to the pod definition. Those can be used to e.g.\nfetch secrets for injection into the vmSingle configuration from external sources. Any\nerrors during the execution of an initContainer will lead to a restart of the Pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/\nUsing initContainers for any use case other then secret fetching is entirely outside the scope\nof what the maintainers will support and by doing so, you accept that this behaviour may break\nat any time without notice.",
+          "description": "InitContainers allows adding initContainers to the pod definition.\nAny errors during the execution of an initContainer will lead to a restart of the Pod.\nMore info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
           "items": {
             "description": "A single application container that you want to run within a pod.",
             "required": [
@@ -222,6 +306,10 @@
         "license": {
           "description": "License allows to configure license key to be used for enterprise features.\nUsing license key is supported starting from VictoriaMetrics v1.94.0.\nSee [here](https://docs.victoriametrics.com/enterprise)",
           "properties": {
+            "forceOffline": {
+              "description": "Enforce offline verification of the license key.",
+              "type": "boolean"
+            },
             "key": {
               "description": "Enterprise license key. This flag is available only in [VictoriaMetrics enterprise](https://docs.victoriametrics.com/enterprise).\nTo request a trial license, [go to](https://victoriametrics.com/products/enterprise/trial)",
               "type": "string"
@@ -235,7 +323,7 @@
                 },
                 "name": {
                   "default": "",
-                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                   "type": "string"
                 },
                 "optional": {
@@ -249,6 +337,10 @@
               "type": "object",
               "x-kubernetes-map-type": "atomic",
               "additionalProperties": false
+            },
+            "reloadInterval": {
+              "description": "Interval to be used for checking for license key changes. Note that this is only applicable when using KeyRef.",
+              "type": "string"
             }
           },
           "type": "object",
@@ -277,6 +369,32 @@
             "PANIC"
           ],
           "type": "string"
+        },
+        "managedMetadata": {
+          "description": "ManagedMetadata defines metadata that will be added to the all objects\ncreated by operator for the given CustomResource",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Annotations is an unstructured key value map stored with a resource that may be\nset by external tools to store and retrieve arbitrary metadata. They are not\nqueryable and should be preserved when modifying objects.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
+              "type": "object"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Labels Map of string keys and values that can be used to organize and categorize\n(scope and select) objects.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "minReadySeconds": {
+          "description": "MinReadySeconds defines a minimum number of seconds to wait before starting update next pod\nif previous in healthy state\nHas no effect for VLogs and VMSingle",
+          "format": "int32",
+          "type": "integer"
         },
         "nodeSelector": {
           "additionalProperties": {
@@ -315,11 +433,11 @@
           "additionalProperties": false
         },
         "port": {
-          "description": "Port listen port",
+          "description": "Port listen address",
           "type": "string"
         },
         "priorityClassName": {
-          "description": "PriorityClassName assigned to the Pods",
+          "description": "PriorityClassName class assigned to the Pods",
           "type": "string"
         },
         "readinessGates": {
@@ -346,11 +464,11 @@
           "x-kubernetes-preserve-unknown-fields": true
         },
         "removePvcAfterDelete": {
-          "description": "RemovePvcAfterDelete - if true, controller adds ownership to pvc\nand after VMSingle objest deletion - pvc will be garbage collected\nby controller manager",
+          "description": "RemovePvcAfterDelete - if true, controller adds ownership to pvc\nand after VMSingle object deletion - pvc will be garbage collected\nby controller manager",
           "type": "boolean"
         },
         "replicaCount": {
-          "description": "ReplicaCount is the expected size of the VMSingle\nit can be 0 or 1\nif you need more - use vm cluster",
+          "description": "ReplicaCount is the expected size of the Application.",
           "format": "int32",
           "type": "integer"
         },
@@ -358,12 +476,16 @@
           "description": "Resources container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
                   "name": {
                     "description": "Name must match the name of one entry in pod.spec.resourceClaims of\nthe Pod where this field is used. It makes that resource available\ninside a container.",
+                    "type": "string"
+                  },
+                  "request": {
+                    "description": "Request is the name chosen for a request in the referenced claim.\nIf empty, everything from the claim is made available, otherwise\nonly the result of this request.",
                     "type": "string"
                   }
                 },
@@ -416,11 +538,12 @@
           "additionalProperties": false
         },
         "retentionPeriod": {
-          "description": "RetentionPeriod for the stored metrics\nNote VictoriaMetrics has data/ and indexdb/ folders\nmetrics from data/ removed eventually as soon as partition leaves retention period\nreverse index data at indexdb rotates once at the half of configured [retention period](https://docs.victoriametrics.com/Single-server-VictoriaMetrics/#retention)",
+          "description": "RetentionPeriod defines how long to retain stored metrics, specified as a duration (e.g., \"1d\", \"1w\", \"1m\").\nData with timestamps outside the RetentionPeriod is automatically deleted. The minimum allowed value is 1d, or 24h.\nThe default value is 1 (one month).\nSee [retention](https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/#retention) docs for details.",
+          "pattern": "^[0-9]+(h|d|w|y)?$",
           "type": "string"
         },
         "revisionHistoryLimitCount": {
-          "description": "The number of old ReplicaSets to retain to allow rollback in deployment or\nmaximum number of revisions that will be maintained in the StatefulSet's revision history.\nDefaults to 10.",
+          "description": "The number of old ReplicaSets to retain to allow rollback in deployment or\nmaximum number of revisions that will be maintained in the Deployment revision history.\nHas no effect at StatefulSets\nDefaults to 10.",
           "format": "int32",
           "type": "integer"
         },
@@ -433,7 +556,7 @@
           "type": "string"
         },
         "secrets": {
-          "description": "Secrets is a list of Secrets in the same namespace as the VMSingle\nobject, which shall be mounted into the VMSingle Pods.",
+          "description": "Secrets is a list of Secrets in the same namespace as the Application\nobject, which shall be mounted into the Application container\nat /etc/vm/secrets/SECRET_NAME folder",
           "items": {
             "type": "string"
           },
@@ -445,7 +568,7 @@
           "x-kubernetes-preserve-unknown-fields": true
         },
         "serviceAccountName": {
-          "description": "ServiceAccountName is the name of the ServiceAccount to use to run the\nVMSingle Pods.",
+          "description": "ServiceAccountName is the name of the ServiceAccount to use to run the pods",
           "type": "string"
         },
         "serviceScrapeSpec": {
@@ -506,7 +629,7 @@
           "x-kubernetes-preserve-unknown-fields": true
         },
         "storage": {
-          "description": "Storage is the definition of how storage will be used by the VMSingle\nby default it`s empty dir",
+          "description": "Storage is the definition of how storage will be used by the VMSingle\nby default it`s empty dir\nthis option is ignored if storageDataPath is set",
           "properties": {
             "accessModes": {
               "description": "accessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
@@ -658,7 +781,7 @@
               "type": "string"
             },
             "volumeAttributesClassName": {
-              "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+              "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
               "type": "string"
             },
             "volumeMode": {
@@ -674,7 +797,7 @@
           "additionalProperties": false
         },
         "storageDataPath": {
-          "description": "StorageDataPath disables spec.storage option and overrides arg for victoria-metrics binary --storageDataPath,\nits users responsibility to mount proper device into given path.",
+          "description": "StorageDataPath disables spec.storage option and overrides arg for victoria-metrics binary --storageDataPath,\nits users responsibility to mount proper device into given path.\nIt requires to provide spec.volumes and spec.volumeMounts with at least 1 value",
           "type": "string"
         },
         "storageMetadata": {
@@ -714,7 +837,7 @@
                 },
                 "name": {
                   "default": "",
-                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                   "type": "string"
                 },
                 "optional": {
@@ -744,7 +867,12 @@
               },
               "type": "array"
             },
+            "enableWindows": {
+              "description": "EnableWindows enables aggregating data in separate windows ( available from v0.54.0).",
+              "type": "boolean"
+            },
             "ignoreFirstIntervals": {
+              "description": "IgnoreFirstIntervals instructs to ignore first interval",
               "type": "integer"
             },
             "ignoreOldSamples": {
@@ -761,7 +889,7 @@
                 "description": "StreamAggrRule defines the rule in stream aggregation config",
                 "properties": {
                   "by": {
-                    "description": "By is an optional list of labels for grouping input series.\n\n\nSee also Without.\n\n\nIf neither By nor Without are set, then the Outputs are calculated\nindividually per each input time series.",
+                    "description": "By is an optional list of labels for grouping input series.\n\nSee also Without.\n\nIf neither By nor Without are set, then the Outputs are calculated\nindividually per each input time series.",
                     "items": {
                       "type": "string"
                     },
@@ -772,11 +900,15 @@
                     "type": "string"
                   },
                   "drop_input_labels": {
-                    "description": "DropInputLabels is an optional list with labels, which must be dropped before further processing of input samples.\n\n\nLabels are dropped before de-duplication and aggregation.",
+                    "description": "DropInputLabels is an optional list with labels, which must be dropped before further processing of input samples.\n\nLabels are dropped before de-duplication and aggregation.",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
+                  },
+                  "enable_windows": {
+                    "description": "EnableWindows enables aggregating data in separate windows",
+                    "type": "boolean"
                   },
                   "flush_on_shutdown": {
                     "description": "FlushOnShutdown defines whether to flush the aggregation state on process termination\nor config reload. Is `false` by default.\nIt is not recommended changing this setting, unless unfinished aggregations states\nare preferred to missing data points.",
@@ -867,7 +999,7 @@
                     "type": "boolean"
                   },
                   "match": {
-                    "description": "Match is a label selector (or list of label selectors) for filtering time series for the given selector.\n\n\nIf the match isn't set, then all the input time series are processed.",
+                    "description": "Match is a label selector (or list of label selectors) for filtering time series for the given selector.\n\nIf the match isn't set, then all the input time series are processed.",
                     "x-kubernetes-preserve-unknown-fields": true
                   },
                   "no_align_flush_to_interval": {
@@ -944,7 +1076,7 @@
                     "type": "array"
                   },
                   "outputs": {
-                    "description": "Outputs is a list of output aggregate functions to produce.\n\n\nThe following names are allowed:\n\n\n- total - aggregates input counters\n- increase - counts the increase over input counters\n- count_series - counts the input series\n- count_samples - counts the input samples\n- sum_samples - sums the input samples\n- last - the last biggest sample value\n- min - the minimum sample value\n- max - the maximum sample value\n- avg - the average value across all the samples\n- stddev - standard deviation across all the samples\n- stdvar - standard variance across all the samples\n- histogram_bucket - creates VictoriaMetrics histogram for input samples\n- quantiles(phi1, ..., phiN) - quantiles' estimation for phi in the range [0..1]\n\n\nThe output time series will have the following names:\n\n\n  input_name:aggr_<interval>_<output>",
+                    "description": "Outputs is a list of output aggregate functions to produce.\n\nThe following names are allowed:\n\n- total - aggregates input counters\n- increase - counts the increase over input counters\n- count_series - counts the input series\n- count_samples - counts the input samples\n- sum_samples - sums the input samples\n- last - the last biggest sample value\n- min - the minimum sample value\n- max - the maximum sample value\n- avg - the average value across all the samples\n- stddev - standard deviation across all the samples\n- stdvar - standard variance across all the samples\n- histogram_bucket - creates VictoriaMetrics histogram for input samples\n- quantiles(phi1, ..., phiN) - quantiles' estimation for phi in the range [0..1]\n\nThe output time series will have the following names:\n\n  input_name:aggr_<interval>_<output>",
                     "items": {
                       "type": "string"
                     },
@@ -955,7 +1087,7 @@
                     "type": "string"
                   },
                   "without": {
-                    "description": "Without is an optional list of labels, which must be excluded when grouping input series.\n\n\nSee also By.\n\n\nIf neither By nor Without are set, then the Outputs are calculated\nindividually per each input time series.",
+                    "description": "Without is an optional list of labels, which must be excluded when grouping input series.\n\nSee also By.\n\nIf neither By nor Without are set, then the Outputs are calculated\nindividually per each input time series.",
                     "items": {
                       "type": "string"
                     },
@@ -1026,6 +1158,10 @@
           },
           "type": "array"
         },
+        "useDefaultResources": {
+          "description": "UseDefaultResources controls resource settings\nBy default, operator sets built-in resource requirements",
+          "type": "boolean"
+        },
         "useStrictSecurity": {
           "description": "UseStrictSecurity enables strict security mode for component\nit restricts disk writes access\nuses non-root user out of the box\ndrops not needed security permissions",
           "type": "boolean"
@@ -1051,7 +1187,7 @@
                 },
                 "name": {
                   "default": "",
-                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                   "type": "string"
                 },
                 "optional": {
@@ -1125,7 +1261,7 @@
                           },
                           "name": {
                             "default": "",
-                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                             "type": "string"
                           },
                           "optional": {
@@ -1200,7 +1336,7 @@
                           },
                           "name": {
                             "default": "",
-                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nTODO: Add other useful fields. apiVersion, kind, uid?\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names\nTODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
                             "type": "string"
                           },
                           "optional": {
@@ -1223,6 +1359,55 @@
                 "required": [
                   "name"
                 ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "extraEnvsFrom": {
+              "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+              "items": {
+                "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                "properties": {
+                  "configMapRef": {
+                    "description": "The ConfigMap to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the ConfigMap must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "prefix": {
+                    "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                    "type": "string"
+                  },
+                  "secretRef": {
+                    "description": "The Secret to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
                 "type": "object",
                 "additionalProperties": false
               },
@@ -1274,12 +1459,16 @@
               "description": "Resources container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
               "properties": {
                 "claims": {
-                  "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\n\nThis field is immutable. It can only be set for containers.",
+                  "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
                   "items": {
                     "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                     "properties": {
                       "name": {
                         "description": "Name must match the name of one entry in pod.spec.resourceClaims of\nthe Pod where this field is used. It makes that resource available\ninside a container.",
+                        "type": "string"
+                      },
+                      "request": {
+                        "description": "Request is the name chosen for a request in the referenced claim.\nIf empty, everything from the claim is made available, otherwise\nonly the result of this request.",
                         "type": "string"
                       }
                     },
@@ -1379,7 +1568,7 @@
                     "type": "boolean"
                   },
                   "recursiveReadOnly": {
-                    "description": "RecursiveReadOnly specifies whether read-only mounts should be handled\nrecursively.\n\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made\nrecursively read-only.  If this field is set to IfPossible, the mount is made\nrecursively read-only, if it is supported by the container runtime.  If this\nfield is set to Enabled, the mount is made recursively read-only if it is\nsupported by the container runtime, otherwise the pod will not be started and\nan error will be generated to indicate the reason.\n\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to\nNone (or be unspecified, which defaults to None).\n\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
+                    "description": "RecursiveReadOnly specifies whether read-only mounts should be handled\nrecursively.\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made\nrecursively read-only.  If this field is set to IfPossible, the mount is made\nrecursively read-only, if it is supported by the container runtime.  If this\nfield is set to Enabled, the mount is made recursively read-only if it is\nsupported by the container runtime, otherwise the pod will not be started and\nan error will be generated to indicate the reason.\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to\nNone (or be unspecified, which defaults to None).\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
                     "type": "string"
                   },
                   "subPath": {
@@ -1405,7 +1594,7 @@
           "additionalProperties": false
         },
         "volumeMounts": {
-          "description": "VolumeMounts allows configuration of additional VolumeMounts on the output Deployment definition.\nVolumeMounts specified will be appended to other VolumeMounts in the VMSingle container,\nthat are generated as a result of StorageSpec objects.",
+          "description": "VolumeMounts allows configuration of additional VolumeMounts on the output Deployment/StatefulSet definition.\nVolumeMounts specified will be appended to other VolumeMounts in the Application container",
           "items": {
             "description": "VolumeMount describes a mounting of a Volume within a container.",
             "properties": {
@@ -1426,7 +1615,7 @@
                 "type": "boolean"
               },
               "recursiveReadOnly": {
-                "description": "RecursiveReadOnly specifies whether read-only mounts should be handled\nrecursively.\n\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made\nrecursively read-only.  If this field is set to IfPossible, the mount is made\nrecursively read-only, if it is supported by the container runtime.  If this\nfield is set to Enabled, the mount is made recursively read-only if it is\nsupported by the container runtime, otherwise the pod will not be started and\nan error will be generated to indicate the reason.\n\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to\nNone (or be unspecified, which defaults to None).\n\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
+                "description": "RecursiveReadOnly specifies whether read-only mounts should be handled\nrecursively.\n\nIf ReadOnly is false, this field has no meaning and must be unspecified.\n\nIf ReadOnly is true, and this field is set to Disabled, the mount is not made\nrecursively read-only.  If this field is set to IfPossible, the mount is made\nrecursively read-only, if it is supported by the container runtime.  If this\nfield is set to Enabled, the mount is made recursively read-only if it is\nsupported by the container runtime, otherwise the pod will not be started and\nan error will be generated to indicate the reason.\n\nIf this field is set to IfPossible or Enabled, MountPropagation must be set to\nNone (or be unspecified, which defaults to None).\n\nIf this field is not specified, it is treated as an equivalent of Disabled.",
                 "type": "string"
               },
               "subPath": {
@@ -1448,7 +1637,7 @@
           "type": "array"
         },
         "volumes": {
-          "description": "Volumes allows configuration of additional volumes on the output deploy definition.\nVolumes specified will be appended to other volumes that are generated as a result of\nStorageSpec objects.",
+          "description": "Volumes allows configuration of additional volumes on the output Deployment/StatefulSet definition.\nVolumes specified will be appended to other volumes that are generated.\n/ +optional",
           "items": {
             "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
             "required": [
@@ -1460,50 +1649,93 @@
           "type": "array"
         }
       },
-      "required": [
-        "retentionPeriod"
-      ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
       "description": "VMSingleStatus defines the observed state of VMSingle",
       "properties": {
-        "availableReplicas": {
-          "description": "AvailableReplicas Total number of available pods (ready for at least minReadySeconds) targeted by this VMSingle.",
-          "format": "int32",
+        "conditions": {
+          "description": "Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"",
+          "items": {
+            "description": "Condition defines status condition of the resource",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastUpdateTime": {
+                "description": "LastUpdateTime is the last time of given type update.\nThis value is used for status TTL update and removal",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "Type of condition in CamelCase or in name.namespace.resource.victoriametrics.com/CamelCase.",
+                "maxLength": 316,
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "lastUpdateTime",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration defines current generation picked by operator for the\nreconcile",
+          "format": "int64",
           "type": "integer"
         },
         "reason": {
-          "description": "Reason defines a reason in case of update failure",
+          "description": "Reason defines human readable error reason",
           "type": "string"
-        },
-        "replicas": {
-          "description": "ReplicaCount Total number of non-terminated pods targeted by this VMSingle.",
-          "format": "int32",
-          "type": "integer"
         },
         "singleStatus": {
-          "description": "UpdateStatus defines a status of single node rollout",
+          "description": "LegacyStatus is deprecated and will be removed at v0.52.0 version",
           "type": "string"
         },
-        "unavailableReplicas": {
-          "description": "UnavailableReplicas Total number of unavailable pods targeted by this VMSingle.",
-          "format": "int32",
-          "type": "integer"
-        },
-        "updatedReplicas": {
-          "description": "UpdatedReplicas Total number of non-terminated pods targeted by this VMSingle.",
-          "format": "int32",
-          "type": "integer"
+        "updateStatus": {
+          "description": "UpdateStatus defines a status for update rollout",
+          "type": "string"
         }
       },
-      "required": [
-        "availableReplicas",
-        "replicas",
-        "unavailableReplicas",
-        "updatedReplicas"
-      ],
       "type": "object",
       "additionalProperties": false
     }

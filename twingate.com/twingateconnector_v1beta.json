@@ -1,0 +1,144 @@
+{
+  "type": "object",
+  "description": "TwingateConnector represents a Connector in Twingate.",
+  "required": [
+    "spec"
+  ],
+  "properties": {
+    "spec": {
+      "type": "object",
+      "description": "TwingateConnectorSpec defines the desired state of TwingateConnector",
+      "x-kubernetes-validations": [
+        {
+          "rule": "(!has(oldSelf.id) || self.id == oldSelf.id)",
+          "message": "id is immutable once set"
+        },
+        {
+          "rule": "(has(self.image) && !has(self.imagePolicy)) || (!has(self.image) && has(self.imagePolicy)) || (!has(self.image) && !has(self.imagePolicy))",
+          "message": "Can define either `image` or `imagePolicy`, not both."
+        }
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "nullable": true
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 30,
+          "description": "Name of the Connector (optional, if not specified Twingate will give a random name)"
+        },
+        "logLevel": {
+          "type": "integer",
+          "default": 3,
+          "minimum": -1,
+          "maximum": 7,
+          "description": "Log level for the Connector (-1 to 7: -1 for no logs, 0 - least verbose, 7 - most verbose, default: 3)."
+        },
+        "logAnalytics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time connection logs."
+        },
+        "hasStatusNotificationsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable status notifications for the Connector."
+        },
+        "image": {
+          "type": "object",
+          "description": "Image defines the image to use for the Connector.",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "default": "twingate/connector",
+              "description": "Repository to use for the Connector."
+            },
+            "tag": {
+              "type": "string",
+              "default": "1",
+              "description": "Tag to use for the Connector."
+            }
+          },
+          "additionalProperties": false
+        },
+        "imagePolicy": {
+          "type": "object",
+          "description": "ImagePolicy defines the image to use for the Connector and a schedule to keep it up to date.",
+          "required": [
+            "provider"
+          ],
+          "x-kubernetes-validations": [
+            {
+              "rule": "self.provider != \"google\" || (self.provider == \"google\" && !has(self.repository))",
+              "message": "Google provider requires specifying repository."
+            }
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Provider determines how the operator looks for a new connector version.\n  * dockerhub: Check Twingate's official DockerHub repository (`twingate/connector`) for new tags.\n  * google: Check Google Container Registry specified by the `repository` value for new tags.\n",
+              "enum": [
+                "dockerhub",
+                "google"
+              ],
+              "default": "dockerhub"
+            },
+            "repository": {
+              "type": "string",
+              "default": "twingate/connector",
+              "description": "Repository to use for pod's image."
+            },
+            "schedule": {
+              "type": "string",
+              "description": "Cron schedule to check for new versions."
+            },
+            "version": {
+              "type": "string",
+              "description": "Semver version specifier (ex: '^1.0.0'). Uses NPM spec: https://github.com/npm/node-semver#ranges"
+            },
+            "allowPrerelease": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow pre-release versions."
+            }
+          },
+          "additionalProperties": false
+        },
+        "containerExtra": {
+          "type": "object",
+          "description": "Extra container configuration for the Connector Deployment's pod template at `.spec.template.spec.containers`.",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "podExtra": {
+          "type": "object",
+          "description": "Extra pod configuration to be added to the Connector Deployment's pod template at `.spec.template.spec`",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "podAnnotations": {
+          "type": "object",
+          "description": "Extra annotations to add to the Connector Deployment's pod template at `.spec.template.metadata.annotations`.",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "podLabels": {
+          "type": "object",
+          "description": "Extra labels to add to the Connector Deployment's pod template at `.spec.template.metadata.labels`.",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "sidecarContainers": {
+          "type": "array",
+          "description": "SidecarContainers allows injecting additional containers to the Connector Pod.",
+          "items": {
+            "type": "object",
+            "x-kubernetes-preserve-unknown-fields": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "x-kubernetes-preserve-unknown-fields": true
+    }
+  }
+}

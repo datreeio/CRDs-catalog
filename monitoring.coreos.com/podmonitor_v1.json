@@ -31,6 +31,17 @@
           "pattern": "(^0|([0-9]*[.])?[0-9]+((K|M|G|T|E|P)i?)?B)$",
           "type": "string"
         },
+        "fallbackScrapeProtocol": {
+          "description": "The protocol to use if a scrape returns blank, unparseable, or otherwise invalid Content-Type.\n\nIt requires Prometheus >= v3.0.0.",
+          "enum": [
+            "PrometheusProto",
+            "OpenMetricsText0.0.1",
+            "OpenMetricsText1.0.0",
+            "PrometheusText0.0.4",
+            "PrometheusText1.0.0"
+          ],
+          "type": "string"
+        },
         "jobLabel": {
           "description": "The label to use to retrieve the job name from.\n`jobLabel` selects the label from the associated Kubernetes `Pod`\nobject which will be used as the `job` label for all metrics.\n\nFor example if `jobLabel` is set to `foo` and the Kubernetes `Pod`\nobject is labeled with `foo: bar`, then Prometheus adds the `job=\"bar\"`\nlabel to all ingested metrics.\n\nIf the value of this field is empty, the `job` label of the metrics\ndefaults to the namespace and name of the PodMonitor object (e.g. `<namespace>/<name>`).",
           "type": "string"
@@ -644,8 +655,15 @@
                 "type": "string"
               },
               "port": {
-                "description": "Name of the Pod port which this endpoint refers to.\n\nIt takes precedence over `targetPort`.",
+                "description": "The `Pod` port name which exposes the endpoint.\n\nIt takes precedence over the `portNumber` and `targetPort` fields.",
                 "type": "string"
+              },
+              "portNumber": {
+                "description": "The `Pod` port number which exposes the endpoint.",
+                "format": "int32",
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
               },
               "proxyUrl": {
                 "description": "`proxyURL` configures the HTTP Proxy URL (e.g.\n\"http://proxyserver:2195\") to go through when scraping the target.",
@@ -730,7 +748,7 @@
                 "type": "string"
               },
               "scrapeTimeout": {
-                "description": "Timeout after which Prometheus considers the scrape to be failed.\n\nIf empty, Prometheus uses the global scrape timeout unless it is less\nthan the target's scrape interval value in which the latter is used.",
+                "description": "Timeout after which Prometheus considers the scrape to be failed.\n\nIf empty, Prometheus uses the global scrape timeout unless it is less\nthan the target's scrape interval value in which the latter is used.\nThe value cannot be greater than the scrape interval otherwise the operator will reject the resource.",
                 "pattern": "^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$",
                 "type": "string"
               },
@@ -743,7 +761,7 @@
                     "type": "string"
                   }
                 ],
-                "description": "Name or number of the target port of the `Pod` object behind the Service, the\nport must be specified with container port property.\n\nDeprecated: use 'port' instead.",
+                "description": "Name or number of the target port of the `Pod` object behind the Service, the\nport must be specified with container port property.\n\nDeprecated: use 'port' or 'portNumber' instead.",
                 "x-kubernetes-int-or-string": true
               },
               "tlsConfig": {
@@ -949,12 +967,13 @@
         "scrapeProtocols": {
           "description": "`scrapeProtocols` defines the protocols to negotiate during a scrape. It tells clients the\nprotocols supported by Prometheus in order of preference (from most to least preferred).\n\nIf unset, Prometheus uses its default value.\n\nIt requires Prometheus >= v2.49.0.",
           "items": {
-            "description": "ScrapeProtocol represents a protocol used by Prometheus for scraping metrics.\nSupported values are:\n* `OpenMetricsText0.0.1`\n* `OpenMetricsText1.0.0`\n* `PrometheusProto`\n* `PrometheusText0.0.4`",
+            "description": "ScrapeProtocol represents a protocol used by Prometheus for scraping metrics.\nSupported values are:\n* `OpenMetricsText0.0.1`\n* `OpenMetricsText1.0.0`\n* `PrometheusProto`\n* `PrometheusText0.0.4`\n* `PrometheusText1.0.0`",
             "enum": [
               "PrometheusProto",
               "OpenMetricsText0.0.1",
               "OpenMetricsText1.0.0",
-              "PrometheusText0.0.4"
+              "PrometheusText0.0.4",
+              "PrometheusText1.0.0"
             ],
             "type": "string"
           },
@@ -1007,6 +1026,14 @@
           "type": "object",
           "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
+        },
+        "selectorMechanism": {
+          "description": "Mechanism used to select the endpoints to scrape.\nBy default, the selection process relies on relabel configurations to filter the discovered targets.\nAlternatively, you can opt in for role selectors, which may offer better efficiency in large clusters.\nWhich strategy is best for your use case needs to be carefully evaluated.\n\nIt requires Prometheus >= v2.17.0.",
+          "enum": [
+            "RelabelConfig",
+            "RoleSelector"
+          ],
+          "type": "string"
         },
         "targetLimit": {
           "description": "`targetLimit` defines a limit on the number of scraped targets that will\nbe accepted.",

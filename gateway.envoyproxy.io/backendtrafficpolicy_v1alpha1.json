@@ -354,6 +354,12 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "initialJitter": {
+                  "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                  "format": "duration",
+                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                  "type": "string"
+                },
                 "interval": {
                   "default": "3s",
                   "description": "Interval defines the time between active health checks.",
@@ -635,7 +641,19 @@
         "httpUpgrade": {
           "description": "HTTPUpgrade defines the configuration for HTTP protocol upgrades.\nIf not specified, the default upgrade configuration(websocket) will be used.",
           "items": {
+            "description": "ProtocolUpgradeConfig specifies the configuration for protocol upgrades.",
             "properties": {
+              "connect": {
+                "description": "Connect specifies the configuration for the CONNECT config.\nThis is allowed only when type is CONNECT.",
+                "properties": {
+                  "terminate": {
+                    "description": "Terminate the CONNECT request, and forwards the payload as raw TCP data.",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "type": {
                 "description": "Type is the case-insensitive type of protocol upgrade.\ne.g. `websocket`, `CONNECT`, `spdy/3.1` etc.",
                 "type": "string"
@@ -645,6 +663,12 @@
               "type"
             ],
             "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "The connect configuration is only allowed when the type is CONNECT.",
+                "rule": "!has(self.connect) || self.type == 'CONNECT'"
+              }
+            ],
             "additionalProperties": false
           },
           "type": "array"
@@ -728,6 +752,33 @@
               ],
               "additionalProperties": false
             },
+            "endpointOverride": {
+              "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+              "properties": {
+                "extractFrom": {
+                  "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                  "items": {
+                    "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                    "properties": {
+                      "header": {
+                        "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 10,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "extractFrom"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "slowStart": {
               "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
               "properties": {
@@ -751,6 +802,37 @@
                 "RoundRobin"
               ],
               "type": "string"
+            },
+            "zoneAware": {
+              "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+              "properties": {
+                "preferLocal": {
+                  "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                  "properties": {
+                    "force": {
+                      "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                      "properties": {
+                        "minEndpointsInZoneThreshold": {
+                          "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                          "format": "int32",
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minEndpointsThreshold": {
+                      "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                      "format": "int64",
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "required": [
@@ -765,6 +847,10 @@
             {
               "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
               "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+            },
+            {
+              "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+              "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
             }
           ],
           "additionalProperties": false
@@ -1405,7 +1491,7 @@
                     "type": "string"
                   },
                   "path": {
-                    "description": "Path defines parameters used to modify the path of the incoming request.\nThe modified path is then used to construct the `Location` header. When\nempty, the request path is used as-is.",
+                    "description": "Path defines parameters used to modify the path of the incoming request.\nThe modified path is then used to construct the `Location` header. When\nempty, the request path is used as-is.\nOnly ReplaceFullPath path modifier is supported currently.",
                     "properties": {
                       "replaceFullPath": {
                         "description": "ReplaceFullPath specifies the value with which to replace the full path\nof a request during a rewrite or redirect.",
@@ -1431,6 +1517,10 @@
                     ],
                     "type": "object",
                     "x-kubernetes-validations": [
+                      {
+                        "message": "only ReplaceFullPath is supported for path.type",
+                        "rule": "self.type == 'ReplaceFullPath'"
+                      },
                       {
                         "message": "replaceFullPath must be specified when type is set to 'ReplaceFullPath'",
                         "rule": "self.type == 'ReplaceFullPath' ? has(self.replaceFullPath) : true"
@@ -1482,7 +1572,7 @@
                 "description": "Response configuration.",
                 "properties": {
                   "body": {
-                    "description": "Body of the Custom Response",
+                    "description": "Body of the Custom Response\nSupports Envoy command operators for dynamic content (see https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#command-operators).",
                     "properties": {
                       "inline": {
                         "description": "Inline contains the value as an inline string.",
@@ -1589,6 +1679,11 @@
         "retry": {
           "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
           "properties": {
+            "numAttemptsPerPriority": {
+              "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+              "format": "int32",
+              "type": "integer"
+            },
             "numRetries": {
               "default": 2,
               "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -1647,6 +1742,7 @@
                       "5xx",
                       "gateway-error",
                       "reset",
+                      "reset-before-request",
                       "connect-failure",
                       "retriable-4xx",
                       "refused-stream",

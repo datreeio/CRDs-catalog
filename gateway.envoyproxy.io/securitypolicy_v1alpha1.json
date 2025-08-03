@@ -91,6 +91,14 @@
                 "additionalProperties": false
               },
               "type": "array"
+            },
+            "forwardClientIDHeader": {
+              "description": "ForwardClientIDHeader is the name of the header to forward the client identity to the backend\nservice. The header will be added to the request with the client id as the value.",
+              "type": "string"
+            },
+            "sanitize": {
+              "description": "Sanitize indicates whether to remove the API key from the request before forwarding it to the backend service.",
+              "type": "boolean"
             }
           },
           "required": [
@@ -165,7 +173,7 @@
                     "description": "Principal specifies the client identity of a request.\nIf there are multiple principal types, all principals must match for the rule to match.\nFor example, if there are two principals: one for client IP and one for JWT claim,\nthe rule will match only if both the client IP and the JWT claim match.",
                     "properties": {
                       "clientCIDRs": {
-                        "description": "ClientCIDRs are the IP CIDR ranges of the client.\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"\n\nIf multiple CIDR ranges are specified, one of the CIDR ranges must match\nthe client IP for the rule to match.\n\nThe client IP is inferred from the X-Forwarded-For header, a custom header,\nor the proxy protocol.\nYou can use the `ClientIPDetection` or the `EnableProxyProtocol` field in\nthe `ClientTrafficPolicy` to configure how the client IP is detected.",
+                        "description": "ClientCIDRs are the IP CIDR ranges of the client.\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"\n\nIf multiple CIDR ranges are specified, one of the CIDR ranges must match\nthe client IP for the rule to match.\n\nThe client IP is inferred from the X-Forwarded-For header, a custom header,\nor the proxy protocol.\nYou can use the `ClientIPDetection` or the `ProxyProtocol` field in\nthe `ClientTrafficPolicy` to configure how the client IP is detected.",
                         "items": {
                           "description": "CIDR defines a CIDR Address range.\nA CIDR can be an IPv4 address range such as \"192.168.1.0/24\" or an IPv6 address range such as \"2001:0db8:11a3:09d7::/64\".",
                           "pattern": "((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\\/([0-9]+))",
@@ -424,7 +432,7 @@
             },
             "failOpen": {
               "default": false,
-              "description": "FailOpen is a switch used to control the behavior when a response from the External Authorization service cannot be obtained.\nIf FailOpen is set to true, the system allows the traffic to pass through.\nOtherwise, if it is set to false or not set (defaulting to false),\nthe system blocks the traffic and returns a HTTP 5xx error, reflecting a fail-closed approach.\nThis setting determines whether to prioritize accessibility over strict security in case of authorization service failure.",
+              "description": "FailOpen is a switch used to control the behavior when a response from the External Authorization service cannot be obtained.\nIf FailOpen is set to true, the system allows the traffic to pass through.\nOtherwise, if it is set to false or not set (defaulting to false),\nthe system blocks the traffic and returns a HTTP 5xx error, reflecting a fail-closed approach.\nThis setting determines whether to prioritize accessibility over strict security in case of authorization service failure.\n\nIf set to true, the External Authorization will also be bypassed if its configuration is invalid.",
               "type": "boolean"
             },
             "grpc": {
@@ -787,6 +795,12 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "initialJitter": {
+                              "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                              "format": "duration",
+                              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                              "type": "string"
+                            },
                             "interval": {
                               "default": "3s",
                               "description": "Interval defines the time between active health checks.",
@@ -1144,6 +1158,33 @@
                           ],
                           "additionalProperties": false
                         },
+                        "endpointOverride": {
+                          "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                          "properties": {
+                            "extractFrom": {
+                              "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                              "items": {
+                                "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                "properties": {
+                                  "header": {
+                                    "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "maxItems": 10,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "extractFrom"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
                         "slowStart": {
                           "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                           "properties": {
@@ -1167,6 +1208,37 @@
                             "RoundRobin"
                           ],
                           "type": "string"
+                        },
+                        "zoneAware": {
+                          "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                          "properties": {
+                            "preferLocal": {
+                              "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                              "properties": {
+                                "force": {
+                                  "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                  "properties": {
+                                    "minEndpointsInZoneThreshold": {
+                                      "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                      "format": "int32",
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "minEndpointsThreshold": {
+                                  "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                  "format": "int64",
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -1181,6 +1253,10 @@
                         {
                           "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                           "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                        },
+                        {
+                          "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                          "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                         }
                       ],
                       "additionalProperties": false
@@ -1206,6 +1282,11 @@
                     "retry": {
                       "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                       "properties": {
+                        "numAttemptsPerPriority": {
+                          "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
                         "numRetries": {
                           "default": 2,
                           "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -1264,6 +1345,7 @@
                                   "5xx",
                                   "gateway-error",
                                   "reset",
+                                  "reset-before-request",
                                   "connect-failure",
                                   "retriable-4xx",
                                   "refused-stream",
@@ -1361,12 +1443,12 @@
                   "rule": "has(self.backendRef) || self.backendRefs.size() > 0"
                 },
                 {
-                  "message": "BackendRefs only supports Service and Backend kind.",
-                  "rule": "has(self.backendRefs) ? self.backendRefs.all(f, f.kind == 'Service' || f.kind == 'Backend') : true"
+                  "message": "BackendRefs only supports Service, ServiceImport, and Backend kind.",
+                  "rule": "has(self.backendRefs) ? self.backendRefs.all(f, f.kind == 'Service' || f.kind == 'ServiceImport' || f.kind == 'Backend') : true"
                 },
                 {
-                  "message": "BackendRefs only supports Core and gateway.envoyproxy.io group.",
-                  "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'gateway.envoyproxy.io')) : true"
+                  "message": "BackendRefs only supports Core, multicluster.x-k8s.io, and gateway.envoyproxy.io groups.",
+                  "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'multicluster.x-k8s.io' || f.group == 'gateway.envoyproxy.io')) : true"
                 }
               ],
               "additionalProperties": false
@@ -1738,6 +1820,12 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "initialJitter": {
+                              "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                              "format": "duration",
+                              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                              "type": "string"
+                            },
                             "interval": {
                               "default": "3s",
                               "description": "Interval defines the time between active health checks.",
@@ -2095,6 +2183,33 @@
                           ],
                           "additionalProperties": false
                         },
+                        "endpointOverride": {
+                          "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                          "properties": {
+                            "extractFrom": {
+                              "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                              "items": {
+                                "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                "properties": {
+                                  "header": {
+                                    "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "maxItems": 10,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "extractFrom"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
                         "slowStart": {
                           "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                           "properties": {
@@ -2118,6 +2233,37 @@
                             "RoundRobin"
                           ],
                           "type": "string"
+                        },
+                        "zoneAware": {
+                          "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                          "properties": {
+                            "preferLocal": {
+                              "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                              "properties": {
+                                "force": {
+                                  "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                  "properties": {
+                                    "minEndpointsInZoneThreshold": {
+                                      "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                      "format": "int32",
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "minEndpointsThreshold": {
+                                  "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                  "format": "int64",
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -2132,6 +2278,10 @@
                         {
                           "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                           "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                        },
+                        {
+                          "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                          "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                         }
                       ],
                       "additionalProperties": false
@@ -2157,6 +2307,11 @@
                     "retry": {
                       "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                       "properties": {
+                        "numAttemptsPerPriority": {
+                          "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
                         "numRetries": {
                           "default": 2,
                           "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -2215,6 +2370,7 @@
                                   "5xx",
                                   "gateway-error",
                                   "reset",
+                                  "reset-before-request",
                                   "connect-failure",
                                   "retriable-4xx",
                                   "refused-stream",
@@ -2323,12 +2479,12 @@
                   "rule": "has(self.backendRef) || self.backendRefs.size() > 0"
                 },
                 {
-                  "message": "BackendRefs only supports Service and Backend kind.",
-                  "rule": "has(self.backendRefs) ? self.backendRefs.all(f, f.kind == 'Service' || f.kind == 'Backend') : true"
+                  "message": "BackendRefs only supports Service, ServiceImport, and Backend kind.",
+                  "rule": "has(self.backendRefs) ? self.backendRefs.all(f, f.kind == 'Service' || f.kind == 'ServiceImport' || f.kind == 'Backend') : true"
                 },
                 {
-                  "message": "BackendRefs only supports Core and gateway.envoyproxy.io group.",
-                  "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'gateway.envoyproxy.io')) : true"
+                  "message": "BackendRefs only supports Core, multicluster.x-k8s.io, and gateway.envoyproxy.io groups.",
+                  "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'multicluster.x-k8s.io' || f.group == 'gateway.envoyproxy.io')) : true"
                 }
               ],
               "additionalProperties": false
@@ -2872,6 +3028,12 @@
                                     "type": "object",
                                     "additionalProperties": false
                                   },
+                                  "initialJitter": {
+                                    "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                                    "format": "duration",
+                                    "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                    "type": "string"
+                                  },
                                   "interval": {
                                     "default": "3s",
                                     "description": "Interval defines the time between active health checks.",
@@ -3229,6 +3391,33 @@
                                 ],
                                 "additionalProperties": false
                               },
+                              "endpointOverride": {
+                                "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                                "properties": {
+                                  "extractFrom": {
+                                    "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                                    "items": {
+                                      "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                      "properties": {
+                                        "header": {
+                                          "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "type": "object",
+                                      "additionalProperties": false
+                                    },
+                                    "maxItems": 10,
+                                    "minItems": 1,
+                                    "type": "array"
+                                  }
+                                },
+                                "required": [
+                                  "extractFrom"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
                               "slowStart": {
                                 "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                                 "properties": {
@@ -3252,6 +3441,37 @@
                                   "RoundRobin"
                                 ],
                                 "type": "string"
+                              },
+                              "zoneAware": {
+                                "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                                "properties": {
+                                  "preferLocal": {
+                                    "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                                    "properties": {
+                                      "force": {
+                                        "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                        "properties": {
+                                          "minEndpointsInZoneThreshold": {
+                                            "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                            "format": "int32",
+                                            "type": "integer"
+                                          }
+                                        },
+                                        "type": "object",
+                                        "additionalProperties": false
+                                      },
+                                      "minEndpointsThreshold": {
+                                        "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                        "format": "int64",
+                                        "type": "integer"
+                                      }
+                                    },
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -3266,6 +3486,10 @@
                               {
                                 "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                                 "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                              },
+                              {
+                                "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                                "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                               }
                             ],
                             "additionalProperties": false
@@ -3291,6 +3515,11 @@
                           "retry": {
                             "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                             "properties": {
+                              "numAttemptsPerPriority": {
+                                "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                                "format": "int32",
+                                "type": "integer"
+                              },
                               "numRetries": {
                                 "default": 2,
                                 "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -3349,6 +3578,7 @@
                                         "5xx",
                                         "gateway-error",
                                         "reset",
+                                        "reset-before-request",
                                         "connect-failure",
                                         "retriable-4xx",
                                         "refused-stream",
@@ -3501,9 +3731,47 @@
           "description": "OIDC defines the configuration for the OpenID Connect (OIDC) authentication.",
           "properties": {
             "clientID": {
-              "description": "The client ID to be used in the OIDC\n[Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).",
+              "description": "The client ID to be used in the OIDC\n[Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).\n\nOnly one of clientID or clientIDRef must be set.",
               "minLength": 1,
               "type": "string"
+            },
+            "clientIDRef": {
+              "description": "The Kubernetes secret which contains the client ID to be used in the\n[Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).\nExactly one of clientID or clientIDRef must be set.\nThis is an Opaque secret. The client ID should be stored in the key \"client-id\".\n\nOnly one of clientID or clientIDRef must be set.",
+              "properties": {
+                "group": {
+                  "default": "",
+                  "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                  "maxLength": 253,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "Secret",
+                  "description": "Kind is kind of the referent. For example \"Secret\".",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name is the name of the referent.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
             },
             "clientSecret": {
               "description": "The Kubernetes secret which contains the OIDC client secret to be used in the\n[Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).\n\nThis is an Opaque secret. The client secret should be stored in the key\n\"client-secret\".",
@@ -3540,6 +3808,22 @@
               "required": [
                 "name"
               ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "cookieConfig": {
+              "description": "CookieConfigs allows setting the SameSite attribute for OIDC cookies.\nBy default, its unset.",
+              "properties": {
+                "sameSite": {
+                  "default": "Strict",
+                  "enum": [
+                    "Lax",
+                    "Strict",
+                    "None"
+                  ],
+                  "type": "string"
+                }
+              },
               "type": "object",
               "additionalProperties": false
             },
@@ -3996,6 +4280,12 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "initialJitter": {
+                              "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                              "format": "duration",
+                              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                              "type": "string"
+                            },
                             "interval": {
                               "default": "3s",
                               "description": "Interval defines the time between active health checks.",
@@ -4353,6 +4643,33 @@
                           ],
                           "additionalProperties": false
                         },
+                        "endpointOverride": {
+                          "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                          "properties": {
+                            "extractFrom": {
+                              "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                              "items": {
+                                "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                "properties": {
+                                  "header": {
+                                    "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "maxItems": 10,
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "extractFrom"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
                         "slowStart": {
                           "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                           "properties": {
@@ -4376,6 +4693,37 @@
                             "RoundRobin"
                           ],
                           "type": "string"
+                        },
+                        "zoneAware": {
+                          "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                          "properties": {
+                            "preferLocal": {
+                              "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                              "properties": {
+                                "force": {
+                                  "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                  "properties": {
+                                    "minEndpointsInZoneThreshold": {
+                                      "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                      "format": "int32",
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "minEndpointsThreshold": {
+                                  "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                  "format": "int64",
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -4390,6 +4738,10 @@
                         {
                           "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                           "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                        },
+                        {
+                          "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                          "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                         }
                       ],
                       "additionalProperties": false
@@ -4415,6 +4767,11 @@
                     "retry": {
                       "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                       "properties": {
+                        "numAttemptsPerPriority": {
+                          "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
                         "numRetries": {
                           "default": 2,
                           "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -4473,6 +4830,7 @@
                                   "5xx",
                                   "gateway-error",
                                   "reset",
+                                  "reset-before-request",
                                   "connect-failure",
                                   "retriable-4xx",
                                   "refused-stream",
@@ -4562,6 +4920,10 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "endSessionEndpoint": {
+                  "description": "The OIDC Provider's [end session endpoint](https://openid.net/specs/openid-connect-core-1_0.html#RPLogout).\n\nIf the end session endpoint is provided, EG will use it to log out the user from the OIDC Provider when the user accesses the logout path.\nEG will also try to discover the end session endpoint from the provider's [Well-Known Configuration Endpoint](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse) when authorizationEndpoint or tokenEndpoint is not provided.",
+                  "type": "string"
+                },
                 "issuer": {
                   "description": "The OIDC Provider's [issuer identifier](https://openid.net/specs/openid-connect-discovery-1_0.html#IssuerDiscovery).\nIssuer MUST be a URI RFC 3986 [RFC3986] with a scheme component that MUST\nbe https, a host component, and optionally, port and path components and\nno query or fragment components.",
                   "minLength": 1,
@@ -4616,11 +4978,16 @@
             }
           },
           "required": [
-            "clientID",
             "clientSecret",
             "provider"
           ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "only one of clientID or clientIDRef must be set",
+              "rule": "(has(self.clientID) && !has(self.clientIDRef)) || (!has(self.clientID) && has(self.clientIDRef))"
+            }
+          ],
           "additionalProperties": false
         },
         "targetRef": {
@@ -4791,20 +5158,12 @@
           "rule": "has(self.targetRef) ? self.targetRef.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute'] : true"
         },
         {
-          "message": "this policy does not yet support the sectionName field",
-          "rule": "has(self.targetRef) ? !has(self.targetRef.sectionName) : true"
-        },
-        {
           "message": "this policy can only have a targetRefs[*].group of gateway.networking.k8s.io",
           "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, ref.group == 'gateway.networking.k8s.io') : true "
         },
         {
           "message": "this policy can only have a targetRefs[*].kind of Gateway/HTTPRoute/GRPCRoute",
           "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, ref.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute']) : true "
-        },
-        {
-          "message": "this policy does not yet support the sectionName field",
-          "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, !has(ref.sectionName)) : true"
         },
         {
           "message": "if authorization.rules.principal.jwt is used, jwt must be defined",

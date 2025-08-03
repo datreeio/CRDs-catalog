@@ -200,11 +200,6 @@
           "format": "int32",
           "type": "integer"
         },
-        "disableLuaValidation": {
-          "default": false,
-          "description": "DisableLuaValidation disables the Lua script validation for Lua EnvoyExtensionPolicies",
-          "type": "boolean"
-        },
         "extraArgs": {
           "description": "ExtraArgs defines additional command line options that are provided to Envoy.\nMore info: https://www.envoyproxy.io/docs/envoy/latest/operations/cli#command-line-options\nNote: some command line options are used internally(e.g. --log-level) so they cannot be provided here.",
           "items": {
@@ -343,6 +338,14 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "luaValidation": {
+          "description": "LuaValidation determines strictness of the Lua script validation for Lua EnvoyExtensionPolicies\nDefault: Strict",
+          "enum": [
+            "Strict",
+            "Disabled"
+          ],
+          "type": "string"
         },
         "mergeGateways": {
           "description": "MergeGateways defines if Gateway resources should be merged onto the same Envoy Proxy Infrastructure.\nSetting this field to true would merge all Gateway Listeners under the parent Gateway Class.\nThis means that the port, protocol and hostname tuple must be unique for every listener.\nIf a duplicate listener is detected, the newer listener (based on timestamp) will be rejected and its status will be updated with a \"Accepted=False\" condition.",
@@ -493,8 +496,24 @@
                           "type": "array"
                         },
                         "image": {
-                          "description": "Image specifies the EnvoyProxy container image to be used, instead of the default image.",
-                          "type": "string"
+                          "description": "Image specifies the EnvoyProxy container image to be used including a tag, instead of the default image.\nThis field is mutually exclusive with ImageRepository.",
+                          "type": "string",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "Image must include a tag and allowed characters only (e.g., 'repo:tag').",
+                              "rule": "self.matches('^[a-zA-Z0-9._/-]+:[a-zA-Z0-9._-]+$')"
+                            }
+                          ]
+                        },
+                        "imageRepository": {
+                          "description": "ImageRepository specifies the container image repository to be used without specifying a tag.\nThe default tag will be used.\nThis field is mutually exclusive with Image.",
+                          "type": "string",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "ImageRepository must contain only allowed characters and must not include a tag or any colons.",
+                              "rule": "self.matches('^[a-zA-Z0-9._/-]+$')"
+                            }
+                          ]
                         },
                         "resources": {
                           "description": "Resources required by this container.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
@@ -750,6 +769,12 @@
                         }
                       },
                       "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "Either image or imageRepository can be set.",
+                          "rule": "!has(self.image) || !has(self.imageRepository)"
+                        }
+                      ],
                       "additionalProperties": false
                     },
                     "name": {
@@ -3563,8 +3588,24 @@
                           "type": "array"
                         },
                         "image": {
-                          "description": "Image specifies the EnvoyProxy container image to be used, instead of the default image.",
-                          "type": "string"
+                          "description": "Image specifies the EnvoyProxy container image to be used including a tag, instead of the default image.\nThis field is mutually exclusive with ImageRepository.",
+                          "type": "string",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "Image must include a tag and allowed characters only (e.g., 'repo:tag').",
+                              "rule": "self.matches('^[a-zA-Z0-9._/-]+:[a-zA-Z0-9._-]+$')"
+                            }
+                          ]
+                        },
+                        "imageRepository": {
+                          "description": "ImageRepository specifies the container image repository to be used without specifying a tag.\nThe default tag will be used.\nThis field is mutually exclusive with Image.",
+                          "type": "string",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "ImageRepository must contain only allowed characters and must not include a tag or any colons.",
+                              "rule": "self.matches('^[a-zA-Z0-9._/-]+$')"
+                            }
+                          ]
                         },
                         "resources": {
                           "description": "Resources required by this container.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
@@ -3820,6 +3861,12 @@
                         }
                       },
                       "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "Either image or imageRepository can be set.",
+                          "rule": "!has(self.image) || !has(self.imageRepository)"
+                        }
+                      ],
                       "additionalProperties": false
                     },
                     "initContainers": {
@@ -8495,6 +8542,10 @@
                         }
                       ]
                     },
+                    "name": {
+                      "description": "Name of the horizontalPodAutoScaler.\nWhen unset, this defaults to an autogenerated name.",
+                      "type": "string"
+                    },
                     "patch": {
                       "description": "Patch defines how to perform the patch operation to the HorizontalPodAutoscaler",
                       "properties": {
@@ -8552,6 +8603,10 @@
                       ],
                       "description": "MinAvailable specifies the minimum amount of pods (can be expressed as integers or as a percentage) that must be available at all times during voluntary disruptions,\nsuch as node drains or updates. This setting ensures that your envoy proxy maintains a certain level of availability\nand resilience during maintenance operations. Cannot be combined with maxUnavailable.",
                       "x-kubernetes-int-or-string": true
+                    },
+                    "name": {
+                      "description": "Name of the podDisruptionBudget.\nWhen unset, this defaults to an autogenerated name.",
+                      "type": "string"
                     },
                     "patch": {
                       "description": "Patch defines how to perform the patch operation to the PodDisruptionBudget",
@@ -8680,6 +8735,17 @@
                       "rule": "!has(self.loadBalancerIP) || self.type == 'LoadBalancer'"
                     }
                   ],
+                  "additionalProperties": false
+                },
+                "envoyServiceAccount": {
+                  "description": "EnvoyServiceAccount defines the desired state of the Envoy service account resource.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the Service Account.\nWhen unset, this defaults to an autogenerated name.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
                   "additionalProperties": false
                 },
                 "useListenerPortAsContainerPort": {
@@ -9157,6 +9223,12 @@
                                               "type": "object",
                                               "additionalProperties": false
                                             },
+                                            "initialJitter": {
+                                              "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                                              "format": "duration",
+                                              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                              "type": "string"
+                                            },
                                             "interval": {
                                               "default": "3s",
                                               "description": "Interval defines the time between active health checks.",
@@ -9514,6 +9586,33 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "endpointOverride": {
+                                          "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                                          "properties": {
+                                            "extractFrom": {
+                                              "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                                              "items": {
+                                                "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                                "properties": {
+                                                  "header": {
+                                                    "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "type": "object",
+                                                "additionalProperties": false
+                                              },
+                                              "maxItems": 10,
+                                              "minItems": 1,
+                                              "type": "array"
+                                            }
+                                          },
+                                          "required": [
+                                            "extractFrom"
+                                          ],
+                                          "type": "object",
+                                          "additionalProperties": false
+                                        },
                                         "slowStart": {
                                           "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                                           "properties": {
@@ -9537,6 +9636,37 @@
                                             "RoundRobin"
                                           ],
                                           "type": "string"
+                                        },
+                                        "zoneAware": {
+                                          "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                                          "properties": {
+                                            "preferLocal": {
+                                              "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                                              "properties": {
+                                                "force": {
+                                                  "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                                  "properties": {
+                                                    "minEndpointsInZoneThreshold": {
+                                                      "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                                      "format": "int32",
+                                                      "type": "integer"
+                                                    }
+                                                  },
+                                                  "type": "object",
+                                                  "additionalProperties": false
+                                                },
+                                                "minEndpointsThreshold": {
+                                                  "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                                  "format": "int64",
+                                                  "type": "integer"
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "type": "object",
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -9551,6 +9681,10 @@
                                         {
                                           "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                                           "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                                        },
+                                        {
+                                          "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                                          "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                                         }
                                       ],
                                       "additionalProperties": false
@@ -9576,6 +9710,11 @@
                                     "retry": {
                                       "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                                       "properties": {
+                                        "numAttemptsPerPriority": {
+                                          "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                                          "format": "int32",
+                                          "type": "integer"
+                                        },
                                         "numRetries": {
                                           "default": 2,
                                           "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -9634,6 +9773,7 @@
                                                   "5xx",
                                                   "gateway-error",
                                                   "reset",
+                                                  "reset-before-request",
                                                   "connect-failure",
                                                   "retriable-4xx",
                                                   "refused-stream",
@@ -10165,6 +10305,12 @@
                                               "type": "object",
                                               "additionalProperties": false
                                             },
+                                            "initialJitter": {
+                                              "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                                              "format": "duration",
+                                              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                              "type": "string"
+                                            },
                                             "interval": {
                                               "default": "3s",
                                               "description": "Interval defines the time between active health checks.",
@@ -10522,6 +10668,33 @@
                                           ],
                                           "additionalProperties": false
                                         },
+                                        "endpointOverride": {
+                                          "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                                          "properties": {
+                                            "extractFrom": {
+                                              "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                                              "items": {
+                                                "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                                "properties": {
+                                                  "header": {
+                                                    "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "type": "object",
+                                                "additionalProperties": false
+                                              },
+                                              "maxItems": 10,
+                                              "minItems": 1,
+                                              "type": "array"
+                                            }
+                                          },
+                                          "required": [
+                                            "extractFrom"
+                                          ],
+                                          "type": "object",
+                                          "additionalProperties": false
+                                        },
                                         "slowStart": {
                                           "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                                           "properties": {
@@ -10545,6 +10718,37 @@
                                             "RoundRobin"
                                           ],
                                           "type": "string"
+                                        },
+                                        "zoneAware": {
+                                          "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                                          "properties": {
+                                            "preferLocal": {
+                                              "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                                              "properties": {
+                                                "force": {
+                                                  "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                                  "properties": {
+                                                    "minEndpointsInZoneThreshold": {
+                                                      "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                                      "format": "int32",
+                                                      "type": "integer"
+                                                    }
+                                                  },
+                                                  "type": "object",
+                                                  "additionalProperties": false
+                                                },
+                                                "minEndpointsThreshold": {
+                                                  "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                                  "format": "int64",
+                                                  "type": "integer"
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "type": "object",
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": [
@@ -10559,6 +10763,10 @@
                                         {
                                           "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                                           "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                                        },
+                                        {
+                                          "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                                          "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                                         }
                                       ],
                                       "additionalProperties": false
@@ -10584,6 +10792,11 @@
                                     "retry": {
                                       "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                                       "properties": {
+                                        "numAttemptsPerPriority": {
+                                          "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                                          "format": "int32",
+                                          "type": "integer"
+                                        },
                                         "numRetries": {
                                           "default": 2,
                                           "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -10642,6 +10855,7 @@
                                                   "5xx",
                                                   "gateway-error",
                                                   "reset",
+                                                  "reset-before-request",
                                                   "connect-failure",
                                                   "retriable-4xx",
                                                   "refused-stream",
@@ -10828,6 +11042,10 @@
             "metrics": {
               "description": "Metrics defines metrics configuration for managed proxies.",
               "properties": {
+                "clusterStatName": {
+                  "description": "ClusterStatName defines the value of cluster alt_stat_name, determining how cluster stats are named.\nFor more details, see envoy docs: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto.html\nThe supported operators for this pattern are:\n%ROUTE_NAME%: name of Gateway API xRoute resource\n%ROUTE_NAMESPACE%: namespace of Gateway API xRoute resource\n%ROUTE_KIND%: kind of Gateway API xRoute resource\n%ROUTE_RULE_NAME%: name of the Gateway API xRoute section\n%ROUTE_RULE_NUMBER%: name of the Gateway API xRoute section\n%BACKEND_REFS%: names of all backends referenced in <NAMESPACE>/<NAME>|<NAMESPACE>/<NAME>|... format\nOnly xDS Clusters created for HTTPRoute and GRPCRoute are currently supported.\nDefault: %ROUTE_KIND%/%ROUTE_NAMESPACE%/%ROUTE_NAME%/rule/%ROUTE_RULE_NUMBER%\nExample: httproute/my-ns/my-route/rule/0",
+                  "type": "string"
+                },
                 "enablePerEndpointStats": {
                   "description": "EnablePerEndpointStats enables per endpoint envoy stats metrics.\nPlease use with caution.",
                   "type": "boolean"
@@ -11273,6 +11491,12 @@
                                         "type": "object",
                                         "additionalProperties": false
                                       },
+                                      "initialJitter": {
+                                        "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                                        "format": "duration",
+                                        "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                        "type": "string"
+                                      },
                                       "interval": {
                                         "default": "3s",
                                         "description": "Interval defines the time between active health checks.",
@@ -11630,6 +11854,33 @@
                                     ],
                                     "additionalProperties": false
                                   },
+                                  "endpointOverride": {
+                                    "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                                    "properties": {
+                                      "extractFrom": {
+                                        "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                                        "items": {
+                                          "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                          "properties": {
+                                            "header": {
+                                              "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "type": "object",
+                                          "additionalProperties": false
+                                        },
+                                        "maxItems": 10,
+                                        "minItems": 1,
+                                        "type": "array"
+                                      }
+                                    },
+                                    "required": [
+                                      "extractFrom"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
                                   "slowStart": {
                                     "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                                     "properties": {
@@ -11653,6 +11904,37 @@
                                       "RoundRobin"
                                     ],
                                     "type": "string"
+                                  },
+                                  "zoneAware": {
+                                    "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                                    "properties": {
+                                      "preferLocal": {
+                                        "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                                        "properties": {
+                                          "force": {
+                                            "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                            "properties": {
+                                              "minEndpointsInZoneThreshold": {
+                                                "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                                "format": "int32",
+                                                "type": "integer"
+                                              }
+                                            },
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "minEndpointsThreshold": {
+                                            "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                            "format": "int64",
+                                            "type": "integer"
+                                          }
+                                        },
+                                        "type": "object",
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "type": "object",
+                                    "additionalProperties": false
                                   }
                                 },
                                 "required": [
@@ -11667,6 +11949,10 @@
                                   {
                                     "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                                     "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                                  },
+                                  {
+                                    "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                                    "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                                   }
                                 ],
                                 "additionalProperties": false
@@ -11692,6 +11978,11 @@
                               "retry": {
                                 "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                                 "properties": {
+                                  "numAttemptsPerPriority": {
+                                    "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                                    "format": "int32",
+                                    "type": "integer"
+                                  },
                                   "numRetries": {
                                     "default": 2,
                                     "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -11750,6 +12041,7 @@
                                             "5xx",
                                             "gateway-error",
                                             "reset",
+                                            "reset-before-request",
                                             "connect-failure",
                                             "retriable-4xx",
                                             "refused-stream",
@@ -12337,6 +12629,12 @@
                                   "type": "object",
                                   "additionalProperties": false
                                 },
+                                "initialJitter": {
+                                  "description": "InitialJitter defines the maximum time Envoy will wait before the first health check.\nEnvoy will randomly select a value between 0 and the initial jitter value.",
+                                  "format": "duration",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
                                 "interval": {
                                   "default": "3s",
                                   "description": "Interval defines the time between active health checks.",
@@ -12694,6 +12992,33 @@
                               ],
                               "additionalProperties": false
                             },
+                            "endpointOverride": {
+                              "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
+                              "properties": {
+                                "extractFrom": {
+                                  "description": "ExtractFrom defines the sources to extract endpoint override information from.",
+                                  "items": {
+                                    "description": "EndpointOverrideExtractFrom defines a source to extract endpoint override information from.",
+                                    "properties": {
+                                      "header": {
+                                        "description": "Header defines the header to get the override endpoint addresses.\nThe header value must specify at least one endpoint in `IP:Port` format or multiple endpoints in `IP:Port,IP:Port,...` format.\nFor example `10.0.0.5:8080` or `[2600:4040:5204::1574:24ae]:80`.\nThe IPv6 address is enclosed in square brackets.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "maxItems": 10,
+                                  "minItems": 1,
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "extractFrom"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "slowStart": {
                               "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
                               "properties": {
@@ -12717,6 +13042,37 @@
                                 "RoundRobin"
                               ],
                               "type": "string"
+                            },
+                            "zoneAware": {
+                              "description": "ZoneAware defines the configuration related to the distribution of requests between locality zones.",
+                              "properties": {
+                                "preferLocal": {
+                                  "description": "PreferLocalZone configures zone-aware routing to prefer sending traffic to the local locality zone.",
+                                  "properties": {
+                                    "force": {
+                                      "description": "ForceLocalZone defines override configuration for forcing all traffic to stay within the local zone instead of the default behavior\nwhich maintains equal distribution among upstream endpoints while sending as much traffic as possible locally.",
+                                      "properties": {
+                                        "minEndpointsInZoneThreshold": {
+                                          "description": "MinEndpointsInZoneThreshold is the minimum number of upstream endpoints in the local zone required to honor the forceLocalZone\noverride. This is useful for protecting zones with fewer endpoints.",
+                                          "format": "int32",
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "type": "object",
+                                      "additionalProperties": false
+                                    },
+                                    "minEndpointsThreshold": {
+                                      "description": "MinEndpointsThreshold is the minimum number of total upstream endpoints across all zones required to enable zone-aware routing.",
+                                      "format": "int64",
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
                             }
                           },
                           "required": [
@@ -12731,6 +13087,10 @@
                             {
                               "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
                               "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                            },
+                            {
+                              "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
+                              "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
                             }
                           ],
                           "additionalProperties": false
@@ -12756,6 +13116,11 @@
                         "retry": {
                           "description": "Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.\nIf not set, retry will be disabled.",
                           "properties": {
+                            "numAttemptsPerPriority": {
+                              "description": "NumAttemptsPerPriority defines the number of requests (initial attempt + retries)\nthat should be sent to the same priority before switching to a different one.\nIf not specified or set to 0, all requests are sent to the highest priority that is healthy.",
+                              "format": "int32",
+                              "type": "integer"
+                            },
                             "numRetries": {
                               "default": 2,
                               "description": "NumRetries is the number of retries to be attempted. Defaults to 2.",
@@ -12814,6 +13179,7 @@
                                       "5xx",
                                       "gateway-error",
                                       "reset",
+                                      "reset-before-request",
                                       "connect-failure",
                                       "retriable-4xx",
                                       "refused-stream",
@@ -12913,6 +13279,16 @@
                       "format": "int32",
                       "minimum": 0,
                       "type": "integer"
+                    },
+                    "serviceName": {
+                      "description": "ServiceName defines the service name to use in tracing configuration.\nIf not set, Envoy Gateway will use a default service name set as\n\"name.namespace\" (e.g., \"my-gateway.default\").\nNote: This field is only supported for OpenTelemetry and Datadog tracing providers.\nFor Zipkin, the service name in traces is always derived from the Envoy --service-cluster flag\n(typically \"namespace/name\" format). Setting this field has no effect for Zipkin.",
+                      "type": "string",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "serviceName cannot be empty if provided",
+                          "rule": "self != \"\""
+                        }
+                      ]
                     },
                     "type": {
                       "default": "OpenTelemetry",

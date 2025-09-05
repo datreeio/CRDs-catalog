@@ -1,0 +1,258 @@
+{
+  "description": "AKSNodeClass is the Schema for the AKSNodeClass API",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "AKSNodeClassSpec is the top level specification for the AKS Karpenter Provider.\nThis will contain configuration necessary to launch instances in AKS.",
+      "properties": {
+        "imageFamily": {
+          "default": "Ubuntu2204",
+          "description": "ImageFamily is the image family that instances use.",
+          "enum": [
+            "Ubuntu2204",
+            "AzureLinux"
+          ],
+          "type": "string"
+        },
+        "kubelet": {
+          "description": "Kubelet defines args to be used when configuring kubelet on provisioned nodes.\nThey are a subset of the upstream types, recognizing not all options may be supported.\nWherever possible, the types and names should reflect the upstream kubelet types.",
+          "properties": {
+            "allowedUnsafeSysctls": {
+              "description": "A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in `*`).\nUnsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`,\nand `net.*`. For example: \"`kernel.msg*,net.ipv4.route.min_pmtu`\"\nDefault: []",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "containerLogMaxFiles": {
+              "default": 5,
+              "description": "containerLogMaxFiles specifies the maximum number of container log files that can be present for a container.\nDefault: 5",
+              "format": "int32",
+              "minimum": 2,
+              "type": "integer"
+            },
+            "containerLogMaxSize": {
+              "default": "50Mi",
+              "description": "containerLogMaxSize is a quantity defining the maximum size of the container log\nfile before it is rotated. For example: \"5Mi\" or \"256Ki\".\nDefault: \"10Mi\"\nAKS CustomKubeletConfig has containerLogMaxSizeMB (with units), defaults to 50",
+              "pattern": "^\\d+(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$",
+              "type": "string"
+            },
+            "cpuCFSQuota": {
+              "default": true,
+              "description": "CPUCFSQuota enables CPU CFS quota enforcement for containers that specify CPU limits.\nNote: AKS CustomKubeletConfig uses cpuCfsQuota (camelCase)",
+              "type": "boolean"
+            },
+            "cpuCFSQuotaPeriod": {
+              "default": "100ms",
+              "description": "cpuCfsQuotaPeriod sets the CPU CFS quota period value, `cpu.cfs_period_us`.\nThe value must be between 1 ms and 1 second, inclusive.\nDefault: \"100ms\"",
+              "type": "string"
+            },
+            "cpuManagerPolicy": {
+              "default": "none",
+              "description": "cpuManagerPolicy is the name of the policy to use.",
+              "enum": [
+                "none",
+                "static"
+              ],
+              "type": "string"
+            },
+            "imageGCHighThresholdPercent": {
+              "description": "ImageGCHighThresholdPercent is the percent of disk usage after which image\ngarbage collection is always run. The percent is calculated by dividing this\nfield value by 100, so this field must be between 0 and 100, inclusive.\nWhen specified, the value must be greater than ImageGCLowThresholdPercent.\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "imageGCLowThresholdPercent": {
+              "description": "ImageGCLowThresholdPercent is the percent of disk usage before which image\ngarbage collection is never run. Lowest disk usage to garbage collect to.\nThe percent is calculated by dividing this field value by 100,\nso the field value must be between 0 and 100, inclusive.\nWhen specified, the value must be less than imageGCHighThresholdPercent\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "podPidsLimit": {
+              "description": "podPidsLimit is the maximum number of PIDs in any pod.\nAKS CustomKubeletConfig uses PodMaxPids, int32 (!)\nDefault: -1",
+              "format": "int64",
+              "type": "integer"
+            },
+            "topologyManagerPolicy": {
+              "default": "none",
+              "description": "topologyManagerPolicy is the name of the topology manager policy to use.\nValid values include:\n\n- `restricted`: kubelet only allows pods with optimal NUMA node alignment for requested resources;\n- `best-effort`: kubelet will favor pods with NUMA alignment of CPU and device resources;\n- `none`: kubelet has no knowledge of NUMA alignment of a pod's CPU and device resources.\n- `single-numa-node`: kubelet only allows pods with a single NUMA alignment\n  of CPU and device resources.",
+              "enum": [
+                "restricted",
+                "best-effort",
+                "none",
+                "single-numa-node"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "imageGCHighThresholdPercent must be greater than imageGCLowThresholdPercent",
+              "rule": "has(self.imageGCHighThresholdPercent) && has(self.imageGCLowThresholdPercent) ?  self.imageGCHighThresholdPercent > self.imageGCLowThresholdPercent  : true"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "maxPods": {
+          "description": "MaxPods is an override for the maximum number of pods that can run on a worker node instance.\nSee minimum + maximum pods per node documentation: https://learn.microsoft.com/en-us/azure/aks/concepts-network-ip-address-planning#maximum-pods-per-node\nDefault behavior if this is not specified depends on the network plugin:\n  - If Network Plugin is Azure with \"\" (v1 or NodeSubnet), the default is 30.\n  - If Network Plugin is Azure with \"overlay\", the default is 250.\n  - If Network Plugin is None, the default is 250.\n  - Otherwise, the default is 110 (the usual Kubernetes default).",
+          "format": "int32",
+          "maximum": 250,
+          "minimum": 10,
+          "type": "integer"
+        },
+        "osDiskSizeGB": {
+          "default": 128,
+          "description": "osDiskSizeGB is the size of the OS disk in GB.",
+          "format": "int32",
+          "minimum": 30,
+          "type": "integer"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Tags to be applied on Azure resources like instances.",
+          "type": "object"
+        },
+        "vnetSubnetID": {
+          "description": "VNETSubnetID is the subnet used by nics provisioned with this nodeclass.\nIf not specified, we will use the default --vnet-subnet-id specified in karpenter's options config",
+          "pattern": "(?i)^\\/subscriptions\\/[^\\/]+\\/resourceGroups\\/[a-zA-Z0-9_\\-().]{0,89}[a-zA-Z0-9_\\-()]\\/providers\\/Microsoft\\.Network\\/virtualNetworks\\/[^\\/]+\\/subnets\\/[^\\/]+$",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "AKSNodeClassStatus contains the resolved state of the AKSNodeClass",
+      "properties": {
+        "conditions": {
+          "description": "Conditions contains signals for health and readiness",
+          "items": {
+            "description": "Condition aliases the upstream type and adds additional helper methods",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "images": {
+          "description": "Images contains the current set of images available to use\nfor the NodeClass",
+          "items": {
+            "description": "NodeImage contains resolved image selector values utilized for node launch",
+            "properties": {
+              "id": {
+                "description": "The ID of the image. Examples:\n- CIG: /CommunityGalleries/AKSUbuntu-38d80f77-467a-481f-a8d4-09b6d4220bd2/images/2204gen2containerd/versions/2022.10.03\n- SIG: /subscriptions/10945678-1234-1234-1234-123456789012/resourceGroups/AKS-Ubuntu/providers/Microsoft.Compute/galleries/AKSUbuntu/images/2204gen2containerd/versions/2022.10.03",
+                "type": "string"
+              },
+              "requirements": {
+                "description": "Requirements of the image to be utilized on an instance type",
+                "items": {
+                  "description": "A node selector requirement is a selector that contains values, a key, and an operator\nthat relates the key and values.",
+                  "properties": {
+                    "key": {
+                      "description": "The label key that the selector applies to.",
+                      "type": "string"
+                    },
+                    "operator": {
+                      "description": "Represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
+                      "type": "string"
+                    },
+                    "values": {
+                      "description": "An array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. If the operator is Gt or Lt, the values\narray must have a single element, which will be interpreted as an integer.\nThis array is replaced during a strategic merge patch.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "operator"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "requirements"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "kubernetesVersion": {
+          "description": "KubernetesVersion contains the current kubernetes version which should be\nused for nodes provisioned for the NodeClass",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

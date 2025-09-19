@@ -24,6 +24,56 @@
         },
         "name": {
           "type": "string"
+        },
+        "removeSecret": {
+          "description": "RemoveSecret indicates whether the current secret for this ceph client should be removed or not.\nIf true, the K8s secret will be deleted, but the cephx keyring will remain until the CR is deleted.",
+          "type": "boolean"
+        },
+        "secretName": {
+          "description": "SecretName is the name of the secret created for this ceph client.\nIf not specified, the default name is \"rook-ceph-client-\" as a prefix to the CR name.",
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "SecretName is immutable and cannot be changed",
+              "rule": "self == oldSelf"
+            }
+          ]
+        },
+        "security": {
+          "description": "Security represents security settings",
+          "properties": {
+            "cephx": {
+              "description": "CephX configures CephX key settings. More: https://docs.ceph.com/en/latest/dev/cephx/",
+              "properties": {
+                "keyGeneration": {
+                  "description": "KeyGeneration specifies the desired CephX key generation. This is used when KeyRotationPolicy\nis KeyGeneration and ignored for other policies. If this is set to greater than the current\nkey generation, relevant keys will be rotated, and the generation value will be updated to\nthis new value (generation values are not necessarily incremental, though that is the\nintended use case). If this is set to less than or equal to the current key generation, keys\nare not rotated.",
+                  "format": "int32",
+                  "maximum": 4294967295,
+                  "minimum": 0,
+                  "type": "integer",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "keyGeneration cannot be decreased",
+                      "rule": "self >= oldSelf"
+                    }
+                  ]
+                },
+                "keyRotationPolicy": {
+                  "description": "KeyRotationPolicy controls if and when CephX keys are rotated after initial creation.\nOne of Disabled, or KeyGeneration. Default Disabled.",
+                  "enum": [
+                    "",
+                    "Disabled",
+                    "KeyGeneration"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "required": [
@@ -35,6 +85,21 @@
     "status": {
       "description": "Status represents the status of a Ceph Client",
       "properties": {
+        "cephx": {
+          "properties": {
+            "keyCephVersion": {
+              "description": "KeyCephVersion reports the Ceph version that created the current generation's keys. This is\nsame string format as reported by `CephCluster.status.version.version` to allow them to be\ncompared. E.g., `20.2.0-0`.\nFor all newly-created resources, this field set to the version of Ceph that created the key.\nThe special value \"Uninitialized\" indicates that keys are being created for the first time.\nAn empty string indicates that the version is unknown, as expected in brownfield deployments.",
+              "type": "string"
+            },
+            "keyGeneration": {
+              "description": "KeyGeneration represents the CephX key generation for the last successful reconcile.\nFor all newly-created resources, this field is set to `1`.\nWhen keys are rotated due to any rotation policy, the generation is incremented or updated to\nthe configured policy generation.\nGeneration `0` indicates that keys existed prior to the implementation of key tracking.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "info": {
           "additionalProperties": {
             "type": "string"

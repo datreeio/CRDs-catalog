@@ -1,0 +1,565 @@
+{
+  "description": "Placement defines a rule to select a set of ManagedClusters from the ManagedClusterSets bound\nto the placement namespace.\n\nHere is how the placement policy combines with other selection methods to determine a matching\nlist of ManagedClusters:\n 1. Kubernetes clusters are registered with hub as cluster-scoped ManagedClusters;\n 2. ManagedClusters are organized into cluster-scoped ManagedClusterSets;\n 3. ManagedClusterSets are bound to workload namespaces;\n 4. Namespace-scoped Placements specify a slice of ManagedClusterSets which select a working set\n    of potential ManagedClusters;\n 5. Then Placements subselect from that working set using label/claim selection.\n\nA ManagedCluster will not be selected if no ManagedClusterSet is bound to the placement\nnamespace. A user is able to bind a ManagedClusterSet to a namespace by creating a\nManagedClusterSetBinding in that namespace if they have an RBAC rule to CREATE on the virtual\nsubresource of `managedclustersets/bind`.\n\nA slice of PlacementDecisions with the label cluster.open-cluster-management.io/placement={placement name}\nwill be created to represent the ManagedClusters selected by this placement.\n\nIf a ManagedCluster is selected and added into the PlacementDecisions, other components may\napply workload on it; once it is removed from the PlacementDecisions, the workload applied on\nthis ManagedCluster should be evicted accordingly.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the attributes of Placement.",
+      "properties": {
+        "clusterSets": {
+          "description": "ClusterSets represent the ManagedClusterSets from which the ManagedClusters are selected.\nIf the slice is empty, ManagedClusters will be selected from the ManagedClusterSets bound to the placement\nnamespace, otherwise ManagedClusters will be selected from the intersection of this slice and the\nManagedClusterSets bound to the placement namespace.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "decisionStrategy": {
+          "description": "DecisionStrategy divide the created placement decision to groups and define number of clusters per decision group.",
+          "properties": {
+            "groupStrategy": {
+              "description": "GroupStrategy define strategies to divide selected clusters to decision groups.",
+              "properties": {
+                "clustersPerDecisionGroup": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "default": "100%",
+                  "description": "ClustersPerDecisionGroup is a specific number or percentage of the total selected clusters.\nThe specific number will divide the placementDecisions to decisionGroups each group has max number of clusters\nequal to that specific number.\nThe percentage will divide the placementDecisions to decisionGroups each group has max number of clusters based\non the total num of selected clusters and percentage.\nex; for a total 100 clusters selected, ClustersPerDecisionGroup equal to 20% will divide the placement decision\nto 5 groups each group should have 20 clusters.\nDefault is having all clusters in a single group.\n\nThe predefined decisionGroups is expected to be a subset of the selected clusters and the number of items in each\ngroup SHOULD be less than ClustersPerDecisionGroup. Once the number of items exceeds the ClustersPerDecisionGroup,\nthe decisionGroups will also be be divided into multiple decisionGroups with same GroupName but different GroupIndex.",
+                  "pattern": "^((100|[1-9][0-9]{0,1})%|[1-9][0-9]*)$",
+                  "x-kubernetes-int-or-string": true
+                },
+                "decisionGroups": {
+                  "description": "DecisionGroups represents a list of predefined groups to put decision results.\nDecision groups will be constructed based on the DecisionGroups field at first. The clusters not included in the\nDecisionGroups will be divided to other decision groups afterwards. Each decision group should not have the number\nof clusters larger than the ClustersPerDecisionGroup.",
+                  "items": {
+                    "description": "DecisionGroup define a subset of clusters that will be added to placementDecisions with groupName label.",
+                    "properties": {
+                      "groupClusterSelector": {
+                        "description": "LabelSelector to select clusters subset by label.",
+                        "properties": {
+                          "claimSelector": {
+                            "description": "ClaimSelector represents a selector of ManagedClusters by clusterClaims in status",
+                            "properties": {
+                              "matchExpressions": {
+                                "description": "matchExpressions is a list of cluster claim selector requirements. The requirements are ANDed.",
+                                "items": {
+                                  "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                  "properties": {
+                                    "key": {
+                                      "description": "key is the label key that the selector applies to.",
+                                      "type": "string"
+                                    },
+                                    "operator": {
+                                      "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                      "type": "string"
+                                    },
+                                    "values": {
+                                      "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "operator"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "type": "array"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "labelSelector": {
+                            "description": "LabelSelector represents a selector of ManagedClusters by label",
+                            "properties": {
+                              "matchExpressions": {
+                                "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                                "items": {
+                                  "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                  "properties": {
+                                    "key": {
+                                      "description": "key is the label key that the selector applies to.",
+                                      "type": "string"
+                                    },
+                                    "operator": {
+                                      "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                      "type": "string"
+                                    },
+                                    "values": {
+                                      "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "atomic"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "operator"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "atomic"
+                              },
+                              "matchLabels": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                                "type": "object"
+                              }
+                            },
+                            "type": "object",
+                            "x-kubernetes-map-type": "atomic",
+                            "additionalProperties": false
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "groupName": {
+                        "description": "Group name to be added as label value to the created placement Decisions labels with label key cluster.open-cluster-management.io/decision-group-name",
+                        "pattern": "^[a-zA-Z0-9][-A-Za-z0-9_.]{0,61}[a-zA-Z0-9]$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "groupClusterSelector",
+                      "groupName"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "numberOfClusters": {
+          "description": "NumberOfClusters represents the desired number of ManagedClusters to be selected which meet the\nplacement requirements.\n1) If not specified, all ManagedClusters which meet the placement requirements (including ClusterSets,\n   and Predicates) will be selected;\n2) Otherwise if the nubmer of ManagedClusters meet the placement requirements is larger than\n   NumberOfClusters, a random subset with desired number of ManagedClusters will be selected;\n3) If the nubmer of ManagedClusters meet the placement requirements is equal to NumberOfClusters,\n   all of them will be selected;\n4) If the nubmer of ManagedClusters meet the placement requirements is less than NumberOfClusters,\n   all of them will be selected, and the status of condition `PlacementConditionSatisfied` will be\n   set to false;",
+          "format": "int32",
+          "type": "integer"
+        },
+        "predicates": {
+          "description": "Predicates represent a slice of predicates to select ManagedClusters. The predicates are ORed.",
+          "items": {
+            "description": "ClusterPredicate represents a predicate to select ManagedClusters.",
+            "properties": {
+              "requiredClusterSelector": {
+                "description": "RequiredClusterSelector represents a selector of ManagedClusters by label and claim. If specified,\n1) Any ManagedCluster, which does not match the selector, should not be selected by this ClusterPredicate;\n2) If a selected ManagedCluster (of this ClusterPredicate) ceases to match the selector (e.g. due to\n   an update) of any ClusterPredicate, it will be eventually removed from the placement decisions;\n3) If a ManagedCluster (not selected previously) starts to match the selector, it will either\n   be selected or at least has a chance to be selected (when NumberOfClusters is specified);",
+                "properties": {
+                  "celSelector": {
+                    "description": "CelSelector represents a selector of ManagedClusters by CEL expressions on ManagedCluster fields",
+                    "properties": {
+                      "celExpressions": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "claimSelector": {
+                    "description": "ClaimSelector represents a selector of ManagedClusters by clusterClaims in status",
+                    "properties": {
+                      "matchExpressions": {
+                        "description": "matchExpressions is a list of cluster claim selector requirements. The requirements are ANDed.",
+                        "items": {
+                          "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                          "properties": {
+                            "key": {
+                              "description": "key is the label key that the selector applies to.",
+                              "type": "string"
+                            },
+                            "operator": {
+                              "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                              "type": "string"
+                            },
+                            "values": {
+                              "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "labelSelector": {
+                    "description": "LabelSelector represents a selector of ManagedClusters by label",
+                    "properties": {
+                      "matchExpressions": {
+                        "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                        "items": {
+                          "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                          "properties": {
+                            "key": {
+                              "description": "key is the label key that the selector applies to.",
+                              "type": "string"
+                            },
+                            "operator": {
+                              "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                              "type": "string"
+                            },
+                            "values": {
+                              "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      },
+                      "matchLabels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                        "type": "object"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "prioritizerPolicy": {
+          "description": "PrioritizerPolicy defines the policy of the prioritizers.\nIf this field is unset, then default prioritizer mode and configurations are used.\nReferring to PrioritizerPolicy to see more description about Mode and Configurations.",
+          "properties": {
+            "configurations": {
+              "items": {
+                "description": "PrioritizerConfig represents the configuration of prioritizer",
+                "properties": {
+                  "scoreCoordinate": {
+                    "description": "ScoreCoordinate represents the configuration of the prioritizer and score source.",
+                    "properties": {
+                      "addOn": {
+                        "description": "When type is \"AddOn\", AddOn defines the resource name and score name.",
+                        "properties": {
+                          "resourceName": {
+                            "description": "ResourceName defines the resource name of the AddOnPlacementScore.\nThe placement prioritizer selects AddOnPlacementScore CR by this name.",
+                            "type": "string"
+                          },
+                          "scoreName": {
+                            "description": "ScoreName defines the score name inside AddOnPlacementScore.\nAddOnPlacementScore contains a list of score name and score value, ScoreName specify the score to be used by\nthe prioritizer.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "resourceName",
+                          "scoreName"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "builtIn": {
+                        "description": "BuiltIn defines the name of a BuiltIn prioritizer. Below are the valid BuiltIn prioritizer names.\n1) Balance: balance the decisions among the clusters.\n2) Steady: ensure the existing decision is stabilized.\n3) ResourceAllocatableCPU & ResourceAllocatableMemory: sort clusters based on the allocatable.\n4) Spread: spread the workload evenly to topologies.",
+                        "type": "string"
+                      },
+                      "type": {
+                        "default": "BuiltIn",
+                        "description": "Type defines the type of the prioritizer score.\nType is either \"BuiltIn\", \"AddOn\" or \"\", where \"\" is \"BuiltIn\" by default.\nWhen the type is \"BuiltIn\", need to specify a BuiltIn prioritizer name in BuiltIn.\nWhen the type is \"AddOn\", need to configure the score source in AddOn.",
+                        "enum": [
+                          "BuiltIn",
+                          "AddOn"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "weight": {
+                    "default": 1,
+                    "description": "Weight defines the weight of the prioritizer score. The value must be ranged in [-10,10].\nEach prioritizer will calculate an integer score of a cluster in the range of [-100, 100].\nThe final score of a cluster will be sum(weight * prioritizer_score).\nA higher weight indicates that the prioritizer weights more in the cluster selection,\nwhile 0 weight indicates that the prioritizer is disabled. A negative weight indicates\nwants to select the last ones.",
+                    "format": "int32",
+                    "maximum": 10,
+                    "minimum": -10,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "scoreCoordinate"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "mode": {
+              "default": "Additive",
+              "description": "Mode is either Exact, Additive, \"\" where \"\" is Additive by default.\nIn Additive mode, any prioritizer not explicitly enumerated is enabled in its default Configurations,\nin which Steady and Balance prioritizers have the weight of 1 while other prioritizers have the weight of 0.\nAdditive doesn't require configuring all prioritizers. The default Configurations may change in the future,\nand additional prioritization will happen.\nIn Exact mode, any prioritizer not explicitly enumerated is weighted as zero.\nExact requires knowing the full set of prioritizers you want, but avoids behavior changes between releases.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "spreadPolicy": {
+          "description": "SpreadPolicy defines how placement decisions should be distributed among a\nset of ManagedClusters.",
+          "properties": {
+            "spreadConstraints": {
+              "description": "SpreadConstraints defines how the placement decision should be distributed among a set of ManagedClusters.\nThe importance of the SpreadConstraintsTerms follows the natural order of their index in the slice.\nThe scheduler first consider SpreadConstraintsTerms with smaller index then those with larger index\nto distribute the placement decision.",
+              "items": {
+                "description": "SpreadConstraintsTerm defines a terminology to spread placement decisions.",
+                "properties": {
+                  "maxSkew": {
+                    "default": 1,
+                    "description": "MaxSkew represents the degree to which the workload may be unevenly distributed.\nSkew is the maximum difference between the number of selected ManagedClusters in a topology and the global minimum.\nThe global minimum is the minimum number of selected ManagedClusters for the topologies within the same TopologyKey.\nThe minimum possible value of MaxSkew is 1, and the default value is 1.",
+                    "format": "int32",
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "topologyKey": {
+                    "description": "TopologyKey is either a label key or a cluster claim name of ManagedClusters.",
+                    "maxLength": 316,
+                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$",
+                    "type": "string"
+                  },
+                  "topologyKeyType": {
+                    "description": "TopologyKeyType indicates the type of TopologyKey. It could be Label or Claim.",
+                    "enum": [
+                      "Label",
+                      "Claim"
+                    ],
+                    "type": "string"
+                  },
+                  "whenUnsatisfiable": {
+                    "default": "ScheduleAnyway",
+                    "description": "WhenUnsatisfiable represents the action of the scheduler when MaxSkew cannot be satisfied.\nIt could be DoNotSchedule or ScheduleAnyway. The default value is ScheduleAnyway.\nDoNotSchedule instructs the scheduler not to schedule more ManagedClusters when MaxSkew is not satisfied.\nScheduleAnyway instructs the scheduler to keep scheduling even if MaxSkew is not satisfied.",
+                    "enum": [
+                      "DoNotSchedule",
+                      "ScheduleAnyway"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "topologyKey",
+                  "topologyKeyType"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 8,
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "tolerations": {
+          "description": "Tolerations are applied to placements, and allow (but do not require) the managed clusters with\ncertain taints to be selected by placements with matching tolerations.",
+          "items": {
+            "description": "Toleration represents the toleration object that can be attached to a placement.\nThe placement this Toleration is attached to tolerates any taint that matches\nthe triple <key,value,effect> using the matching operator <operator>.",
+            "properties": {
+              "effect": {
+                "description": "Effect indicates the taint effect to match. Empty means match all taint effects.\nWhen specified, allowed values are NoSelect, PreferNoSelect and NoSelectIfNew.",
+                "enum": [
+                  "NoSelect",
+                  "PreferNoSelect",
+                  "NoSelectIfNew"
+                ],
+                "type": "string"
+              },
+              "key": {
+                "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys.\nIf the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              },
+              "operator": {
+                "default": "Equal",
+                "description": "Operator represents a key's relationship to the value.\nValid operators are Exists and Equal. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a placement can\ntolerate all taints of a particular category.",
+                "type": "string"
+              },
+              "tolerationSeconds": {
+                "description": "TolerationSeconds represents the period of time the toleration (which must be of effect\nNoSelect/PreferNoSelect, otherwise this field is ignored) tolerates the taint.\nThe default value is nil, which indicates it tolerates the taint forever.\nThe start time of counting the TolerationSeconds should be the TimeAdded in Taint, not the cluster\nscheduled time or TolerationSeconds added time.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "value": {
+                "description": "Value is the taint value the toleration matches to.\nIf the operator is Exists, the value should be empty, otherwise just a regular string.",
+                "maxLength": 1024,
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status represents the current status of the Placement",
+      "properties": {
+        "conditions": {
+          "description": "Conditions contains the different condition status for this Placement.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "decisionGroups": {
+          "description": "List of decision groups determined by the placement and DecisionStrategy.",
+          "items": {
+            "description": "Present decision groups status based on the DecisionStrategy definition.",
+            "properties": {
+              "clusterCount": {
+                "default": 0,
+                "description": "Total number of clusters in the decision group. Clusters count is equal or less than the clusterPerDecisionGroups defined in the decision strategy.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "decisionGroupIndex": {
+                "description": "Present the decision group index. If there is no decision strategy defined all placement decisions will be in group index 0",
+                "format": "int32",
+                "type": "integer"
+              },
+              "decisionGroupName": {
+                "description": "Decision group name that is defined in the DecisionStrategy's DecisionGroup.",
+                "type": "string"
+              },
+              "decisions": {
+                "description": "List of placement decisions names associated with the decision group",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "numberOfSelectedClusters": {
+          "description": "NumberOfSelectedClusters represents the number of selected ManagedClusters",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

@@ -113,7 +113,11 @@
               "description": "The erasure code settings",
               "properties": {
                 "algorithm": {
-                  "description": "The algorithm for erasure coding",
+                  "description": "The algorithm for erasure coding.\nIf absent, defaults to the plugin specified in osd_pool_default_erasure_code_profile.",
+                  "enum": [
+                    "isa",
+                    "jerasure"
+                  ],
                   "type": "string"
                 },
                 "codingChunks": {
@@ -146,7 +150,12 @@
                   "type": "boolean"
                 },
                 "mode": {
-                  "description": "Mode is the mirroring mode: either pool or image",
+                  "description": "Mode is the mirroring mode: pool, image or init-only.",
+                  "enum": [
+                    "pool",
+                    "image",
+                    "init-only"
+                  ],
                   "type": "string"
                 },
                 "peers": {
@@ -268,6 +277,7 @@
                 },
                 "targetSizeRatio": {
                   "description": "TargetSizeRatio gives a hint (%) to Ceph in terms of expected consumption of the total cluster capacity",
+                  "minimum": 0,
                   "type": "number"
                 }
               },
@@ -306,6 +316,10 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "defaultRealm": {
+          "description": "Set this realm as the default in Ceph. Only one realm should be default.\nDo not set this true on more than one CephObjectStore.\nThis may not be set when zone is also specified; in this case, the realm\nreferenced by the zone's zonegroup should configure defaulting behavior.",
+          "type": "boolean"
         },
         "gateway": {
           "description": "The rgw pod info",
@@ -1647,6 +1661,25 @@
               "description": "PriorityClassName sets priority classes on the rgw pods",
               "type": "string"
             },
+            "readAffinity": {
+              "description": "ReadAffinity defines the RGW read affinity policy to optimize the read requests for the RGW clients\nNote: Only supported from Ceph Tentacle (v20)",
+              "properties": {
+                "type": {
+                  "description": "Type defines the RGW ReadAffinity type\nlocalize: read from the nearest OSD based on crush location of the RGW client\nbalance: picks a random OSD from the PG's active set\ndefault: read from the primary OSD",
+                  "enum": [
+                    "localize",
+                    "balance",
+                    "default"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "resources": {
               "description": "The resource requirements for the rgw pods",
               "nullable": true,
@@ -1727,6 +1760,35 @@
                 "type": "string"
               },
               "description": "RgwConfig sets Ceph RGW config values for the gateway clients that serve this object store.\nValues are modified at runtime without RGW restart.\nThis feature is intended for advanced users. It allows breaking configurations to be easily\napplied. Use with caution.",
+              "nullable": true,
+              "type": "object"
+            },
+            "rgwConfigFromSecret": {
+              "additionalProperties": {
+                "description": "SecretKeySelector selects a key of a Secret.",
+                "properties": {
+                  "key": {
+                    "description": "The key of the secret to select from.  Must be a valid secret key.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret or its key must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key"
+                ],
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "description": "RgwConfigFromSecret works exactly like RgwConfig but takes config value from Secret Key reference.\nValues are modified at runtime without RGW restart.\nThis feature is intended for advanced users. It allows breaking configurations to be easily\napplied. Use with caution.",
               "nullable": true,
               "type": "object"
             },
@@ -2189,7 +2251,11 @@
               "description": "The erasure code settings",
               "properties": {
                 "algorithm": {
-                  "description": "The algorithm for erasure coding",
+                  "description": "The algorithm for erasure coding.\nIf absent, defaults to the plugin specified in osd_pool_default_erasure_code_profile.",
+                  "enum": [
+                    "isa",
+                    "jerasure"
+                  ],
                   "type": "string"
                 },
                 "codingChunks": {
@@ -2222,7 +2288,12 @@
                   "type": "boolean"
                 },
                 "mode": {
-                  "description": "Mode is the mirroring mode: either pool or image",
+                  "description": "Mode is the mirroring mode: pool, image or init-only.",
+                  "enum": [
+                    "pool",
+                    "image",
+                    "init-only"
+                  ],
                   "type": "string"
                 },
                 "peers": {
@@ -2344,6 +2415,7 @@
                 },
                 "targetSizeRatio": {
                   "description": "TargetSizeRatio gives a hint (%) to Ceph in terms of expected consumption of the total cluster capacity",
+                  "minimum": 0,
                   "type": "number"
                 }
               },
@@ -2621,7 +2693,7 @@
           "nullable": true,
           "properties": {
             "name": {
-              "description": "RGW Zone the Object Store is in",
+              "description": "CephObjectStoreZone name this CephObjectStore is part of",
               "type": "string"
             }
           },
@@ -2633,11 +2705,39 @@
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "defaultRealm must not be true when zone.name is set (multisite configuration)",
+          "rule": "!(has(self.defaultRealm) && self.defaultRealm == true && has(self.zone) && size(self.zone.name) > 0)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
       "description": "ObjectStoreStatus represents the status of a Ceph Object Store resource",
       "properties": {
+        "cephx": {
+          "properties": {
+            "daemon": {
+              "description": "Daemon shows the CephX key status for local Ceph daemons associated with this resources.",
+              "properties": {
+                "keyCephVersion": {
+                  "description": "KeyCephVersion reports the Ceph version that created the current generation's keys. This is\nsame string format as reported by `CephCluster.status.version.version` to allow them to be\ncompared. E.g., `20.2.0-0`.\nFor all newly-created resources, this field set to the version of Ceph that created the key.\nThe special value \"Uninitialized\" indicates that keys are being created for the first time.\nAn empty string indicates that the version is unknown, as expected in brownfield deployments.",
+                  "type": "string"
+                },
+                "keyGeneration": {
+                  "description": "KeyGeneration represents the CephX key generation for the last successful reconcile.\nFor all newly-created resources, this field is set to `1`.\nWhen keys are rotated due to any rotation policy, the generation is incremented or updated to\nthe configured policy generation.\nGeneration `0` indicates that keys existed prior to the implementation of key tracking.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "conditions": {
           "items": {
             "description": "Condition represents a status condition on any Rook-Ceph Custom Resource.",

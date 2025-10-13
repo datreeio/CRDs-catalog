@@ -1,0 +1,227 @@
+{
+  "description": "ManagedCluster represents the desired state and current status\nof a managed cluster. ManagedCluster is a cluster-scoped resource. The name\nis the cluster UID.\n\nThe cluster join process is a double opt-in process. See the following join process steps:\n\n1. The agent on the managed cluster creates a CSR on the hub with the cluster UID and agent name.\n2. The agent on the managed cluster creates a ManagedCluster on the hub.\n3. The cluster admin on the hub cluster approves the CSR for the UID and agent name of the ManagedCluster.\n4. The cluster admin sets the spec.acceptClient of the ManagedCluster to true.\n5. The cluster admin on the managed cluster creates a credential of the kubeconfig for the hub cluster.\n\nAfter the hub cluster creates the cluster namespace, the klusterlet agent on the ManagedCluster pushes\nthe credential to the hub cluster to use against the kube-apiserver of the ManagedCluster.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec represents a desired configuration for the agent on the managed cluster.",
+      "properties": {
+        "hubAcceptsClient": {
+          "description": "hubAcceptsClient represents that hub accepts the joining of Klusterlet agent on\nthe managed cluster with the hub. The default value is false, and can only be set\ntrue when the user on hub has an RBAC rule to UPDATE on the virtual subresource\nof managedclusters/accept.\nWhen the value is set true, a namespace whose name is the same as the name of ManagedCluster\nis created on the hub. This namespace represents the managed cluster, also role/rolebinding is created on\nthe namespace to grant the permision of access from the agent on the managed cluster.\nWhen the value is set to false, the namespace representing the managed cluster is\ndeleted.",
+          "type": "boolean"
+        },
+        "leaseDurationSeconds": {
+          "default": 60,
+          "description": "LeaseDurationSeconds is used to coordinate the lease update time of Klusterlet agents on the managed cluster.\nIf its value is zero, the Klusterlet agent will update its lease every 60 seconds by default",
+          "format": "int32",
+          "type": "integer"
+        },
+        "managedClusterClientConfigs": {
+          "description": "ManagedClusterClientConfigs represents a list of the apiserver address of the managed cluster.\nIf it is empty, the managed cluster has no accessible address for the hub to connect with it.",
+          "items": {
+            "description": "ClientConfig represents the apiserver address of the managed cluster.",
+            "properties": {
+              "caBundle": {
+                "description": "CABundle is the ca bundle to connect to apiserver of the managed cluster.\nSystem certs are used if it is not set.",
+                "format": "byte",
+                "type": "string"
+              },
+              "url": {
+                "description": "URL is the URL of apiserver endpoint of the managed cluster.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "taints": {
+          "description": "Taints is a property of managed cluster that allow the cluster to be repelled when scheduling.\nTaints, including 'ManagedClusterUnavailable' and 'ManagedClusterUnreachable', can not be added/removed by agent\nrunning on the managed cluster; while it's fine to add/remove other taints from either hub cluser or managed cluster.",
+          "items": {
+            "description": "The managed cluster this Taint is attached to has the \"effect\" on\nany placement that does not tolerate the Taint.",
+            "properties": {
+              "effect": {
+                "description": "Effect indicates the effect of the taint on placements that do not tolerate the taint.\nValid effects are NoSelect, PreferNoSelect and NoSelectIfNew.",
+                "enum": [
+                  "NoSelect",
+                  "PreferNoSelect",
+                  "NoSelectIfNew"
+                ],
+                "type": "string"
+              },
+              "key": {
+                "description": "Key is the taint key applied to a cluster. e.g. bar or foo.example.com/bar.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              },
+              "timeAdded": {
+                "description": "TimeAdded represents the time at which the taint was added.",
+                "format": "date-time",
+                "nullable": true,
+                "type": "string"
+              },
+              "value": {
+                "description": "Value is the taint value corresponding to the taint key.",
+                "maxLength": 1024,
+                "type": "string"
+              }
+            },
+            "required": [
+              "effect",
+              "key"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status represents the current status of joined managed cluster",
+      "properties": {
+        "allocatable": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+            "x-kubernetes-int-or-string": true
+          },
+          "description": "Allocatable represents the total allocatable resources on the managed cluster.",
+          "type": "object"
+        },
+        "capacity": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+            "x-kubernetes-int-or-string": true
+          },
+          "description": "Capacity represents the total resource capacity from all nodeStatuses\non the managed cluster.",
+          "type": "object"
+        },
+        "clusterClaims": {
+          "description": "ClusterClaims represents cluster information that a managed cluster claims,\nfor example a unique cluster identifier (id.k8s.io) and kubernetes version\n(kubeversion.open-cluster-management.io). They are written from the managed\ncluster. The set of claims is not uniform across a fleet, some claims can be\nvendor or version specific and may not be included from all managed clusters.",
+          "items": {
+            "description": "ManagedClusterClaim represents a ClusterClaim collected from a managed cluster.",
+            "properties": {
+              "name": {
+                "description": "Name is the name of a ClusterClaim resource on managed cluster. It's a well known\nor customized name to identify the claim.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              "value": {
+                "description": "Value is a claim-dependent string",
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "conditions": {
+          "description": "Conditions contains the different condition statuses for this managed cluster.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "Version represents the kubernetes version of the managed cluster.",
+          "properties": {
+            "kubernetes": {
+              "description": "Kubernetes is the kubernetes version of managed cluster.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

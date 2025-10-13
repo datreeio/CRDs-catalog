@@ -16,7 +16,7 @@
       "description": "IngressRouteSpec defines the desired state of IngressRoute.",
       "properties": {
         "entryPoints": {
-          "description": "EntryPoints defines the list of entry point names to bind to.\nEntry points have to be configured in the static configuration.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/entrypoints/\nDefault: all.",
+          "description": "EntryPoints defines the list of entry point names to bind to.\nEntry points have to be configured in the static configuration.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/entrypoints/\nDefault: all.",
           "items": {
             "type": "string"
           },
@@ -35,11 +35,11 @@
                 "type": "string"
               },
               "match": {
-                "description": "Match defines the router's rule.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/routers/#rule",
+                "description": "Match defines the router's rule.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#rule",
                 "type": "string"
               },
               "middlewares": {
-                "description": "Middlewares defines the list of references to Middleware resources.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/providers/kubernetes-crd/#kind-middleware",
+                "description": "Middlewares defines the list of references to Middleware resources.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/providers/kubernetes-crd/#kind-middleware",
                 "items": {
                   "description": "MiddlewareRef is a reference to a Middleware resource.",
                   "properties": {
@@ -61,15 +61,27 @@
                 "type": "array"
               },
               "observability": {
-                "description": "Observability defines the observability configuration for a router.\nMore info: https://doc.traefik.io/traefik/v3.2/routing/routers/#observability",
+                "description": "Observability defines the observability configuration for a router.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#observability",
                 "properties": {
                   "accessLogs": {
+                    "description": "AccessLogs enables access logs for this router.",
                     "type": "boolean"
                   },
                   "metrics": {
+                    "description": "Metrics enables metrics for this router.",
                     "type": "boolean"
                   },
+                  "traceVerbosity": {
+                    "default": "minimal",
+                    "description": "TraceVerbosity defines the verbosity level of the tracing for this router.",
+                    "enum": [
+                      "minimal",
+                      "detailed"
+                    ],
+                    "type": "string"
+                  },
                   "tracing": {
+                    "description": "Tracing enables tracing for this router.",
                     "type": "boolean"
                   }
                 },
@@ -77,7 +89,8 @@
                 "additionalProperties": false
               },
               "priority": {
-                "description": "Priority defines the router's priority.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/routers/#priority",
+                "description": "Priority defines the router's priority.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#priority",
+                "maximum": 9223372036854775000,
                 "type": "integer"
               },
               "services": {
@@ -112,7 +125,7 @@
                               "type": "string"
                             }
                           ],
-                          "description": "Interval defines the frequency of the health check calls.\nDefault: 30s",
+                          "description": "Interval defines the frequency of the health check calls for healthy targets.\nDefault: 30s",
                           "x-kubernetes-int-or-string": true
                         },
                         "method": {
@@ -149,6 +162,18 @@
                             }
                           ],
                           "description": "Timeout defines the maximum duration Traefik will wait for a health check request before considering the server unhealthy.\nDefault: 5s",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "unhealthyInterval": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "UnhealthyInterval defines the frequency of the health check calls for unhealthy targets.\nWhen UnhealthyInterval is not defined, it defaults to the Interval value.\nDefault: 30s",
                           "x-kubernetes-int-or-string": true
                         }
                       },
@@ -215,11 +240,15 @@
                       "type": "string"
                     },
                     "sticky": {
-                      "description": "Sticky defines the sticky sessions configuration.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/services/#sticky-sessions",
+                      "description": "Sticky defines the sticky sessions configuration.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/services/#sticky-sessions",
                       "properties": {
                         "cookie": {
                           "description": "Cookie defines the sticky cookie configuration.",
                           "properties": {
+                            "domain": {
+                              "description": "Domain defines the host to which the cookie will be sent.\nMore info: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#domaindomain-value",
+                              "type": "string"
+                            },
                             "httpOnly": {
                               "description": "HTTPOnly defines whether the cookie can be accessed by client-side APIs, such as JavaScript.",
                               "type": "boolean"
@@ -238,6 +267,11 @@
                             },
                             "sameSite": {
                               "description": "SameSite defines the same site policy.\nMore info: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite",
+                              "enum": [
+                                "none",
+                                "lax",
+                                "strict"
+                              ],
                               "type": "string"
                             },
                             "secure": {
@@ -253,11 +287,17 @@
                       "additionalProperties": false
                     },
                     "strategy": {
-                      "description": "Strategy defines the load balancing strategy between the servers.\nRoundRobin is the only supported value at the moment.",
+                      "description": "Strategy defines the load balancing strategy between the servers.\nSupported values are: wrr (Weighed round-robin) and p2c (Power of two choices).\nRoundRobin value is deprecated and supported for backward compatibility.",
+                      "enum": [
+                        "wrr",
+                        "p2c",
+                        "RoundRobin"
+                      ],
                       "type": "string"
                     },
                     "weight": {
                       "description": "Weight defines the weight and should only be specified when Name references a TraefikService object\n(and to be precise, one that embeds a Weighted Round Robin).",
+                      "minimum": 0,
                       "type": "integer"
                     }
                   },
@@ -270,7 +310,7 @@
                 "type": "array"
               },
               "syntax": {
-                "description": "Syntax defines the router's rule syntax.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/routers/#rulesyntax",
+                "description": "Syntax defines the router's rule syntax.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#rulesyntax\nDeprecated: Please do not use this field and rewrite the router rules to use the v3 syntax.",
                 "type": "string"
               }
             },
@@ -283,14 +323,14 @@
           "type": "array"
         },
         "tls": {
-          "description": "TLS defines the TLS configuration.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/routers/#tls",
+          "description": "TLS defines the TLS configuration.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#tls",
           "properties": {
             "certResolver": {
-              "description": "CertResolver defines the name of the certificate resolver to use.\nCert resolvers have to be configured in the static configuration.\nMore info: https://doc.traefik.io/traefik/v3.3/https/acme/#certificate-resolvers",
+              "description": "CertResolver defines the name of the certificate resolver to use.\nCert resolvers have to be configured in the static configuration.\nMore info: https://doc.traefik.io/traefik/v3.5/https/acme/#certificate-resolvers",
               "type": "string"
             },
             "domains": {
-              "description": "Domains defines the list of domains that will be used to issue certificates.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/routers/#domains",
+              "description": "Domains defines the list of domains that will be used to issue certificates.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/routers/#domains",
               "items": {
                 "description": "Domain holds a domain name with SANs.",
                 "properties": {
@@ -312,14 +352,14 @@
               "type": "array"
             },
             "options": {
-              "description": "Options defines the reference to a TLSOption, that specifies the parameters of the TLS connection.\nIf not defined, the `default` TLSOption is used.\nMore info: https://doc.traefik.io/traefik/v3.3/https/tls/#tls-options",
+              "description": "Options defines the reference to a TLSOption, that specifies the parameters of the TLS connection.\nIf not defined, the `default` TLSOption is used.\nMore info: https://doc.traefik.io/traefik/v3.5/https/tls/#tls-options",
               "properties": {
                 "name": {
-                  "description": "Name defines the name of the referenced TLSOption.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/providers/kubernetes-crd/#kind-tlsoption",
+                  "description": "Name defines the name of the referenced TLSOption.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/providers/kubernetes-crd/#kind-tlsoption",
                   "type": "string"
                 },
                 "namespace": {
-                  "description": "Namespace defines the namespace of the referenced TLSOption.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/providers/kubernetes-crd/#kind-tlsoption",
+                  "description": "Namespace defines the namespace of the referenced TLSOption.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/providers/kubernetes-crd/#kind-tlsoption",
                   "type": "string"
                 }
               },
@@ -337,11 +377,11 @@
               "description": "Store defines the reference to the TLSStore, that will be used to store certificates.\nPlease note that only `default` TLSStore can be used.",
               "properties": {
                 "name": {
-                  "description": "Name defines the name of the referenced TLSStore.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/providers/kubernetes-crd/#kind-tlsstore",
+                  "description": "Name defines the name of the referenced TLSStore.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/providers/kubernetes-crd/#kind-tlsstore",
                   "type": "string"
                 },
                 "namespace": {
-                  "description": "Namespace defines the namespace of the referenced TLSStore.\nMore info: https://doc.traefik.io/traefik/v3.3/routing/providers/kubernetes-crd/#kind-tlsstore",
+                  "description": "Namespace defines the namespace of the referenced TLSStore.\nMore info: https://doc.traefik.io/traefik/v3.5/routing/providers/kubernetes-crd/#kind-tlsstore",
                   "type": "string"
                 }
               },

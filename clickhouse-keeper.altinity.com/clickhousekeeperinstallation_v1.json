@@ -1,0 +1,1145 @@
+{
+  "description": "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more clusters",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation\nof an object. Servers should convert recognized schemas to the latest\ninternal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources\n",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this\nobject represents. Servers may infer this from the endpoint the client\nsubmits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds\n",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Specification of the desired behavior of one or more ClickHouse clusters\nMore info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md\n",
+      "properties": {
+        "configuration": {
+          "description": "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource",
+          "properties": {
+            "clusters": {
+              "description": "describes clusters layout and allows change settings on cluster-level and replica-level\n",
+              "items": {
+                "properties": {
+                  "files": {
+                    "description": "optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\noverride top-level `chi.spec.configuration.files`\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "layout": {
+                    "description": "describe current cluster layout, how much shards in cluster, how much replica in shard\nallows override settings on each shard and replica separatelly\n",
+                    "properties": {
+                      "replicas": {
+                        "description": "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do",
+                        "items": {
+                          "properties": {
+                            "files": {
+                              "description": "optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\noverride top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents\n",
+                              "type": "object",
+                              "x-kubernetes-preserve-unknown-fields": true
+                            },
+                            "name": {
+                              "description": "optional, by default replica name is generated, but you can override it and setup custom name",
+                              "maxLength": 15,
+                              "minLength": 1,
+                              "pattern": "^[a-zA-Z0-9-]{0,15}$",
+                              "type": "string"
+                            },
+                            "settings": {
+                              "description": "optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`\noverride top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\n",
+                              "type": "object",
+                              "x-kubernetes-preserve-unknown-fields": true
+                            },
+                            "shards": {
+                              "description": "optional, list of shards related to current replica, will ignore if `chi.spec.configuration.clusters.layout.shards` presents",
+                              "items": {
+                                "properties": {
+                                  "files": {
+                                    "description": "optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\noverride top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents\n",
+                                    "type": "object",
+                                    "x-kubernetes-preserve-unknown-fields": true
+                                  },
+                                  "name": {
+                                    "description": "optional, by default shard name is generated, but you can override it and setup custom name",
+                                    "maxLength": 15,
+                                    "minLength": 1,
+                                    "pattern": "^[a-zA-Z0-9-]{0,15}$",
+                                    "type": "string"
+                                  },
+                                  "raftPort": {
+                                    "maximum": 65535,
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  },
+                                  "settings": {
+                                    "description": "optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`\noverride top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\n",
+                                    "type": "object",
+                                    "x-kubernetes-preserve-unknown-fields": true
+                                  },
+                                  "templates": {
+                                    "description": "optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica\noverride top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`\n",
+                                    "properties": {
+                                      "clusterServiceTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "dataVolumeClaimTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "hostTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`",
+                                        "type": "string"
+                                      },
+                                      "logVolumeClaimTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "podTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "replicaServiceTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "serviceTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                                        "type": "string"
+                                      },
+                                      "serviceTemplates": {
+                                        "description": "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "type": "array"
+                                      },
+                                      "shardServiceTemplate": {
+                                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      },
+                                      "volumeClaimTemplate": {
+                                        "description": "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "zkPort": {
+                                    "maximum": 65535,
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  }
+                                },
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array"
+                            },
+                            "shardsCount": {
+                              "description": "optional, count of shards related to current replica, you can override each shard behavior on low-level `chi.spec.configuration.clusters.layout.replicas.shards`",
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "templates": {
+                              "description": "optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica\noverride top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`\n",
+                              "properties": {
+                                "clusterServiceTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "dataVolumeClaimTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "hostTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`",
+                                  "type": "string"
+                                },
+                                "logVolumeClaimTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "podTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "replicaServiceTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "serviceTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                                  "type": "string"
+                                },
+                                "serviceTemplates": {
+                                  "description": "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "nullable": true,
+                                  "type": "array"
+                                },
+                                "shardServiceTemplate": {
+                                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                },
+                                "volumeClaimTemplate": {
+                                  "description": "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
+                      "replicasCount": {
+                        "description": "how much replicas in each shards for current cluster will run in Kubernetes,\neach replica is a separate `StatefulSet` which contains only one `Pod` with `clickhouse-server` instance,\nevery shard contains 1 replica by default\"\n",
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "name": {
+                    "description": "cluster name, used to identify set of servers and wide used during generate names of related Kubernetes resources",
+                    "maxLength": 15,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z0-9-]{0,15}$",
+                    "type": "string"
+                  },
+                  "pdbManaged": {
+                    "description": "Specifies whether the Pod Disruption Budget (PDB) should be managed.\nDuring the next installation, if PDB management is enabled, the operator will\nattempt to retrieve any existing PDB. If none is found, it will create a new one\nand initiate a reconciliation loop. If PDB management is disabled, the existing PDB\nwill remain intact, and the reconciliation loop will not be executed. By default,\nPDB management is enabled.\n",
+                    "enum": [
+                      "",
+                      "0",
+                      "1",
+                      "False",
+                      "false",
+                      "True",
+                      "true",
+                      "No",
+                      "no",
+                      "Yes",
+                      "yes",
+                      "Off",
+                      "off",
+                      "On",
+                      "on",
+                      "Disable",
+                      "disable",
+                      "Enable",
+                      "enable",
+                      "Disabled",
+                      "disabled",
+                      "Enabled",
+                      "enabled"
+                    ],
+                    "type": "string"
+                  },
+                  "pdbMaxUnavailable": {
+                    "description": "Pod eviction is allowed if at most \"pdbMaxUnavailable\" pods are unavailable after the eviction,\ni.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions\nby specifying 0. This is a mutually exclusive setting with \"minAvailable\".\n",
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "settings": {
+                    "description": "optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`\noverride top-level `chi.spec.configuration.settings`\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "templates": {
+                    "description": "optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster\noverride top-level `chi.spec.configuration.templates`\n",
+                    "properties": {
+                      "clusterServiceTemplate": {
+                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "dataVolumeClaimTemplate": {
+                        "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "hostTemplate": {
+                        "description": "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`",
+                        "type": "string"
+                      },
+                      "logVolumeClaimTemplate": {
+                        "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "podTemplate": {
+                        "description": "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "replicaServiceTemplate": {
+                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "serviceTemplate": {
+                        "description": "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                        "type": "string"
+                      },
+                      "serviceTemplates": {
+                        "description": "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                        "items": {
+                          "type": "string"
+                        },
+                        "nullable": true,
+                        "type": "array"
+                      },
+                      "shardServiceTemplate": {
+                        "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      },
+                      "volumeClaimTemplate": {
+                        "description": "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "files": {
+              "description": "allows define content of any setting\n",
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            },
+            "settings": {
+              "description": "allows configure multiple aspects and behavior for `clickhouse-keeper` instance\n",
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "defaults": {
+          "description": "define default behavior for whole ClickHouseInstallation, some behavior can be re-define on cluster, shard and replica level\nMore info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specdefaults\n",
+          "properties": {
+            "distributedDDL": {
+              "description": "allows change `<yandex><distributed_ddl></distributed_ddl></yandex>` settings\nMore info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl\n",
+              "properties": {
+                "profile": {
+                  "description": "Settings from this profile will be used to execute DDL queries",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "replicasUseFQDN": {
+              "description": "define should replicas be specified by FQDN in `<host></host>`.\nIn case of \"no\" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup\n\"no\" by default\n",
+              "enum": [
+                "",
+                "0",
+                "1",
+                "False",
+                "false",
+                "True",
+                "true",
+                "No",
+                "no",
+                "Yes",
+                "yes",
+                "Off",
+                "off",
+                "On",
+                "on",
+                "Disable",
+                "disable",
+                "Enable",
+                "enable",
+                "Disabled",
+                "disabled",
+                "Enabled",
+                "enabled"
+              ],
+              "type": "string"
+            },
+            "storageManagement": {
+              "description": "default storage management options",
+              "properties": {
+                "provisioner": {
+                  "description": "defines `PVC` provisioner - be it StatefulSet or the Operator",
+                  "enum": [
+                    "",
+                    "StatefulSet",
+                    "Operator"
+                  ],
+                  "type": "string"
+                },
+                "reclaimPolicy": {
+                  "description": "defines behavior of `PVC` deletion.\n`Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet\n",
+                  "enum": [
+                    "",
+                    "Retain",
+                    "Delete"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "templates": {
+              "description": "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource",
+              "properties": {
+                "clusterServiceTemplate": {
+                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "dataVolumeClaimTemplate": {
+                  "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "hostTemplate": {
+                  "description": "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`",
+                  "type": "string"
+                },
+                "logVolumeClaimTemplate": {
+                  "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "podTemplate": {
+                  "description": "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "replicaServiceTemplate": {
+                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "serviceTemplate": {
+                  "description": "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                  "type": "string"
+                },
+                "serviceTemplates": {
+                  "description": "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                  "items": {
+                    "type": "string"
+                  },
+                  "nullable": true,
+                  "type": "array"
+                },
+                "shardServiceTemplate": {
+                  "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                },
+                "volumeClaimTemplate": {
+                  "description": "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "namespaceDomainPattern": {
+          "description": "Custom domain pattern which will be used for DNS names of `Service` or `Pod`.\nTypical use scenario - custom cluster domain in Kubernetes cluster\nExample: %s.svc.my.test\n",
+          "type": "string"
+        },
+        "reconciling": {
+          "description": "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side",
+          "properties": {
+            "cleanup": {
+              "description": "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle",
+              "properties": {
+                "reconcileFailedObjects": {
+                  "description": "Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.\nDefault behavior is `Retain`\"\n",
+                  "properties": {
+                    "configMap": {
+                      "description": "Behavior policy for failed ConfigMap, `Retain` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "pvc": {
+                      "description": "Behavior policy for failed PVC, `Retain` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "service": {
+                      "description": "Behavior policy for failed Service, `Retain` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "statefulSet": {
+                      "description": "Behavior policy for failed StatefulSet, `Retain` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "unknownObjects": {
+                  "description": "Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,\nbut do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.\nDefault behavior is `Delete`\"\n",
+                  "properties": {
+                    "configMap": {
+                      "description": "Behavior policy for unknown ConfigMap, `Delete` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "pvc": {
+                      "description": "Behavior policy for unknown PVC, `Delete` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "service": {
+                      "description": "Behavior policy for unknown Service, `Delete` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    },
+                    "statefulSet": {
+                      "description": "Behavior policy for unknown StatefulSet, `Delete` by default",
+                      "enum": [
+                        "",
+                        "Retain",
+                        "Delete"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "configMapPropagationTimeout": {
+              "description": "Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`\nMore details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically\n",
+              "maximum": 3600,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "policy": {
+              "description": "DISCUSSED TO BE DEPRECATED\nSyntax sugar\nOverrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config\nPossible values:\n - wait - should wait to exclude host, complete queries and include host back into the cluster\n - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster\n",
+              "enum": [
+                "",
+                "wait",
+                "nowait"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "stop": {
+          "description": "Allows to stop all ClickHouse clusters defined in a CHI.\nWorks as the following:\n - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.\n - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.\n",
+          "enum": [
+            "",
+            "0",
+            "1",
+            "False",
+            "false",
+            "True",
+            "true",
+            "No",
+            "no",
+            "Yes",
+            "yes",
+            "Off",
+            "off",
+            "On",
+            "on",
+            "Disable",
+            "disable",
+            "Enable",
+            "enable",
+            "Disabled",
+            "disabled",
+            "Enabled",
+            "enabled"
+          ],
+          "type": "string"
+        },
+        "suspend": {
+          "description": "Suspend reconciliation of resources managed by a ClickHouse Keeper.\nWorks as the following:\n - When `suspend` is `true` operator stops reconciling all resources.\n - When `suspend` is `false` or not set, operator reconciles all resources.\n",
+          "enum": [
+            "",
+            "0",
+            "1",
+            "False",
+            "false",
+            "True",
+            "true",
+            "No",
+            "no",
+            "Yes",
+            "yes",
+            "Off",
+            "off",
+            "On",
+            "on",
+            "Disable",
+            "disable",
+            "Enable",
+            "enable",
+            "Disabled",
+            "disabled",
+            "Enabled",
+            "enabled"
+          ],
+          "type": "string"
+        },
+        "taskID": {
+          "description": "Allows to define custom taskID for CHI update and watch status of this update execution.\nDisplayed in all .status.taskID* fields.\nBy default (if not filled) every update of CHI manifest will generate random taskID\n",
+          "type": "string"
+        },
+        "templates": {
+          "description": "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it",
+          "properties": {
+            "hostTemplates": {
+              "description": "hostTemplate will use during apply to generate `clickhose-server` config files",
+              "items": {
+                "properties": {
+                  "name": {
+                    "description": "template name, could use to link inside top-level `chi.spec.defaults.templates.hostTemplate`, cluster-level `chi.spec.configuration.clusters.templates.hostTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.hostTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.hostTemplate`",
+                    "type": "string"
+                  },
+                  "portDistribution": {
+                    "description": "define how will distribute numeric values of named ports in `Pod.spec.containers.ports` and clickhouse-server configs",
+                    "items": {
+                      "properties": {
+                        "type": {
+                          "description": "type of distribution, when `Unspecified` (default value) then all listen ports on clickhouse-server configuration in all Pods will have the same value, when `ClusterScopeIndex` then ports will increment to offset from base value depends on shard and replica index inside cluster with combination of `chi.spec.templates.podTemlates.spec.HostNetwork` it allows setup ClickHouse cluster inside Kubernetes and provide access via external network bypass Kubernetes internal network",
+                          "enum": [
+                            "",
+                            "Unspecified",
+                            "ClusterScopeIndex"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "spec": {
+                    "properties": {
+                      "files": {
+                        "description": "optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\n",
+                        "type": "object",
+                        "x-kubernetes-preserve-unknown-fields": true
+                      },
+                      "name": {
+                        "description": "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`",
+                        "maxLength": 15,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z0-9-]{0,15}$",
+                        "type": "string"
+                      },
+                      "raftPort": {
+                        "maximum": 65535,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "settings": {
+                        "description": "optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\n",
+                        "type": "object",
+                        "x-kubernetes-preserve-unknown-fields": true
+                      },
+                      "templates": {
+                        "description": "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do",
+                        "properties": {
+                          "clusterServiceTemplate": {
+                            "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "dataVolumeClaimTemplate": {
+                            "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "hostTemplate": {
+                            "description": "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure every `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod`",
+                            "type": "string"
+                          },
+                          "logVolumeClaimTemplate": {
+                            "description": "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "podTemplate": {
+                            "description": "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "replicaServiceTemplate": {
+                            "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "serviceTemplate": {
+                            "description": "optional, template name from chi.spec.templates.serviceTemplates. used for customization of the `Service` resource, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                            "type": "string"
+                          },
+                          "serviceTemplates": {
+                            "description": "optional, template names from chi.spec.templates.serviceTemplates. used for customization of the `Service` resources, created by `clickhouse-operator` to cover all clusters in whole `chi` resource",
+                            "items": {
+                              "type": "string"
+                            },
+                            "nullable": true,
+                            "type": "array"
+                          },
+                          "shardServiceTemplate": {
+                            "description": "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          },
+                          "volumeClaimTemplate": {
+                            "description": "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "zkPort": {
+                        "maximum": 65535,
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "podTemplates": {
+              "description": "podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone\nMore information: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatespodtemplates\n",
+              "items": {
+                "properties": {
+                  "distribution": {
+                    "description": "DEPRECATED, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`",
+                    "enum": [
+                      "",
+                      "Unspecified",
+                      "OnePerHost"
+                    ],
+                    "type": "string"
+                  },
+                  "generateName": {
+                    "description": "allows define format for generated `Pod` name, look to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates for details about available template variables",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "description": "allows pass standard object's metadata from template to Pod\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "name": {
+                    "description": "template name, could use to link inside top-level `chi.spec.defaults.templates.podTemplate`, cluster-level `chi.spec.configuration.clusters.templates.podTemplate`, shard-level `chi.spec.configuration.clusters.layout.shards.temlates.podTemplate`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates.podTemplate`",
+                    "type": "string"
+                  },
+                  "podDistribution": {
+                    "description": "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster",
+                    "items": {
+                      "properties": {
+                        "number": {
+                          "description": "define, how much ClickHouse Pods could be inside selected scope with selected distribution type",
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "scope": {
+                          "description": "scope for apply each podDistribution",
+                          "enum": [
+                            "",
+                            "Unspecified",
+                            "Shard",
+                            "Replica",
+                            "Cluster",
+                            "ClickHouseInstallation",
+                            "Namespace"
+                          ],
+                          "type": "string"
+                        },
+                        "topologyKey": {
+                          "description": "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`,\nmore info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity\"\n",
+                          "type": "string"
+                        },
+                        "type": {
+                          "description": "you can define multiple affinity policy types",
+                          "enum": [
+                            "",
+                            "Unspecified",
+                            "ClickHouseAntiAffinity",
+                            "ShardAntiAffinity",
+                            "ReplicaAntiAffinity",
+                            "AnotherNamespaceAntiAffinity",
+                            "AnotherClickHouseInstallationAntiAffinity",
+                            "AnotherClusterAntiAffinity",
+                            "MaxNumberPerNode",
+                            "NamespaceAffinity",
+                            "ClickHouseInstallationAffinity",
+                            "ClusterAffinity",
+                            "ShardAffinity",
+                            "ReplicaAffinity",
+                            "PreviousTailAffinity",
+                            "CircularReplication"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "spec": {
+                    "description": "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "zone": {
+                    "description": "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`",
+                    "properties": {
+                      "key": {
+                        "description": "optional, if defined, allows select kubernetes nodes by label with `name` equal `key`",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "optional, if defined, allows select kubernetes nodes by label with `value` in `values`",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "serviceTemplates": {
+              "description": "allows define template for rendering `Service` which would get endpoint from Pods which scoped chi-wide, cluster-wide, shard-wide, replica-wide level\n",
+              "items": {
+                "properties": {
+                  "generateName": {
+                    "description": "allows define format for generated `Service` name,\nlook to https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatesservicetemplates\nfor details about available template variables\"\n",
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "description": "allows pass standard object's metadata from template to Service\nCould be use for define specificly for Cloud Provider metadata which impact to behavior of service\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "name": {
+                    "description": "template name, could use to link inside\nchi-level `chi.spec.defaults.templates.serviceTemplate`\ncluster-level `chi.spec.configuration.clusters.templates.clusterServiceTemplate`\nshard-level `chi.spec.configuration.clusters.layout.shards.temlates.shardServiceTemplate`\nreplica-level `chi.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate` or `chi.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`\n",
+                    "type": "string"
+                  },
+                  "spec": {
+                    "description": "describe behavior of generated Service\nMore info: https://kubernetes.io/docs/concepts/services-networking/service/\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "volumeClaimTemplates": {
+              "description": "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else\n",
+              "items": {
+                "properties": {
+                  "metadata": {
+                    "description": "allows to pass standard object's metadata from template to PVC\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "name": {
+                    "description": "template name, could use to link inside\ntop-level `chi.spec.defaults.templates.dataVolumeClaimTemplate` or `chi.spec.defaults.templates.logVolumeClaimTemplate`,\ncluster-level `chi.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.templates.logVolumeClaimTemplate`,\nshard-level `chi.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`\nreplica-level `chi.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`\n",
+                    "type": "string"
+                  },
+                  "provisioner": {
+                    "description": "defines `PVC` provisioner - be it StatefulSet or the Operator",
+                    "enum": [
+                      "",
+                      "StatefulSet",
+                      "Operator"
+                    ],
+                    "type": "string"
+                  },
+                  "reclaimPolicy": {
+                    "description": "defines behavior of `PVC` deletion.\n`Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet\n",
+                    "enum": [
+                      "",
+                      "Retain",
+                      "Delete"
+                    ],
+                    "type": "string"
+                  },
+                  "spec": {
+                    "description": "allows define all aspects of `PVC` resource\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims\n",
+                    "type": "object",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other\n",
+      "properties": {
+        "action": {
+          "description": "Action",
+          "type": "string"
+        },
+        "actions": {
+          "description": "Actions",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "chop-commit": {
+          "description": "Operator git commit SHA",
+          "type": "string"
+        },
+        "chop-date": {
+          "description": "Operator build date",
+          "type": "string"
+        },
+        "chop-ip": {
+          "description": "IP address of the operator's pod which managed this resource",
+          "type": "string"
+        },
+        "chop-version": {
+          "description": "Operator version",
+          "type": "string"
+        },
+        "clusters": {
+          "description": "Clusters count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "endpoint": {
+          "description": "Endpoint",
+          "type": "string"
+        },
+        "endpoints": {
+          "description": "All endpoints",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "error": {
+          "description": "Last error",
+          "type": "string"
+        },
+        "errors": {
+          "description": "Errors",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "fqdns": {
+          "description": "Pods FQDNs",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "generation": {
+          "description": "Generation",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hosts": {
+          "description": "Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsAdded": {
+          "description": "Added Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsCompleted": {
+          "description": "Completed Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsDelete": {
+          "description": "About to delete Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsDeleted": {
+          "description": "Deleted Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsUnchanged": {
+          "description": "Unchanged Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsUpdated": {
+          "description": "Updated Hosts count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "hostsWithReplicaCaughtUp": {
+          "description": "List of hosts with replica caught up",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "hostsWithTablesCreated": {
+          "description": "List of hosts with tables created by the operator",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "normalized": {
+          "description": "Normalized resource requested",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "normalizedCompleted": {
+          "description": "Normalized resource completed",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
+        "pod-ips": {
+          "description": "Pod IPs",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "pods": {
+          "description": "Pods",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "replicas": {
+          "description": "Replicas count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shards": {
+          "description": "Shards count",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "description": "Status",
+          "type": "string"
+        },
+        "taskID": {
+          "description": "Current task id",
+          "type": "string"
+        },
+        "taskIDsCompleted": {
+          "description": "Completed task ids",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "taskIDsStarted": {
+          "description": "Started task ids",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true,
+          "type": "array"
+        },
+        "usedTemplates": {
+          "description": "List of templates used to build this CHI",
+          "items": {
+            "type": "object",
+            "x-kubernetes-preserve-unknown-fields": true
+          },
+          "nullable": true,
+          "type": "array",
+          "x-kubernetes-preserve-unknown-fields": true
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

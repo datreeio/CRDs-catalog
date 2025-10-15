@@ -114,7 +114,7 @@
           "type": "integer"
         },
         "requestsLoadBalancer": {
-          "description": "RequestsLoadBalancer configures load-balancing for vminsert and vmselect requests\nit helps to evenly spread load across pods\nusually it's not possible with kubernetes TCP based service",
+          "description": "RequestsLoadBalancer configures load-balancing for vminsert and vmselect requests.\nIt helps to evenly spread load across pods.\nUsually it's not possible with Kubernetes TCP-based services.\nSee more [here](https://docs.victoriametrics.com/operator/resources/vmcluster/#requests-load-balancing)",
           "properties": {
             "disableInsertBalancing": {
               "type": "boolean"
@@ -135,7 +135,8 @@
           "additionalProperties": false
         },
         "retentionPeriod": {
-          "description": "RetentionPeriod for the stored metrics\nNote VictoriaMetrics has data/ and indexdb/ folders\nmetrics from data/ removed eventually as soon as partition leaves retention period\nreverse index data at indexdb rotates once at the half of configured\n[retention period](https://docs.victoriametrics.com/Single-server-VictoriaMetrics/#retention)",
+          "description": "RetentionPeriod defines how long to retain stored metrics, specified as a duration (e.g., \"1d\", \"1w\", \"1m\").\nData with timestamps outside the RetentionPeriod is automatically deleted. The minimum allowed value is 1d, or 24h.\nThe default value is 1 (one month).\nSee [retention](https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/#retention) docs for details.",
+          "pattern": "^[0-9]+(h|d|w|y)?$",
           "type": "string"
         },
         "serviceAccountName": {
@@ -176,6 +177,10 @@
               },
               "type": "array"
             },
+            "disableAutomountServiceAccountToken": {
+              "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+              "type": "boolean"
+            },
             "disableSelfServiceScrape": {
               "description": "DisableSelfServiceScrape controls creation of VMServiceScrape by operator\nfor the application.\nHas priority over `VM_DISABLESELFSERVICESCRAPECREATION` operator env variable",
               "type": "boolean"
@@ -200,10 +205,11 @@
                     "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                     "properties": {
                       "name": {
-                        "description": "Required.",
+                        "description": "Name is this DNS resolver option's name.\nRequired.",
                         "type": "string"
                       },
                       "value": {
+                        "description": "Value is this DNS resolver option's value.",
                         "type": "string"
                       }
                     },
@@ -255,6 +261,55 @@
                 ],
                 "type": "object",
                 "x-kubernetes-preserve-unknown-fields": true,
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "extraEnvsFrom": {
+              "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+              "items": {
+                "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                "properties": {
+                  "configMapRef": {
+                    "description": "The ConfigMap to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the ConfigMap must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "prefix": {
+                    "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                    "type": "string"
+                  },
+                  "secretRef": {
+                    "description": "The Secret to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
                 "additionalProperties": false
               },
               "type": "array"
@@ -850,317 +905,7 @@
               "description": "ClaimTemplates allows adding additional VolumeClaimTemplates for StatefulSet",
               "items": {
                 "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
-                "properties": {
-                  "apiVersion": {
-                    "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-                    "type": "string"
-                  },
-                  "kind": {
-                    "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "description": "Standard object's metadata.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-                    "type": "object",
-                    "x-kubernetes-preserve-unknown-fields": true
-                  },
-                  "spec": {
-                    "description": "spec defines the desired characteristics of a volume requested by a pod author.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-                    "properties": {
-                      "accessModes": {
-                        "description": "accessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-type": "atomic"
-                      },
-                      "dataSource": {
-                        "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
-                        "properties": {
-                          "apiGroup": {
-                            "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
-                            "type": "string"
-                          },
-                          "kind": {
-                            "description": "Kind is the type of resource being referenced",
-                            "type": "string"
-                          },
-                          "name": {
-                            "description": "Name is the name of resource being referenced",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "name"
-                        ],
-                        "type": "object",
-                        "x-kubernetes-map-type": "atomic",
-                        "additionalProperties": false
-                      },
-                      "dataSourceRef": {
-                        "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
-                        "properties": {
-                          "apiGroup": {
-                            "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
-                            "type": "string"
-                          },
-                          "kind": {
-                            "description": "Kind is the type of resource being referenced",
-                            "type": "string"
-                          },
-                          "name": {
-                            "description": "Name is the name of resource being referenced",
-                            "type": "string"
-                          },
-                          "namespace": {
-                            "description": "Namespace is the namespace of resource being referenced\nNote that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.\n(Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "name"
-                        ],
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "resources": {
-                        "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
-                        "properties": {
-                          "limits": {
-                            "additionalProperties": {
-                              "anyOf": [
-                                {
-                                  "type": "integer"
-                                },
-                                {
-                                  "type": "string"
-                                }
-                              ],
-                              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                              "x-kubernetes-int-or-string": true
-                            },
-                            "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-                            "type": "object"
-                          },
-                          "requests": {
-                            "additionalProperties": {
-                              "anyOf": [
-                                {
-                                  "type": "integer"
-                                },
-                                {
-                                  "type": "string"
-                                }
-                              ],
-                              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                              "x-kubernetes-int-or-string": true
-                            },
-                            "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-                            "type": "object"
-                          }
-                        },
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "selector": {
-                        "description": "selector is a label query over volumes to consider for binding.",
-                        "properties": {
-                          "matchExpressions": {
-                            "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-                            "items": {
-                              "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
-                              "properties": {
-                                "key": {
-                                  "description": "key is the label key that the selector applies to.",
-                                  "type": "string"
-                                },
-                                "operator": {
-                                  "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
-                                  "type": "string"
-                                },
-                                "values": {
-                                  "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
-                                  "items": {
-                                    "type": "string"
-                                  },
-                                  "type": "array",
-                                  "x-kubernetes-list-type": "atomic"
-                                }
-                              },
-                              "required": [
-                                "key",
-                                "operator"
-                              ],
-                              "type": "object",
-                              "additionalProperties": false
-                            },
-                            "type": "array",
-                            "x-kubernetes-list-type": "atomic"
-                          },
-                          "matchLabels": {
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-                            "type": "object"
-                          }
-                        },
-                        "type": "object",
-                        "x-kubernetes-map-type": "atomic",
-                        "additionalProperties": false
-                      },
-                      "storageClassName": {
-                        "description": "storageClassName is the name of the StorageClass required by the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
-                        "type": "string"
-                      },
-                      "volumeAttributesClassName": {
-                        "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
-                        "type": "string"
-                      },
-                      "volumeMode": {
-                        "description": "volumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.",
-                        "type": "string"
-                      },
-                      "volumeName": {
-                        "description": "volumeName is the binding reference to the PersistentVolume backing this claim.",
-                        "type": "string"
-                      }
-                    },
-                    "type": "object",
-                    "additionalProperties": false
-                  },
-                  "status": {
-                    "description": "status represents the current information/status of a persistent volume claim.\nRead-only.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-                    "properties": {
-                      "accessModes": {
-                        "description": "accessModes contains the actual access modes the volume backing the PVC has.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-type": "atomic"
-                      },
-                      "allocatedResourceStatuses": {
-                        "additionalProperties": {
-                          "description": "When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource\nthat it does not recognizes, then it should ignore that update and let other controllers\nhandle it.",
-                          "type": "string"
-                        },
-                        "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
-                        "type": "object",
-                        "x-kubernetes-map-type": "granular"
-                      },
-                      "allocatedResources": {
-                        "additionalProperties": {
-                          "anyOf": [
-                            {
-                              "type": "integer"
-                            },
-                            {
-                              "type": "string"
-                            }
-                          ],
-                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                          "x-kubernetes-int-or-string": true
-                        },
-                        "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
-                        "type": "object"
-                      },
-                      "capacity": {
-                        "additionalProperties": {
-                          "anyOf": [
-                            {
-                              "type": "integer"
-                            },
-                            {
-                              "type": "string"
-                            }
-                          ],
-                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                          "x-kubernetes-int-or-string": true
-                        },
-                        "description": "capacity represents the actual resources of the underlying volume.",
-                        "type": "object"
-                      },
-                      "conditions": {
-                        "description": "conditions is the current Condition of persistent volume claim. If underlying persistent volume is being\nresized then the Condition will be set to 'Resizing'.",
-                        "items": {
-                          "description": "PersistentVolumeClaimCondition contains details about state of pvc",
-                          "properties": {
-                            "lastProbeTime": {
-                              "description": "lastProbeTime is the time we probed the condition.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "lastTransitionTime": {
-                              "description": "lastTransitionTime is the time the condition transitioned from one status to another.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "message": {
-                              "description": "message is the human-readable message indicating details about last transition.",
-                              "type": "string"
-                            },
-                            "reason": {
-                              "description": "reason is a unique, this should be a short, machine understandable string that gives the reason\nfor condition's last transition. If it reports \"Resizing\" that means the underlying\npersistent volume is being resized.",
-                              "type": "string"
-                            },
-                            "status": {
-                              "type": "string"
-                            },
-                            "type": {
-                              "description": "PersistentVolumeClaimConditionType defines the condition of PV claim.\nValid values are:\n  - \"Resizing\", \"FileSystemResizePending\"\n\nIf RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:\n  - \"ControllerResizeError\", \"NodeResizeError\"\n\nIf VolumeAttributesClass feature gate is enabled, then following additional values can be expected:\n  - \"ModifyVolumeError\", \"ModifyingVolume\"",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "status",
-                            "type"
-                          ],
-                          "type": "object",
-                          "additionalProperties": false
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-map-keys": [
-                          "type"
-                        ],
-                        "x-kubernetes-list-type": "map"
-                      },
-                      "currentVolumeAttributesClassName": {
-                        "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
-                        "type": "string"
-                      },
-                      "modifyVolumeStatus": {
-                        "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
-                        "properties": {
-                          "status": {
-                            "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",
-                            "type": "string"
-                          },
-                          "targetVolumeAttributesClassName": {
-                            "description": "targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "phase": {
-                        "description": "phase represents the current phase of PersistentVolumeClaim.",
-                        "type": "string"
-                      }
-                    },
-                    "type": "object",
-                    "additionalProperties": false
-                  }
-                },
-                "type": "object",
-                "additionalProperties": false
+                "type": "object"
               },
               "type": "array"
             },
@@ -1187,6 +932,10 @@
               },
               "type": "array"
             },
+            "disableAutomountServiceAccountToken": {
+              "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+              "type": "boolean"
+            },
             "disableSelfServiceScrape": {
               "description": "DisableSelfServiceScrape controls creation of VMServiceScrape by operator\nfor the application.\nHas priority over `VM_DISABLESELFSERVICESCRAPECREATION` operator env variable",
               "type": "boolean"
@@ -1211,10 +960,11 @@
                     "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                     "properties": {
                       "name": {
-                        "description": "Required.",
+                        "description": "Name is this DNS resolver option's name.\nRequired.",
                         "type": "string"
                       },
                       "value": {
+                        "description": "Value is this DNS resolver option's value.",
                         "type": "string"
                       }
                     },
@@ -1266,6 +1016,55 @@
                 ],
                 "type": "object",
                 "x-kubernetes-preserve-unknown-fields": true,
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "extraEnvsFrom": {
+              "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+              "items": {
+                "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                "properties": {
+                  "configMapRef": {
+                    "description": "The ConfigMap to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the ConfigMap must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "prefix": {
+                    "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                    "type": "string"
+                  },
+                  "secretRef": {
+                    "description": "The Secret to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
                 "additionalProperties": false
               },
               "type": "array"
@@ -2020,10 +1819,11 @@
                                 "type": "string"
                               },
                               "status": {
+                                "description": "Status is the status of the condition.\nCan be True, False, Unknown.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=state%20of%20pvc-,conditions.status,-(string)%2C%20required",
                                 "type": "string"
                               },
                               "type": {
-                                "description": "PersistentVolumeClaimConditionType defines the condition of PV claim.\nValid values are:\n  - \"Resizing\", \"FileSystemResizePending\"\n\nIf RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:\n  - \"ControllerResizeError\", \"NodeResizeError\"\n\nIf VolumeAttributesClass feature gate is enabled, then following additional values can be expected:\n  - \"ModifyVolumeError\", \"ModifyingVolume\"",
+                                "description": "Type is the type of the condition.\nMore info: https://kubernetes.io/docs/reference/kubernetes-api/config-and-storage-resources/persistent-volume-claim-v1/#:~:text=set%20to%20%27ResizeStarted%27.-,PersistentVolumeClaimCondition,-contains%20details%20about",
                                 "type": "string"
                               }
                             },
@@ -2207,317 +2007,8 @@
               "description": "ClaimTemplates allows adding additional VolumeClaimTemplates for StatefulSet",
               "items": {
                 "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
-                "properties": {
-                  "apiVersion": {
-                    "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-                    "type": "string"
-                  },
-                  "kind": {
-                    "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "description": "Standard object's metadata.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-                    "type": "object",
-                    "x-kubernetes-preserve-unknown-fields": true
-                  },
-                  "spec": {
-                    "description": "spec defines the desired characteristics of a volume requested by a pod author.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-                    "properties": {
-                      "accessModes": {
-                        "description": "accessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-type": "atomic"
-                      },
-                      "dataSource": {
-                        "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
-                        "properties": {
-                          "apiGroup": {
-                            "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
-                            "type": "string"
-                          },
-                          "kind": {
-                            "description": "Kind is the type of resource being referenced",
-                            "type": "string"
-                          },
-                          "name": {
-                            "description": "Name is the name of resource being referenced",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "name"
-                        ],
-                        "type": "object",
-                        "x-kubernetes-map-type": "atomic",
-                        "additionalProperties": false
-                      },
-                      "dataSourceRef": {
-                        "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
-                        "properties": {
-                          "apiGroup": {
-                            "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
-                            "type": "string"
-                          },
-                          "kind": {
-                            "description": "Kind is the type of resource being referenced",
-                            "type": "string"
-                          },
-                          "name": {
-                            "description": "Name is the name of resource being referenced",
-                            "type": "string"
-                          },
-                          "namespace": {
-                            "description": "Namespace is the namespace of resource being referenced\nNote that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.\n(Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "kind",
-                          "name"
-                        ],
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "resources": {
-                        "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
-                        "properties": {
-                          "limits": {
-                            "additionalProperties": {
-                              "anyOf": [
-                                {
-                                  "type": "integer"
-                                },
-                                {
-                                  "type": "string"
-                                }
-                              ],
-                              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                              "x-kubernetes-int-or-string": true
-                            },
-                            "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-                            "type": "object"
-                          },
-                          "requests": {
-                            "additionalProperties": {
-                              "anyOf": [
-                                {
-                                  "type": "integer"
-                                },
-                                {
-                                  "type": "string"
-                                }
-                              ],
-                              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                              "x-kubernetes-int-or-string": true
-                            },
-                            "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
-                            "type": "object"
-                          }
-                        },
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "selector": {
-                        "description": "selector is a label query over volumes to consider for binding.",
-                        "properties": {
-                          "matchExpressions": {
-                            "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
-                            "items": {
-                              "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
-                              "properties": {
-                                "key": {
-                                  "description": "key is the label key that the selector applies to.",
-                                  "type": "string"
-                                },
-                                "operator": {
-                                  "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
-                                  "type": "string"
-                                },
-                                "values": {
-                                  "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
-                                  "items": {
-                                    "type": "string"
-                                  },
-                                  "type": "array",
-                                  "x-kubernetes-list-type": "atomic"
-                                }
-                              },
-                              "required": [
-                                "key",
-                                "operator"
-                              ],
-                              "type": "object",
-                              "additionalProperties": false
-                            },
-                            "type": "array",
-                            "x-kubernetes-list-type": "atomic"
-                          },
-                          "matchLabels": {
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
-                            "type": "object"
-                          }
-                        },
-                        "type": "object",
-                        "x-kubernetes-map-type": "atomic",
-                        "additionalProperties": false
-                      },
-                      "storageClassName": {
-                        "description": "storageClassName is the name of the StorageClass required by the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
-                        "type": "string"
-                      },
-                      "volumeAttributesClassName": {
-                        "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
-                        "type": "string"
-                      },
-                      "volumeMode": {
-                        "description": "volumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.",
-                        "type": "string"
-                      },
-                      "volumeName": {
-                        "description": "volumeName is the binding reference to the PersistentVolume backing this claim.",
-                        "type": "string"
-                      }
-                    },
-                    "type": "object",
-                    "additionalProperties": false
-                  },
-                  "status": {
-                    "description": "status represents the current information/status of a persistent volume claim.\nRead-only.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
-                    "properties": {
-                      "accessModes": {
-                        "description": "accessModes contains the actual access modes the volume backing the PVC has.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-type": "atomic"
-                      },
-                      "allocatedResourceStatuses": {
-                        "additionalProperties": {
-                          "description": "When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource\nthat it does not recognizes, then it should ignore that update and let other controllers\nhandle it.",
-                          "type": "string"
-                        },
-                        "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
-                        "type": "object",
-                        "x-kubernetes-map-type": "granular"
-                      },
-                      "allocatedResources": {
-                        "additionalProperties": {
-                          "anyOf": [
-                            {
-                              "type": "integer"
-                            },
-                            {
-                              "type": "string"
-                            }
-                          ],
-                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                          "x-kubernetes-int-or-string": true
-                        },
-                        "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
-                        "type": "object"
-                      },
-                      "capacity": {
-                        "additionalProperties": {
-                          "anyOf": [
-                            {
-                              "type": "integer"
-                            },
-                            {
-                              "type": "string"
-                            }
-                          ],
-                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                          "x-kubernetes-int-or-string": true
-                        },
-                        "description": "capacity represents the actual resources of the underlying volume.",
-                        "type": "object"
-                      },
-                      "conditions": {
-                        "description": "conditions is the current Condition of persistent volume claim. If underlying persistent volume is being\nresized then the Condition will be set to 'Resizing'.",
-                        "items": {
-                          "description": "PersistentVolumeClaimCondition contains details about state of pvc",
-                          "properties": {
-                            "lastProbeTime": {
-                              "description": "lastProbeTime is the time we probed the condition.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "lastTransitionTime": {
-                              "description": "lastTransitionTime is the time the condition transitioned from one status to another.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "message": {
-                              "description": "message is the human-readable message indicating details about last transition.",
-                              "type": "string"
-                            },
-                            "reason": {
-                              "description": "reason is a unique, this should be a short, machine understandable string that gives the reason\nfor condition's last transition. If it reports \"Resizing\" that means the underlying\npersistent volume is being resized.",
-                              "type": "string"
-                            },
-                            "status": {
-                              "type": "string"
-                            },
-                            "type": {
-                              "description": "PersistentVolumeClaimConditionType defines the condition of PV claim.\nValid values are:\n  - \"Resizing\", \"FileSystemResizePending\"\n\nIf RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:\n  - \"ControllerResizeError\", \"NodeResizeError\"\n\nIf VolumeAttributesClass feature gate is enabled, then following additional values can be expected:\n  - \"ModifyVolumeError\", \"ModifyingVolume\"",
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "status",
-                            "type"
-                          ],
-                          "type": "object",
-                          "additionalProperties": false
-                        },
-                        "type": "array",
-                        "x-kubernetes-list-map-keys": [
-                          "type"
-                        ],
-                        "x-kubernetes-list-type": "map"
-                      },
-                      "currentVolumeAttributesClassName": {
-                        "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
-                        "type": "string"
-                      },
-                      "modifyVolumeStatus": {
-                        "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
-                        "properties": {
-                          "status": {
-                            "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",
-                            "type": "string"
-                          },
-                          "targetVolumeAttributesClassName": {
-                            "description": "targetVolumeAttributesClassName is the name of the VolumeAttributesClass the PVC currently being reconciled",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "status"
-                        ],
-                        "type": "object",
-                        "additionalProperties": false
-                      },
-                      "phase": {
-                        "description": "phase represents the current phase of PersistentVolumeClaim.",
-                        "type": "string"
-                      }
-                    },
-                    "type": "object",
-                    "additionalProperties": false
-                  }
-                },
                 "type": "object",
-                "additionalProperties": false
+                "x-kubernetes-preserve-unknown-fields": true
               },
               "type": "array"
             },
@@ -2539,6 +2030,10 @@
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "type": "array"
+            },
+            "disableAutomountServiceAccountToken": {
+              "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+              "type": "boolean"
             },
             "disableSelfServiceScrape": {
               "description": "DisableSelfServiceScrape controls creation of VMServiceScrape by operator\nfor the application.\nHas priority over `VM_DISABLESELFSERVICESCRAPECREATION` operator env variable",
@@ -2564,10 +2059,11 @@
                     "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
                     "properties": {
                       "name": {
-                        "description": "Required.",
+                        "description": "Name is this DNS resolver option's name.\nRequired.",
                         "type": "string"
                       },
                       "value": {
+                        "description": "Value is this DNS resolver option's value.",
                         "type": "string"
                       }
                     },
@@ -2619,6 +2115,55 @@
                 ],
                 "type": "object",
                 "x-kubernetes-preserve-unknown-fields": true,
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "extraEnvsFrom": {
+              "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+              "items": {
+                "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                "properties": {
+                  "configMapRef": {
+                    "description": "The ConfigMap to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the ConfigMap must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "prefix": {
+                    "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                    "type": "string"
+                  },
+                  "secretRef": {
+                    "description": "The Secret to select from",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
                 "additionalProperties": false
               },
               "type": "array"
@@ -3334,6 +2879,55 @@
                   },
                   "type": "array"
                 },
+                "extraEnvsFrom": {
+                  "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
+                  "items": {
+                    "description": "EnvFromSource represents the source of a set of ConfigMaps",
+                    "properties": {
+                      "configMapRef": {
+                        "description": "The ConfigMap to select from",
+                        "properties": {
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the ConfigMap must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "prefix": {
+                        "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                        "type": "string"
+                      },
+                      "secretRef": {
+                        "description": "The Secret to select from",
+                        "properties": {
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
                 "image": {
                   "description": "Image - docker image settings for VMBackuper",
                   "properties": {
@@ -3582,9 +3176,6 @@
           "additionalProperties": false
         }
       },
-      "required": [
-        "retentionPeriod"
-      ],
       "type": "object",
       "additionalProperties": false
     },
@@ -3658,10 +3249,6 @@
           ],
           "x-kubernetes-list-type": "map"
         },
-        "lastSync": {
-          "description": "Deprecated.",
-          "type": "string"
-        },
         "observedGeneration": {
           "description": "ObservedGeneration defines current generation picked by operator for the\nreconcile",
           "format": "int64",
@@ -3671,18 +3258,11 @@
           "description": "Reason defines human readable error reason",
           "type": "string"
         },
-        "updateFailCount": {
-          "description": "Deprecated.",
-          "type": "integer"
-        },
         "updateStatus": {
           "description": "UpdateStatus defines a status for update rollout",
           "type": "string"
         }
       },
-      "required": [
-        "updateFailCount"
-      ],
       "type": "object",
       "additionalProperties": false
     }

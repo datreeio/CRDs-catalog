@@ -1,0 +1,613 @@
+{
+  "description": "ManifestWork represents a manifests workload that hub wants to deploy on the managed cluster.\nA manifest workload is defined as a set of Kubernetes resources.\nManifestWork must be created in the cluster namespace on the hub, so that agent on the\ncorresponding managed cluster can access this resource and deploy on the managed\ncluster.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec represents a desired configuration of work to be deployed on the managed cluster.",
+      "properties": {
+        "deleteOption": {
+          "description": "DeleteOption represents deletion strategy when the manifestwork is deleted.\nForeground deletion strategy is applied to all the resource in this manifestwork if it is not set.",
+          "properties": {
+            "propagationPolicy": {
+              "default": "Foreground",
+              "description": "propagationPolicy can be Foreground, Orphan or SelectivelyOrphan\nSelectivelyOrphan should be rarely used.  It is provided for cases where particular resources is transfering\nownership from one ManifestWork to another or another management unit.\nSetting this value will allow a flow like\n1. create manifestwork/2 to manage foo\n2. update manifestwork/1 to selectively orphan foo\n3. remove foo from manifestwork/1 without impacting continuity because manifestwork/2 adopts it.",
+              "enum": [
+                "Foreground",
+                "Orphan",
+                "SelectivelyOrphan"
+              ],
+              "type": "string"
+            },
+            "selectivelyOrphans": {
+              "description": "selectivelyOrphan represents a list of resources following orphan deletion stratecy",
+              "properties": {
+                "orphaningRules": {
+                  "description": "orphaningRules defines a slice of orphaningrule.\nEach orphaningrule identifies a single resource included in this manifestwork",
+                  "items": {
+                    "description": "OrphaningRule identifies a single resource included in this manifestwork to be orphaned",
+                    "properties": {
+                      "group": {
+                        "description": "Group is the API Group of the Kubernetes resource,\nempty string indicates it is in core group.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Name is the name of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "description": "Name is the namespace of the Kubernetes resource, empty string indicates\nit is a cluster scoped resource.",
+                        "type": "string"
+                      },
+                      "resource": {
+                        "description": "Resource is the resource name of the Kubernetes resource.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "resource"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "ttlSecondsAfterFinished": {
+              "description": "TTLSecondsAfterFinished limits the lifetime of a ManifestWork that has been marked Complete\nby one or more conditionRules set for its manifests. If this field is set, and\nthe manifestwork has completed, then it is elligible to be automatically deleted.\nIf this field is unset, the manifestwork won't be automatically deleted even afer completion.\nIf this field is set to zero, the manfiestwork becomes elligible to be deleted immediately\nafter completion.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "executor": {
+          "description": "Executor is the configuration that makes the work agent to perform some pre-request processing/checking.\ne.g. the executor identity tells the work agent to check the executor has sufficient permission to write\nthe workloads to the local managed cluster.\nNote that nil executor is still supported for backward-compatibility which indicates that the work agent\nwill not perform any additional actions before applying resources.",
+          "properties": {
+            "subject": {
+              "description": "Subject is the subject identity which the work agent uses to talk to the\nlocal cluster when applying the resources.",
+              "properties": {
+                "serviceAccount": {
+                  "description": "ServiceAccount is for identifying which service account to use by the work agent.\nOnly required if the type is \"ServiceAccount\".",
+                  "properties": {
+                    "name": {
+                      "description": "Name is the name of the service account.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$",
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "Namespace is the namespace of the service account.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "namespace"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": {
+                  "description": "Type is the type of the subject identity.\nSupported types are: \"ServiceAccount\".",
+                  "enum": [
+                    "ServiceAccount"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "manifestConfigs": {
+          "description": "ManifestConfigs represents the configurations of manifests defined in workload field.",
+          "items": {
+            "description": "ManifestConfigOption represents the configurations of a manifest defined in workload field.",
+            "properties": {
+              "conditionRules": {
+                "description": "ConditionRules defines how to set manifestwork conditions for a specific manifest.",
+                "items": {
+                  "properties": {
+                    "celExpressions": {
+                      "description": "CelExpressions defines the CEL expressions to be evaluated for the condition.\nFinal result is the logical AND of all expressions.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "condition": {
+                      "description": "Condition is the type of condition that is set based on this rule.\nAny condition is supported, but certain special conditions can be used to\nto control higher level behaviors of the manifestwork.\nIf the condition is Complete, the manifest will no longer be updated once completed.",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "Message is set on the condition created for this rule",
+                      "type": "string"
+                    },
+                    "messageExpression": {
+                      "description": "MessageExpression uses a CEL expression to generate a message for the condition\nWill override message if both are set and messageExpression returns a non-empty string.\nVariables:\n- object: The current instance of the manifest\n- result: Boolean result of the CEL expressions",
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "Type defines how a manifest should be evaluated for a condition.\nIt can be CEL, or WellKnownConditions.\nIf the type is CEL, user should specify the celExpressions field\nIf the type is WellKnownConditions, certain common types in k8s.io/api will be considered\ncompleted as defined by hardcoded rules.",
+                      "enum": [
+                        "WellKnownConditions",
+                        "CEL"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "condition",
+                    "type"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "Condition is required for CEL rules",
+                      "rule": "self.type != 'CEL' || self.condition != \"\""
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "condition"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "feedbackRules": {
+                "description": "FeedbackRules defines what resource status field should be returned. If it is not set or empty,\nno feedback rules will be honored.",
+                "items": {
+                  "properties": {
+                    "jsonPaths": {
+                      "description": "JsonPaths defines the json path under status field to be synced.",
+                      "items": {
+                        "properties": {
+                          "name": {
+                            "description": "Name represents the alias name for this field",
+                            "type": "string"
+                          },
+                          "path": {
+                            "description": "Path represents the json path of the field under status.\nThe path must point to a field with single value in the type of integer, bool or string.\nIf the path points to a non-existing field, no value will be returned.\nIf the path points to a structure, map or slice, no value will be returned and the status conddition\nof StatusFeedBackSynced will be set as false.\nRef to https://kubernetes.io/docs/reference/kubectl/jsonpath/ on how to write a jsonPath.",
+                            "type": "string"
+                          },
+                          "version": {
+                            "description": "Version is the version of the Kubernetes resource.\nIf it is not specified, the resource with the semantically latest version is\nused to resolve the path.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "path"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    },
+                    "type": {
+                      "description": "Type defines the option of how status can be returned.\nIt can be jsonPaths or wellKnownStatus.\nIf the type is JSONPaths, user should specify the jsonPaths field\nIf the type is WellKnownStatus, certain common fields of status defined by a rule only\nfor types in in k8s.io/api and open-cluster-management/api will be reported,\nIf these status fields do not exist, no values will be reported.",
+                      "enum": [
+                        "WellKnownStatus",
+                        "JSONPaths"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "resourceIdentifier": {
+                "description": "ResourceIdentifier represents the group, resource, name and namespace of a resoure.\niff this refers to a resource not created by this manifest work, the related rules will not be executed.",
+                "properties": {
+                  "group": {
+                    "description": "Group is the API Group of the Kubernetes resource,\nempty string indicates it is in core group.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the Kubernetes resource.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Name is the namespace of the Kubernetes resource, empty string indicates\nit is a cluster scoped resource.",
+                    "type": "string"
+                  },
+                  "resource": {
+                    "description": "Resource is the resource name of the Kubernetes resource.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "resource"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "updateStrategy": {
+                "description": "UpdateStrategy defines the strategy to update this manifest. UpdateStrategy is Update\nif it is not set.",
+                "properties": {
+                  "serverSideApply": {
+                    "description": "serverSideApply defines the configuration for server side apply. It is honored only when the\ntype of the updateStrategy is ServerSideApply",
+                    "properties": {
+                      "fieldManager": {
+                        "default": "work-agent",
+                        "description": "FieldManager is the manager to apply the resource. It is work-agent by default, but can be other name with work-agent\nas the prefix.",
+                        "pattern": "^work-agent",
+                        "type": "string"
+                      },
+                      "force": {
+                        "description": "Force represents to force apply the manifest.",
+                        "type": "boolean"
+                      },
+                      "ignoreFields": {
+                        "description": "IgnoreFields defines a list of json paths in the resource that will not be updated on the spoke.",
+                        "items": {
+                          "properties": {
+                            "condition": {
+                              "default": "OnSpokePresent",
+                              "description": "Condition defines the condition that the fields should be ignored when apply the resource.\nFields in JSONPaths are all ignored when condition is met, otherwise no fields is ignored\nin the apply operation.",
+                              "enum": [
+                                "OnSpokePresent",
+                                "OnSpokeChange"
+                              ],
+                              "type": "string"
+                            },
+                            "jsonPaths": {
+                              "description": "JSONPaths defines the list of json path in the resource to be ignored",
+                              "items": {
+                                "type": "string"
+                              },
+                              "minItems": 1,
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "condition",
+                            "jsonPaths"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "condition"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": {
+                    "default": "Update",
+                    "description": "type defines the strategy to update this manifest, default value is Update.\nUpdate type means to update resource by an update call.\nCreateOnly type means do not update resource based on current manifest.\nServerSideApply type means to update resource using server side apply with work-controller as the field manager.\nIf there is conflict, the related Applied condition of manifest will be in the status of False with the\nreason of ApplyConflict.\nReadOnly type means the agent will only check the existence of the resource based on its metadata,\nstatusFeedBackRules can still be used to get feedbackResults.",
+                    "enum": [
+                      "Update",
+                      "CreateOnly",
+                      "ServerSideApply",
+                      "ReadOnly"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "resourceIdentifier"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "workload": {
+          "description": "Workload represents the manifest workload to be deployed on a managed cluster.",
+          "properties": {
+            "manifests": {
+              "description": "Manifests represents a list of kuberenetes resources to be deployed on a managed cluster.",
+              "items": {
+                "description": "Manifest represents a resource to be deployed on managed cluster.",
+                "type": "object",
+                "x-kubernetes-embedded-resource": true,
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status represents the current status of work.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions contains the different condition statuses for this work.\nValid condition types are:\n1. Applied represents workload in ManifestWork is applied successfully on managed cluster.\n2. Progressing represents workload in ManifestWork is being applied on managed cluster.\n3. Available represents workload in ManifestWork exists on the managed cluster.\n4. Degraded represents the current state of workload does not match the desired\nstate for a certain period.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "resourceStatus": {
+          "description": "ResourceStatus represents the status of each resource in manifestwork deployed on a\nmanaged cluster. The Klusterlet agent on managed cluster syncs the condition from the managed cluster to the hub.",
+          "properties": {
+            "manifests": {
+              "description": "Manifests represents the condition of manifests deployed on managed cluster.\nValid condition types are:\n1. Progressing represents the resource is being applied on managed cluster.\n2. Applied represents the resource is applied successfully on managed cluster.\n3. Available represents the resource exists on the managed cluster.\n4. Degraded represents the current state of resource does not match the desired\nstate for a certain period.",
+              "items": {
+                "description": "ManifestCondition represents the conditions of the resources deployed on a\nmanaged cluster.",
+                "properties": {
+                  "conditions": {
+                    "description": "Conditions represents the conditions of this resource on a managed cluster.",
+                    "items": {
+                      "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                      "properties": {
+                        "lastTransitionTime": {
+                          "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                          "maxLength": 32768,
+                          "type": "string"
+                        },
+                        "observedGeneration": {
+                          "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                          "format": "int64",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "reason": {
+                          "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                          "type": "string"
+                        },
+                        "status": {
+                          "description": "status of the condition, one of True, False, Unknown.",
+                          "enum": [
+                            "True",
+                            "False",
+                            "Unknown"
+                          ],
+                          "type": "string"
+                        },
+                        "type": {
+                          "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                          "maxLength": 316,
+                          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "lastTransitionTime",
+                        "message",
+                        "reason",
+                        "status",
+                        "type"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "resourceMeta": {
+                    "description": "ResourceMeta represents the group, version, kind, name and namespace of a resoure.",
+                    "properties": {
+                      "group": {
+                        "description": "Group is the API Group of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "description": "Kind is the kind of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Name is the name of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "description": "Name is the namespace of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "ordinal": {
+                        "description": "Ordinal represents the index of the manifest on spec.",
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "resource": {
+                        "description": "Resource is the resource name of the Kubernetes resource.",
+                        "type": "string"
+                      },
+                      "version": {
+                        "description": "Version is the version of the Kubernetes resource.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "ordinal"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "statusFeedback": {
+                    "description": "StatusFeedback represents the values of the feild synced back defined in statusFeedbacks",
+                    "properties": {
+                      "values": {
+                        "description": "Values represents the synced value of the interested field.",
+                        "items": {
+                          "properties": {
+                            "fieldValue": {
+                              "description": "Value is the value of the status field.\nThe value of the status field can only be integer, string or boolean.",
+                              "properties": {
+                                "boolean": {
+                                  "description": "Boolean is bool value when type is boolean.",
+                                  "type": "boolean"
+                                },
+                                "integer": {
+                                  "description": "Integer is the integer value when type is integer.",
+                                  "format": "int64",
+                                  "type": "integer"
+                                },
+                                "jsonRaw": {
+                                  "description": "JsonRaw is a json string when type is a list or object",
+                                  "maxLength": 1024,
+                                  "type": "string"
+                                },
+                                "string": {
+                                  "description": "String is the string value when type is string.",
+                                  "type": "string"
+                                },
+                                "type": {
+                                  "description": "Type represents the type of the value, it can be integer, string or boolean.",
+                                  "enum": [
+                                    "Integer",
+                                    "String",
+                                    "Boolean",
+                                    "JsonRaw"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "name": {
+                              "description": "Name represents the alias name for this field. It is the same as what is specified\nin StatuFeedbackRule in the spec.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "fieldValue",
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "name"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "conditions",
+                  "resourceMeta"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

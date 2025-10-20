@@ -1,0 +1,864 @@
+{
+  "description": "DataImportCron defines a cron job for recurring polling/importing disk images as PVCs into a golden image namespace",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "DataImportCronSpec defines specification for DataImportCron",
+      "properties": {
+        "garbageCollect": {
+          "description": "GarbageCollect specifies whether old PVCs should be cleaned up after a new PVC is imported.\nOptions are currently \"Outdated\" and \"Never\", defaults to \"Outdated\".",
+          "type": "string"
+        },
+        "importsToKeep": {
+          "description": "Number of import PVCs to keep when garbage collecting. Default is 3.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "managedDataSource": {
+          "description": "ManagedDataSource specifies the name of the corresponding DataSource this cron will manage.\nDataSource has to be in the same namespace.",
+          "type": "string"
+        },
+        "retentionPolicy": {
+          "description": "RetentionPolicy specifies whether the created DataVolumes and DataSources are retained when their DataImportCron is deleted. Default is RatainAll.",
+          "type": "string"
+        },
+        "schedule": {
+          "description": "Schedule specifies in cron format when and how often to look for new imports",
+          "type": "string"
+        },
+        "template": {
+          "description": "Template specifies template for the DVs to be created",
+          "properties": {
+            "apiVersion": {
+              "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+              "type": "string"
+            },
+            "kind": {
+              "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+              "type": "string"
+            },
+            "metadata": {
+              "type": "object"
+            },
+            "spec": {
+              "description": "DataVolumeSpec defines the DataVolume type specification",
+              "properties": {
+                "checkpoints": {
+                  "description": "Checkpoints is a list of DataVolumeCheckpoints, representing stages in a multistage import.",
+                  "items": {
+                    "description": "DataVolumeCheckpoint defines a stage in a warm migration.",
+                    "properties": {
+                      "current": {
+                        "description": "Current is the identifier of the snapshot created for this checkpoint.",
+                        "type": "string"
+                      },
+                      "previous": {
+                        "description": "Previous is the identifier of the snapshot from the previous checkpoint.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "current",
+                      "previous"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "contentType": {
+                  "description": "DataVolumeContentType options: \"kubevirt\", \"archive\"",
+                  "enum": [
+                    "kubevirt",
+                    "archive"
+                  ],
+                  "type": "string"
+                },
+                "finalCheckpoint": {
+                  "description": "FinalCheckpoint indicates whether the current DataVolumeCheckpoint is the final checkpoint.",
+                  "type": "boolean"
+                },
+                "preallocation": {
+                  "description": "Preallocation controls whether storage for DataVolumes should be allocated in advance.",
+                  "type": "boolean"
+                },
+                "priorityClassName": {
+                  "description": "PriorityClassName for Importer, Cloner and Uploader pod",
+                  "type": "string"
+                },
+                "pvc": {
+                  "description": "PVC is the PVC specification",
+                  "properties": {
+                    "accessModes": {
+                      "description": "accessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    },
+                    "dataSource": {
+                      "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                      "properties": {
+                        "apiGroup": {
+                          "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "Kind is the type of resource being referenced",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of resource being referenced",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "dataSourceRef": {
+                      "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                      "properties": {
+                        "apiGroup": {
+                          "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "Kind is the type of resource being referenced",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of resource being referenced",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace is the namespace of resource being referenced\nNote that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.\n(Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "resources": {
+                      "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                      "properties": {
+                        "limits": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                          "type": "object"
+                        },
+                        "requests": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                          "type": "object"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "selector": {
+                      "description": "selector is a label query over volumes to consider for binding.",
+                      "properties": {
+                        "matchExpressions": {
+                          "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                          "items": {
+                            "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                            "properties": {
+                              "key": {
+                                "description": "key is the label key that the selector applies to.",
+                                "type": "string"
+                              },
+                              "operator": {
+                                "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                "type": "string"
+                              },
+                              "values": {
+                                "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "atomic"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "operator"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        },
+                        "matchLabels": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                          "type": "object"
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "storageClassName": {
+                      "description": "storageClassName is the name of the StorageClass required by the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+                      "type": "string"
+                    },
+                    "volumeAttributesClassName": {
+                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.",
+                      "type": "string"
+                    },
+                    "volumeMode": {
+                      "description": "volumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.",
+                      "type": "string"
+                    },
+                    "volumeName": {
+                      "description": "volumeName is the binding reference to the PersistentVolume backing this claim.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "source": {
+                  "description": "Source is the src of the data for the requested DataVolume",
+                  "properties": {
+                    "blank": {
+                      "description": "DataVolumeBlankImage provides the parameters to create a new raw blank image for the PVC",
+                      "type": "object"
+                    },
+                    "gcs": {
+                      "description": "DataVolumeSourceGCS provides the parameters to create a Data Volume from an GCS source",
+                      "properties": {
+                        "secretRef": {
+                          "description": "SecretRef provides the secret reference needed to access the GCS source",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the url of the GCS source",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "http": {
+                      "description": "DataVolumeSourceHTTP can be either an http or https endpoint, with an optional basic auth user name and password, and an optional configmap containing additional CAs",
+                      "properties": {
+                        "certConfigMap": {
+                          "description": "CertConfigMap is a configmap reference, containing a Certificate Authority(CA) public key, and a base64 encoded pem certificate",
+                          "type": "string"
+                        },
+                        "extraHeaders": {
+                          "description": "ExtraHeaders is a list of strings containing extra headers to include with HTTP transfer requests",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "secretExtraHeaders": {
+                          "description": "SecretExtraHeaders is a list of Secret references, each containing an extra HTTP header that may include sensitive information",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "secretRef": {
+                          "description": "SecretRef A Secret reference, the secret should contain accessKeyId (user name) base64 encoded, and secretKey (password) also base64 encoded",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the URL of the http(s) endpoint",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "imageio": {
+                      "description": "DataVolumeSourceImageIO provides the parameters to create a Data Volume from an imageio source",
+                      "properties": {
+                        "certConfigMap": {
+                          "description": "CertConfigMap provides a reference to the CA cert",
+                          "type": "string"
+                        },
+                        "diskId": {
+                          "description": "DiskID provides id of a disk to be imported",
+                          "type": "string"
+                        },
+                        "secretRef": {
+                          "description": "SecretRef provides the secret reference needed to access the ovirt-engine",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the URL of the ovirt-engine",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "diskId",
+                        "url"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "pvc": {
+                      "description": "DataVolumeSourcePVC provides the parameters to create a Data Volume from an existing PVC",
+                      "properties": {
+                        "name": {
+                          "description": "The name of the source PVC",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "The namespace of the source PVC",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "namespace"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "registry": {
+                      "description": "DataVolumeSourceRegistry provides the parameters to create a Data Volume from an registry source",
+                      "properties": {
+                        "certConfigMap": {
+                          "description": "CertConfigMap provides a reference to the Registry certs",
+                          "type": "string"
+                        },
+                        "imageStream": {
+                          "description": "ImageStream is the name of image stream for import",
+                          "type": "string"
+                        },
+                        "platform": {
+                          "description": "Platform describes the minimum runtime requirements of the image",
+                          "properties": {
+                            "architecture": {
+                              "description": "Architecture specifies the image target CPU architecture",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "pullMethod": {
+                          "description": "PullMethod can be either \"pod\" (default import), or \"node\" (node docker cache based import)",
+                          "type": "string"
+                        },
+                        "secretRef": {
+                          "description": "SecretRef provides the secret reference needed to access the Registry source",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the url of the registry source (starting with the scheme: docker, oci-archive)",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "s3": {
+                      "description": "DataVolumeSourceS3 provides the parameters to create a Data Volume from an S3 source",
+                      "properties": {
+                        "certConfigMap": {
+                          "description": "CertConfigMap is a configmap reference, containing a Certificate Authority(CA) public key, and a base64 encoded pem certificate",
+                          "type": "string"
+                        },
+                        "secretRef": {
+                          "description": "SecretRef provides the secret reference needed to access the S3 source",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the url of the S3 source",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "snapshot": {
+                      "description": "DataVolumeSourceSnapshot provides the parameters to create a Data Volume from an existing VolumeSnapshot",
+                      "properties": {
+                        "name": {
+                          "description": "The name of the source VolumeSnapshot",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "The namespace of the source VolumeSnapshot",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "namespace"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "upload": {
+                      "description": "DataVolumeSourceUpload provides the parameters to create a Data Volume by uploading the source",
+                      "type": "object"
+                    },
+                    "vddk": {
+                      "description": "DataVolumeSourceVDDK provides the parameters to create a Data Volume from a Vmware source",
+                      "properties": {
+                        "backingFile": {
+                          "description": "BackingFile is the path to the virtual hard disk to migrate from vCenter/ESXi",
+                          "type": "string"
+                        },
+                        "extraArgs": {
+                          "description": "ExtraArgs is a reference to a ConfigMap containing extra arguments to pass directly to the VDDK library",
+                          "type": "string"
+                        },
+                        "initImageURL": {
+                          "description": "InitImageURL is an optional URL to an image containing an extracted VDDK library, overrides v2v-vmware config map",
+                          "type": "string"
+                        },
+                        "secretRef": {
+                          "description": "SecretRef provides a reference to a secret containing the username and password needed to access the vCenter or ESXi host",
+                          "type": "string"
+                        },
+                        "thumbprint": {
+                          "description": "Thumbprint is the certificate thumbprint of the vCenter or ESXi host",
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "URL is the URL of the vCenter or ESXi host with the VM to migrate",
+                          "type": "string"
+                        },
+                        "uuid": {
+                          "description": "UUID is the UUID of the virtual machine that the backing file is attached to in vCenter/ESXi",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "sourceRef": {
+                  "description": "SourceRef is an indirect reference to the source of data for the requested DataVolume",
+                  "properties": {
+                    "kind": {
+                      "description": "The kind of the source reference, currently only \"DataSource\" is supported",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The name of the source reference",
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "The namespace of the source reference, defaults to the DataVolume namespace",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "storage": {
+                  "description": "Storage is the requested storage specification",
+                  "properties": {
+                    "accessModes": {
+                      "description": "AccessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "dataSource": {
+                      "description": "This field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) * An existing custom resource that implements data population (Alpha) In order to use custom resource types that implement data population, the AnyVolumeDataSource feature gate must be enabled. If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source.\nIf the AnyVolumeDataSource feature gate is enabled, this field will always have the same contents as the DataSourceRef field.",
+                      "properties": {
+                        "apiGroup": {
+                          "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "Kind is the type of resource being referenced",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of resource being referenced",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "dataSourceRef": {
+                      "description": "Specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any local object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner.\nThis field will replace the functionality of the DataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, both fields (DataSource and DataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty.\nThere are two important differences between DataSource and DataSourceRef:\n* While DataSource only allows two specific types of objects, DataSourceRef allows any non-core object, as well as PersistentVolumeClaim objects.\n* While DataSource ignores disallowed values (dropping them), DataSourceRef preserves all values, and generates an error if a disallowed value is specified.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.",
+                      "properties": {
+                        "apiGroup": {
+                          "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "Kind is the type of resource being referenced",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of resource being referenced",
+                          "type": "string"
+                        },
+                        "namespace": {
+                          "description": "Namespace is the namespace of resource being referenced\nNote that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.\n(Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "resources": {
+                      "description": "Resources represents the minimum resources the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                      "properties": {
+                        "limits": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                          "type": "object"
+                        },
+                        "requests": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
+                          },
+                          "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                          "type": "object"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "selector": {
+                      "description": "A label query over volumes to consider for binding.",
+                      "properties": {
+                        "matchExpressions": {
+                          "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                          "items": {
+                            "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                            "properties": {
+                              "key": {
+                                "description": "key is the label key that the selector applies to.",
+                                "type": "string"
+                              },
+                              "operator": {
+                                "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                "type": "string"
+                              },
+                              "values": {
+                                "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "atomic"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "operator"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        },
+                        "matchLabels": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                          "type": "object"
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "additionalProperties": false
+                    },
+                    "storageClassName": {
+                      "description": "Name of the StorageClass required by the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+                      "type": "string"
+                    },
+                    "volumeMode": {
+                      "description": "volumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.",
+                      "type": "string"
+                    },
+                    "volumeName": {
+                      "description": "VolumeName is the binding reference to the PersistentVolume backing this claim.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "status": {
+              "description": "DataVolumeStatus contains the current status of the DataVolume",
+              "properties": {
+                "claimName": {
+                  "description": "ClaimName is the name of the underlying PVC used by the DataVolume.",
+                  "type": "string"
+                },
+                "conditions": {
+                  "items": {
+                    "description": "DataVolumeCondition represents the state of a data volume condition.",
+                    "properties": {
+                      "lastHeartbeatTime": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "lastTransitionTime": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "DataVolumeConditionType is the string representation of known condition types",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "type"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "phase": {
+                  "description": "Phase is the current phase of the data volume",
+                  "type": "string"
+                },
+                "progress": {
+                  "description": "DataVolumeProgress is the current progress of the DataVolume transfer operation. Value between 0 and 100 inclusive, N/A if not available",
+                  "type": "string"
+                },
+                "restartCount": {
+                  "description": "RestartCount is the number of times the pod populating the DataVolume has restarted",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "spec"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "managedDataSource",
+        "schedule",
+        "template"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "DataImportCronStatus provides the most recently observed status of the DataImportCron",
+      "properties": {
+        "conditions": {
+          "items": {
+            "description": "DataImportCronCondition represents the state of a data import cron condition",
+            "properties": {
+              "lastHeartbeatTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastTransitionTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "type": {
+                "description": "DataImportCronConditionType is the string representation of known condition types",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "currentImports": {
+          "description": "CurrentImports are the imports in progress. Currently only a single import is supported.",
+          "items": {
+            "description": "ImportStatus of a currently in progress import",
+            "properties": {
+              "DataVolumeName": {
+                "description": "DataVolumeName is the currently in progress import DataVolume",
+                "type": "string"
+              },
+              "Digest": {
+                "description": "Digest of the currently imported image",
+                "type": "string"
+              }
+            },
+            "required": [
+              "DataVolumeName",
+              "Digest"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "lastExecutionTimestamp": {
+          "description": "LastExecutionTimestamp is the time of the last polling",
+          "format": "date-time",
+          "type": "string"
+        },
+        "lastImportTimestamp": {
+          "description": "LastImportTimestamp is the time of the last import",
+          "format": "date-time",
+          "type": "string"
+        },
+        "lastImportedPVC": {
+          "description": "LastImportedPVC is the last imported PVC",
+          "properties": {
+            "name": {
+              "description": "The name of the source PVC",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "The namespace of the source PVC",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "namespace"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "sourceFormat": {
+          "description": "SourceFormat defines the format of the DataImportCron-created disk image sources",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

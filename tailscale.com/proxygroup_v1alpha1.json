@@ -1,5 +1,9 @@
 {
-  "description": "ProxyGroup defines a set of Tailscale devices that will act as proxies.\nCurrently only egress ProxyGroups are supported.\n\nUse the tailscale.com/proxy-group annotation on a Service to specify that\nthe egress proxy should be implemented by a ProxyGroup instead of a single\ndedicated proxy. In addition to running a highly available set of proxies,\nProxyGroup also allows for serving many annotated Services from a single\nset of proxies to minimise resource consumption.\n\nMore info: https://tailscale.com/kb/1438/kubernetes-operator-cluster-egress",
+  "description": "ProxyGroup defines a set of Tailscale devices that will act as proxies.\nDepending on spec.Type, it can be a group of egress, ingress, or kube-apiserver\nproxies. In addition to running a highly available set of proxies, ingress\nand egress ProxyGroups also allow for serving many annotated Services from a\nsingle set of proxies to minimise resource consumption.\n\nFor ingress and egress, use the tailscale.com/proxy-group annotation on a\nService to specify that the proxy should be implemented by a ProxyGroup\ninstead of a single dedicated proxy.\n\nMore info:\n* https://tailscale.com/kb/1438/kubernetes-operator-cluster-egress\n* https://tailscale.com/kb/1439/kubernetes-operator-cluster-ingress\n\nFor kube-apiserver, the ProxyGroup is a standalone resource. Use the\nspec.kubeAPIServer field to configure options specific to the kube-apiserver\nProxyGroup type.",
+  "type": "object",
+  "required": [
+    "spec"
+  ],
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -14,11 +18,35 @@
     },
     "spec": {
       "description": "Spec describes the desired ProxyGroup instances.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
       "properties": {
         "hostnamePrefix": {
           "description": "HostnamePrefix is the hostname prefix to use for tailnet devices created\nby the ProxyGroup. Each device will have the integer number from its\nStatefulSet pod appended to this prefix to form the full hostname.\nHostnamePrefix can contain lower case letters, numbers and dashes, it\nmust not start with a dash and must be between 1 and 62 characters long.",
-          "pattern": "^[a-z0-9][a-z0-9-]{0,61}$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,61}$"
+        },
+        "kubeAPIServer": {
+          "description": "KubeAPIServer contains configuration specific to the kube-apiserver\nProxyGroup type. This field is only used when Type is set to \"kube-apiserver\".",
+          "type": "object",
+          "properties": {
+            "hostname": {
+              "description": "Hostname is the hostname with which to expose the Kubernetes API server\nproxies. Must be a valid DNS label no longer than 63 characters. If not\nspecified, the name of the ProxyGroup is used as the hostname. Must be\nunique across the whole tailnet.",
+              "type": "string",
+              "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+            },
+            "mode": {
+              "description": "Mode to run the API server proxy in. Supported modes are auth and noauth.\nIn auth mode, requests from the tailnet proxied over to the Kubernetes\nAPI server are additionally impersonated using the sender's tailnet identity.\nIf not specified, defaults to auth mode.",
+              "type": "string",
+              "enum": [
+                "auth",
+                "noauth"
+              ]
+            }
+          },
+          "additionalProperties": false
         },
         "proxyClass": {
           "description": "ProxyClass is the name of the ProxyClass custom resource that contains\nconfiguration options that should be applied to the resources created\nfor this ProxyGroup. If unset, and there is no default ProxyClass\nconfigured, the operator will create resources with the default\nconfiguration.",
@@ -26,86 +54,46 @@
         },
         "replicas": {
           "description": "Replicas specifies how many replicas to create the StatefulSet with.\nDefaults to 2.",
+          "type": "integer",
           "format": "int32",
-          "minimum": 0,
-          "type": "integer"
+          "minimum": 0
         },
         "tags": {
           "description": "Tags that the Tailscale devices will be tagged with. Defaults to [tag:k8s].\nIf you specify custom tags here, make sure you also make the operator\nan owner of these tags.\nSee  https://tailscale.com/kb/1236/kubernetes-operator/#setting-up-the-kubernetes-operator.\nTags cannot be changed once a ProxyGroup device has been created.\nTag values must be in form ^tag:[a-zA-Z][a-zA-Z0-9-]*$.",
+          "type": "array",
           "items": {
-            "pattern": "^tag:[a-zA-Z][a-zA-Z0-9-]*$",
-            "type": "string"
-          },
-          "type": "array"
+            "type": "string",
+            "pattern": "^tag:[a-zA-Z][a-zA-Z0-9-]*$"
+          }
         },
         "type": {
-          "description": "Type of the ProxyGroup proxies. Supported types are egress and ingress.\nType is immutable once a ProxyGroup is created.",
+          "description": "Type of the ProxyGroup proxies. Supported types are egress, ingress, and kube-apiserver.\nType is immutable once a ProxyGroup is created.",
+          "type": "string",
           "enum": [
             "egress",
-            "ingress"
+            "ingress",
+            "kube-apiserver"
           ],
-          "type": "string",
           "x-kubernetes-validations": [
             {
-              "message": "ProxyGroup type is immutable",
-              "rule": "self == oldSelf"
+              "rule": "self == oldSelf",
+              "message": "ProxyGroup type is immutable"
             }
           ]
         }
       },
-      "required": [
-        "type"
-      ],
-      "type": "object",
       "additionalProperties": false
     },
     "status": {
       "description": "ProxyGroupStatus describes the status of the ProxyGroup resources. This is\nset and managed by the Tailscale operator.",
+      "type": "object",
       "properties": {
         "conditions": {
-          "description": "List of status conditions to indicate the status of the ProxyGroup\nresources. Known condition types are `ProxyGroupReady`.",
+          "description": "List of status conditions to indicate the status of the ProxyGroup\nresources. Known condition types include `ProxyGroupReady` and\n`ProxyGroupAvailable`.\n\n* `ProxyGroupReady` indicates all ProxyGroup resources are reconciled and\n  all expected conditions are true.\n* `ProxyGroupAvailable` indicates that at least one proxy is ready to\n  serve traffic.\n\nFor ProxyGroups of type kube-apiserver, there are two additional conditions:\n\n* `KubeAPIServerProxyConfigured` indicates that at least one API server\n  proxy is configured and ready to serve traffic.\n* `KubeAPIServerProxyValid` indicates that spec.kubeAPIServer config is\n  valid.",
+          "type": "array",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
-            "properties": {
-              "lastTransitionTime": {
-                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
-                "format": "date-time",
-                "type": "string"
-              },
-              "message": {
-                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
-                "maxLength": 32768,
-                "type": "string"
-              },
-              "observedGeneration": {
-                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "reason": {
-                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
-                "maxLength": 1024,
-                "minLength": 1,
-                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
-                "type": "string"
-              },
-              "status": {
-                "description": "status of the condition, one of True, False, Unknown.",
-                "enum": [
-                  "True",
-                  "False",
-                  "Unknown"
-                ],
-                "type": "string"
-              },
-              "type": {
-                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
-                "maxLength": 316,
-                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
-                "type": "string"
-              }
-            },
+            "type": "object",
             "required": [
               "lastTransitionTime",
               "message",
@@ -113,10 +101,48 @@
               "status",
               "type"
             ],
-            "type": "object",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "type": "string",
+                "format": "date-time"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "type": "string",
+                "maxLength": 32768
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "type": "string",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "type": "string",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ]
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "type": "string",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$"
+              }
+            },
             "additionalProperties": false
           },
-          "type": "array",
           "x-kubernetes-list-map-keys": [
             "type"
           ],
@@ -124,39 +150,45 @@
         },
         "devices": {
           "description": "List of tailnet devices associated with the ProxyGroup StatefulSet.",
+          "type": "array",
           "items": {
+            "type": "object",
+            "required": [
+              "hostname"
+            ],
             "properties": {
               "hostname": {
                 "description": "Hostname is the fully qualified domain name of the device.\nIf MagicDNS is enabled in your tailnet, it is the MagicDNS name of the\nnode.",
                 "type": "string"
               },
-              "tailnetIPs": {
-                "description": "TailnetIPs is the set of tailnet IP addresses (both IPv4 and IPv6)\nassigned to the device.",
+              "staticEndpoints": {
+                "description": "StaticEndpoints are user configured, 'static' endpoints by which tailnet peers can reach this device.",
+                "type": "array",
                 "items": {
                   "type": "string"
-                },
-                "type": "array"
+                }
+              },
+              "tailnetIPs": {
+                "description": "TailnetIPs is the set of tailnet IP addresses (both IPv4 and IPv6)\nassigned to the device.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
-            "required": [
-              "hostname"
-            ],
-            "type": "object",
             "additionalProperties": false
           },
-          "type": "array",
           "x-kubernetes-list-map-keys": [
             "hostname"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "url": {
+          "description": "URL of the kube-apiserver proxy advertised by the ProxyGroup devices, if\nany. Only applies to ProxyGroups of type kube-apiserver.",
+          "type": "string"
         }
       },
-      "type": "object",
       "additionalProperties": false
     }
-  },
-  "required": [
-    "spec"
-  ],
-  "type": "object"
+  }
 }

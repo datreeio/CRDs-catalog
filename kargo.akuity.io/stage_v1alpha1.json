@@ -118,6 +118,14 @@
                       {
                         "message": "PromotionTemplate step must have exactly one of uses or task set",
                         "rule": "(has(self.uses) ? !has(self.task) : has(self.task))"
+                      },
+                      {
+                        "message": "PromotionTemplate step referencing a task cannot set continueOnError",
+                        "rule": "!has(self.task) || !has(self.continueOnError)"
+                      },
+                      {
+                        "message": "PromotionTemplate step referencing a task cannot set retry",
+                        "rule": "!has(self.task) || !has(self.retry)"
                       }
                     ],
                     "additionalProperties": false
@@ -190,8 +198,23 @@
               "sources": {
                 "description": "Sources describes where the requested Freight may be obtained from. This is\na required field.",
                 "properties": {
+                  "autoPromotionOptions": {
+                    "description": "AutoPromotionOptions specifies options pertaining to auto-promotion. These\nsettings have no effect if auto-promotion is not enabled for this Stage at\nthe ProjectConfig level.",
+                    "properties": {
+                      "selectionPolicy": {
+                        "description": "SelectionPolicy specifies the rules for identifying new Freight that is\neligible for auto-promotion to this Stage. This field is optional. When\nleft unspecified, the field is implicitly treated as if its value were\n\"NewestFreight\".\n\nAccepted Values:\n\n- \"NewestFreight\": The newest Freight that is available to the Stage is\n  eligible for auto-promotion.\n\n- \"MatchUpstream\": Only the Freight currently used immediately upstream\n  from this Stage is eligible for auto-promotion. This policy may only\n  be applied when the Stage has exactly one upstream Stage.",
+                        "enum": [
+                          "NewestFreight",
+                          "MatchUpstream"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
                   "availabilityStrategy": {
-                    "description": "AvailabilityStrategy specifies the semantics for how requested Freight is\nmade available to the Stage. This field is optional. When left unspecified,\nthe field is implicitly treated as if its value were \"OneOf\".\n\nAccepted Values:\n\n- \"All\": Freight must be be verified and, if applicable, soaked in all\n  upstream Stages to be considered available for promotion.\n- \"OneOf\": Freight must be verified and, if applicable, soaked in at least\n   one upstream Stage to be considered available for promotion.\n- \"\": Treated the same as \"OneOf\".",
+                    "description": "AvailabilityStrategy specifies the semantics for how requested Freight is\nmade available to the Stage. This field is optional. When left unspecified,\nthe field is implicitly treated as if its value were \"OneOf\".\n\nAccepted Values:\n\n- \"All\": Freight must be verified and, if applicable, soaked in all\n  upstream Stages to be considered available for promotion.\n- \"OneOf\": Freight must be verified and, if applicable, soaked in at least\n   one upstream Stage to be considered available for promotion.\n- \"\": Treated the same as \"OneOf\".",
                     "enum": [
                       "All",
                       "OneOf",
@@ -345,6 +368,10 @@
     "status": {
       "description": "Status describes the Stage's current and recent Freight, health, and more.",
       "properties": {
+        "autoPromotionEnabled": {
+          "description": "AutoPromotionEnabled indicates whether automatic promotion is enabled\nfor the Stage based on the ProjectConfig.",
+          "type": "boolean"
+        },
         "conditions": {
           "description": "Conditions contains the last observations of the Stage's current\nstate.",
           "items": {
@@ -494,10 +521,6 @@
                         "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
                         "type": "string"
                       },
-                      "gitRepoURL": {
-                        "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
-                        "type": "string"
-                      },
                       "repoURL": {
                         "description": "RepoURL describes the repository in which the image can be found.",
                         "type": "string"
@@ -640,10 +663,6 @@
                             "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
                             "type": "string"
                           },
-                          "gitRepoURL": {
-                            "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
-                            "type": "string"
-                          },
                           "repoURL": {
                             "description": "RepoURL describes the repository in which the image can be found.",
                             "type": "string"
@@ -775,10 +794,6 @@
                                 },
                                 "digest": {
                                   "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
-                                  "type": "string"
-                                },
-                                "gitRepoURL": {
-                                  "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
                                   "type": "string"
                                 },
                                 "repoURL": {
@@ -931,6 +946,11 @@
                   "description": "Phase describes where the Promotion currently is in its lifecycle.",
                   "type": "string"
                 },
+                "startedAt": {
+                  "description": "StartedAt is the time when the promotion started.",
+                  "format": "date-time",
+                  "type": "string"
+                },
                 "state": {
                   "description": "State stores the state of the promotion process between reconciliation\nattempts.",
                   "x-kubernetes-preserve-unknown-fields": true
@@ -1077,10 +1097,6 @@
                           },
                           "digest": {
                             "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
-                            "type": "string"
-                          },
-                          "gitRepoURL": {
-                            "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
                             "type": "string"
                           },
                           "repoURL": {
@@ -1323,10 +1339,6 @@
                         "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
                         "type": "string"
                       },
-                      "gitRepoURL": {
-                        "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
-                        "type": "string"
-                      },
                       "repoURL": {
                         "description": "RepoURL describes the repository in which the image can be found.",
                         "type": "string"
@@ -1469,10 +1481,6 @@
                             "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
                             "type": "string"
                           },
-                          "gitRepoURL": {
-                            "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
-                            "type": "string"
-                          },
                           "repoURL": {
                             "description": "RepoURL describes the repository in which the image can be found.",
                             "type": "string"
@@ -1604,10 +1612,6 @@
                                 },
                                 "digest": {
                                   "description": "Digest identifies a specific version of the image in the repository\nspecified by RepoURL. This is a more precise identifier than Tag.",
-                                  "type": "string"
-                                },
-                                "gitRepoURL": {
-                                  "description": "GitRepoURL specifies the URL of a Git repository that contains the source\ncode for the image repository referenced by the RepoURL field if Kargo was\nable to infer it.\n\nDeprecated: Use OCI annotations instead. Will be removed in v1.7.0.",
                                   "type": "string"
                                 },
                                 "repoURL": {
@@ -1760,6 +1764,11 @@
                   "description": "Phase describes where the Promotion currently is in its lifecycle.",
                   "type": "string"
                 },
+                "startedAt": {
+                  "description": "StartedAt is the time when the promotion started.",
+                  "format": "date-time",
+                  "type": "string"
+                },
                 "state": {
                   "description": "State stores the state of the promotion process between reconciliation\nattempts.",
                   "x-kubernetes-preserve-unknown-fields": true
@@ -1816,6 +1825,13 @@
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "metadata": {
+          "additionalProperties": {
+            "x-kubernetes-preserve-unknown-fields": true
+          },
+          "description": "Metadata is a map of arbitrary metadata associated with the Stage.\nThis is useful for storing additional information about the Stage\nthat can be shared across promotions, verifications, or other processes.",
+          "type": "object"
         },
         "observedGeneration": {
           "description": "ObservedGeneration represents the .metadata.generation that this Stage\nstatus was reconciled against.",

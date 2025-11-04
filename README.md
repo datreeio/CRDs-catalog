@@ -65,11 +65,29 @@ The following programs are required to be installed on the machine running this 
 * [python3](https://www.python.org/downloads/)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 
+Alternatively, you can use [Nix](https://nixos.org/) or [Devbox](https://www.jetify.com/devbox) to automatically set up all dependencies.
+
 ### Usage
-To use the CRD Extractor:  
+To use the CRD Extractor:
 1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
 2. Extract, and run the utility:
 ```
+cd Utilities
+./crd-extractor.sh
+```
+
+#### Using Devbox
+If you have [Devbox](https://www.jetify.com/devbox) installed:
+```
+cd Utilities
+devbox run crd-extractor
+```
+
+#### Using Nix
+If you have [Nix](https://nixos.org/) with flakes enabled:
+```
+cd Utilities
+nix develop
 ./crd-extractor.sh
 ```
 

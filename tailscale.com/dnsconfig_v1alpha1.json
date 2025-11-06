@@ -1,5 +1,5 @@
 {
-  "description": "DNSConfig can be deployed to cluster to make a subset of Tailscale MagicDNS\nnames resolvable by cluster workloads. Use this if: A) you need to refer to\ntailnet services, exposed to cluster via Tailscale Kubernetes operator egress\nproxies by the MagicDNS names of those tailnet services (usually because the\nservices run over HTTPS)\nB) you have exposed a cluster workload to the tailnet using Tailscale Ingress\nand you also want to refer to the workload from within the cluster over the\nIngress's MagicDNS name (usually because you have some callback component\nthat needs to use the same URL as that used by a non-cluster client on\ntailnet).\nWhen a DNSConfig is applied to a cluster, Tailscale Kubernetes operator will\ndeploy a nameserver for ts.net DNS names and automatically populate it with records\nfor any Tailscale egress or Ingress proxies deployed to that cluster.\nCurrently you must manually update your cluster DNS configuration to add the\nIP address of the deployed nameserver as a ts.net stub nameserver.\nInstructions for how to do it:\nhttps://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/#configuration-of-stub-domain-and-upstream-nameserver-using-coredns (for CoreDNS),\nhttps://cloud.google.com/kubernetes-engine/docs/how-to/kube-dns (for kube-dns).\nTailscale Kubernetes operator will write the address of a Service fronting\nthe nameserver to dsnconfig.status.nameserver.ip.\nDNSConfig is a singleton - you must not create more than one.\nNB: if you want cluster workloads to be able to refer to Tailscale Ingress\nusing its MagicDNS name, you must also annotate the Ingress resource with\ntailscale.com/experimental-forward-cluster-traffic-via-ingress annotation to\nensure that the proxy created for the Ingress listens on its Pod IP address.\nNB: Clusters where Pods get assigned IPv6 addresses only are currently not supported.",
+  "description": "DNSConfig can be deployed to cluster to make a subset of Tailscale MagicDNS\nnames resolvable by cluster workloads. Use this if: A) you need to refer to\ntailnet services, exposed to cluster via Tailscale Kubernetes operator egress\nproxies by the MagicDNS names of those tailnet services (usually because the\nservices run over HTTPS)\nB) you have exposed a cluster workload to the tailnet using Tailscale Ingress\nand you also want to refer to the workload from within the cluster over the\nIngress's MagicDNS name (usually because you have some callback component\nthat needs to use the same URL as that used by a non-cluster client on\ntailnet).\nWhen a DNSConfig is applied to a cluster, Tailscale Kubernetes operator will\ndeploy a nameserver for ts.net DNS names and automatically populate it with records\nfor any Tailscale egress or Ingress proxies deployed to that cluster.\nCurrently you must manually update your cluster DNS configuration to add the\nIP address of the deployed nameserver as a ts.net stub nameserver.\nInstructions for how to do it:\nhttps://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/#configuration-of-stub-domain-and-upstream-nameserver-using-coredns (for CoreDNS),\nhttps://cloud.google.com/kubernetes-engine/docs/how-to/kube-dns (for kube-dns).\nTailscale Kubernetes operator will write the address of a Service fronting\nthe nameserver to dsnconfig.status.nameserver.ip.\nDNSConfig is a singleton - you must not create more than one.\nNB: if you want cluster workloads to be able to refer to Tailscale Ingress\nusing its MagicDNS name, you must also annotate the Ingress resource with\ntailscale.com/experimental-forward-cluster-traffic-via-ingress annotation to\nensure that the proxy created for the Ingress listens on its Pod IP address.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -27,6 +27,62 @@
                 },
                 "tag": {
                   "description": "Tag defaults to unstable.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "pod": {
+              "description": "Pod configuration.",
+              "properties": {
+                "tolerations": {
+                  "description": "If specified, applies tolerations to the pods deployed by the DNSConfig resource.",
+                  "items": {
+                    "description": "The pod this Toleration is attached to tolerates any taint that matches\nthe triple <key,value,effect> using the matching operator <operator>.",
+                    "properties": {
+                      "effect": {
+                        "description": "Effect indicates the taint effect to match. Empty means match all taint effects.\nWhen specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.",
+                        "type": "string"
+                      },
+                      "key": {
+                        "description": "Key is the taint key that the toleration applies to. Empty means match all taint keys.\nIf the key is empty, operator must be Exists; this combination means to match all values and all keys.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "Operator represents a key's relationship to the value.\nValid operators are Exists and Equal. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a pod can\ntolerate all taints of a particular category.",
+                        "type": "string"
+                      },
+                      "tolerationSeconds": {
+                        "description": "TolerationSeconds represents the period of time the toleration (which must be\nof effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,\nit is not set, which means tolerate the taint forever (do not evict). Zero and\nnegative values will be treated as 0 (evict immediately) by the system.",
+                        "format": "int64",
+                        "type": "integer"
+                      },
+                      "value": {
+                        "description": "Value is the taint value the toleration matches to.\nIf the operator is Exists, the value should be empty, otherwise just a regular string.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "replicas": {
+              "description": "Replicas specifies how many Pods to create. Defaults to 1.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "service": {
+              "description": "Service configuration.",
+              "properties": {
+                "clusterIP": {
+                  "description": "ClusterIP sets the static IP of the service used by the nameserver.",
                   "type": "string"
                 }
               },
@@ -110,7 +166,7 @@
           "description": "Nameserver describes the status of nameserver cluster resources.",
           "properties": {
             "ip": {
-              "description": "IP is the ClusterIP of the Service fronting the deployed ts.net nameserver.\nCurrently you must manually update your cluster DNS config to add\nthis address as a stub nameserver for ts.net for cluster workloads to be\nable to resolve MagicDNS names associated with egress or Ingress\nproxies.\nThe IP address will change if you delete and recreate the DNSConfig.",
+              "description": "IP is the ClusterIP of the Service fronting the deployed ts.net nameserver.\nCurrently, you must manually update your cluster DNS config to add\nthis address as a stub nameserver for ts.net for cluster workloads to be\nable to resolve MagicDNS names associated with egress or Ingress\nproxies.\nThe IP address will change if you delete and recreate the DNSConfig.",
               "type": "string"
             }
           },

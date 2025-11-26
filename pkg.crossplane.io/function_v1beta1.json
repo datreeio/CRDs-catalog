@@ -22,28 +22,20 @@
           "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/",
           "type": "object"
         },
-        "controllerConfigRef": {
-          "description": "ControllerConfigRef references a ControllerConfig resource that will be\nused to configure the packaged controller Deployment.\nDeprecated: Use RuntimeConfigReference instead.",
-          "properties": {
-            "name": {
-              "description": "Name of the ControllerConfig.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name"
-          ],
-          "type": "object",
-          "additionalProperties": false
-        },
         "ignoreCrossplaneConstraints": {
           "default": false,
           "description": "IgnoreCrossplaneConstraints indicates to the package manager whether to\nhonor Crossplane version constrains specified by the package.\nDefault is false.",
           "type": "boolean"
         },
         "package": {
-          "description": "Package is the name of the package that is being requested.",
-          "type": "string"
+          "description": "Package is the name of the package that is being requested.\nmust be a fully qualified image name, including the registry,\nrepository, and tag. for example, \"registry.example.com/repo/package:tag\".",
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "must be a fully qualified image name, including the registry, repository, and tag or digest. For example, 'registry.example.com/repo/package:tag' or 'registry.example.com/repo/package[:tag]@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'.",
+              "rule": "self.matches('^[^\\\\.\\\\/]+(\\\\.[^\\\\.\\\\/]+)+(\\\\/[^\\\\/:@]+)+(:[^:@]+(@sha256.+)?|@sha256.+)$')"
+            }
+          ]
         },
         "packagePullPolicy": {
           "default": "IfNotPresent",
@@ -120,6 +112,29 @@
     "status": {
       "description": "FunctionStatus represents the observed state of a Function.",
       "properties": {
+        "appliedImageConfigRefs": {
+          "description": "AppliedImageConfigRefs records any image configs that were applied in\nreconciling this package, and what they were used for.",
+          "items": {
+            "description": "ImageConfigRef is a reference to an image config that indicates how the\nreferenced image config was used by the package manager.",
+            "properties": {
+              "name": {
+                "description": "Name is the name of the image config.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "Reason indicates what the image config was used for.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "reason"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "conditions": {
           "description": "Conditions of the resource.",
           "items": {
@@ -173,6 +188,10 @@
         },
         "currentRevision": {
           "description": "CurrentRevision is the name of the current package revision. It will\nreflect the most up to date revision, whether it has been activated or\nnot.",
+          "type": "string"
+        },
+        "resolvedPackage": {
+          "description": "ResolvedPackage is the name of the package that was used for version\nresolution. It may be different from spec.package if the package path was\nrewritten using an image config.",
           "type": "string"
         }
       },

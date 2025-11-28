@@ -214,6 +214,14 @@
                 "pattern": "^cr-[0-9a-z]+$",
                 "type": "string"
               },
+              "instanceMatchCriteria": {
+                "description": "InstanceMatchCriteria specifies how instances are matched to capacity reservations.",
+                "enum": [
+                  "open",
+                  "targeted"
+                ],
+                "type": "string"
+              },
               "ownerID": {
                 "description": "Owner is the owner id for the ami.",
                 "pattern": "^[0-9]{12}$",
@@ -241,12 +249,12 @@
           "type": "array",
           "x-kubernetes-validations": [
             {
-              "message": "expected at least one, got none, ['tags', 'id']",
-              "rule": "self.all(x, has(x.tags) || has(x.id))"
+              "message": "expected at least one, got none, ['tags', 'id', 'instanceMatchCriteria']",
+              "rule": "self.all(x, has(x.tags) || has(x.id) || has(x.instanceMatchCriteria))"
             },
             {
-              "message": "'id' is mutually exclusive, cannot be set along with tags in a capacity reservation selector term",
-              "rule": "!self.all(x, has(x.id) && (has(x.tags) || has(x.ownerID)))"
+              "message": "'id' is mutually exclusive, cannot be set along with other fields in a capacity reservation selector term",
+              "rule": "!self.all(x, has(x.id) && (has(x.tags) || has(x.ownerID) || has(x.instanceMatchCriteria)))"
             }
           ]
         },
@@ -275,6 +283,12 @@
           ],
           "type": "string"
         },
+        "ipPrefixCount": {
+          "description": "IPPrefixCount sets the number of IPv4 prefixes to be automatically assigned to the network interface.",
+          "format": "int32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "kubelet": {
           "description": "Kubelet defines args to be used when configuring kubelet on provisioned nodes.\nThey are a subset of the upstream types, recognizing not all options may be supported.\nWherever possible, the types and names should reflect the upstream kubelet types.",
           "properties": {
@@ -291,8 +305,8 @@
             },
             "evictionHard": {
               "additionalProperties": {
-                "pattern": "^((\\d{1,2}(\\.\\d{1,2})?|100(\\.0{1,2})?)%||(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?)$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^((\\d{1,2}(\\.\\d{1,2})?|100(\\.0{1,2})?)%||(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?)$"
               },
               "description": "EvictionHard is the map of signal names to quantities that define hard eviction thresholds",
               "type": "object",
@@ -310,8 +324,8 @@
             },
             "evictionSoft": {
               "additionalProperties": {
-                "pattern": "^((\\d{1,2}(\\.\\d{1,2})?|100(\\.0{1,2})?)%||(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?)$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^((\\d{1,2}(\\.\\d{1,2})?|100(\\.0{1,2})?)%||(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?)$"
               },
               "description": "EvictionSoft is the map of signal names to quantities that define soft eviction thresholds",
               "type": "object",
@@ -351,8 +365,8 @@
             },
             "kubeReserved": {
               "additionalProperties": {
-                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
               },
               "description": "KubeReserved contains resources reserved for Kubernetes system components.",
               "type": "object",
@@ -381,8 +395,8 @@
             },
             "systemReserved": {
               "additionalProperties": {
-                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
-                "type": "string"
+                "type": "string",
+                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
               },
               "description": "SystemReserved contains resources reserved for OS system daemons and kernel memory.",
               "type": "object",
@@ -464,16 +478,12 @@
           "additionalProperties": false
         },
         "role": {
-          "description": "Role is the AWS identity that nodes use. This field is immutable.\nThis field is mutually exclusive from instanceProfile.\nMarking this field as immutable avoids concerns around terminating managed instance profiles from running instances.\nThis field may be made mutable in the future, assuming the correct garbage collection and drift handling is implemented\nfor the old instance profiles on an update.",
+          "description": "Role is the AWS identity that nodes use.\nThis field is mutually exclusive from instanceProfile.",
           "type": "string",
           "x-kubernetes-validations": [
             {
               "message": "role cannot be empty",
               "rule": "self != ''"
-            },
-            {
-              "message": "immutable field changed",
-              "rule": "self == oldSelf"
             }
           ]
         },
@@ -625,10 +635,6 @@
           "rule": "(has(self.role) && !has(self.instanceProfile)) || (!has(self.role) && has(self.instanceProfile))"
         },
         {
-          "message": "changing from 'instanceProfile' to 'role' is not supported. You must delete and recreate this node class if you want to change this.",
-          "rule": "(has(oldSelf.role) && has(self.role)) || (has(oldSelf.instanceProfile) && has(self.instanceProfile))"
-        },
-        {
           "message": "if set, amiFamily must be 'AL2' or 'Custom' when using an AL2 alias",
           "rule": "!has(self.amiFamily) || (self.amiSelectorTerms.exists(x, has(x.alias) && x.alias.find('^[^@]+') == 'al2') ? (self.amiFamily == 'Custom' || self.amiFamily == 'AL2') : true)"
         },
@@ -749,6 +755,24 @@
               "ownerID": {
                 "description": "The ID of the AWS account that owns the capacity reservation.",
                 "pattern": "^[0-9]{12}$",
+                "type": "string"
+              },
+              "reservationType": {
+                "default": "default",
+                "description": "The type of capacity reservation.",
+                "enum": [
+                  "default",
+                  "capacity-block"
+                ],
+                "type": "string"
+              },
+              "state": {
+                "default": "active",
+                "description": "The state of the capacity reservation. A capacity reservation is considered to be expiring if it is within the EC2\nreclaimation window. Only capacity-block reservations may be in this state.",
+                "enum": [
+                  "active",
+                  "expiring"
+                ],
                 "type": "string"
               }
             },

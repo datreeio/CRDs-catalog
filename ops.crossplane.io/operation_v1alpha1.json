@@ -1,5 +1,5 @@
 {
-  "description": "A CompositionRevision represents a revision of a Composition. Crossplane\ncreates new revisions when there are changes to the Composition.\n\nCrossplane creates and manages CompositionRevisions. Don't directly edit\nCompositionRevisions.",
+  "description": "An Operation defines a pipeline of functions that together constitute a day\ntwo operation.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,48 +13,23 @@
       "type": "object"
     },
     "spec": {
-      "description": "CompositionRevisionSpec specifies the desired state of the composition\nrevision.",
+      "description": "OperationSpec specifies desired state of an operation.",
       "properties": {
-        "compositeTypeRef": {
-          "description": "CompositeTypeRef specifies the type of composite resource that this\ncomposition is compatible with.",
-          "properties": {
-            "apiVersion": {
-              "description": "APIVersion of the type.",
-              "type": "string"
-            },
-            "kind": {
-              "description": "Kind of the type.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "apiVersion",
-            "kind"
-          ],
-          "type": "object",
-          "x-kubernetes-validations": [
-            {
-              "message": "Value is immutable",
-              "rule": "self == oldSelf"
-            }
-          ],
-          "additionalProperties": false
-        },
         "mode": {
           "default": "Pipeline",
-          "description": "Mode controls what type or \"mode\" of Composition will be used.\n\n\"Pipeline\" indicates that a Composition specifies a pipeline of\nfunctions, each of which is responsible for producing composed\nresources that Crossplane should create or update.",
+          "description": "Mode controls what type or \"mode\" of operation will be used.\n\n\"Pipeline\" indicates that an Operation specifies a pipeline of\nfunctions, each of which is responsible for implementing its logic.",
           "enum": [
             "Pipeline"
           ],
           "type": "string"
         },
         "pipeline": {
-          "description": "Pipeline is a list of function steps that will be used when a\ncomposite resource referring to this composition is created.\n\nThe Pipeline is only used by the \"Pipeline\" mode of Composition. It is\nignored by other modes.",
+          "description": "Pipeline is a list of operation function steps that will be used when\nthis operation runs.",
           "items": {
-            "description": "A PipelineStep in a function pipeline.",
+            "description": "A PipelineStep in an operation function pipeline.",
             "properties": {
               "credentials": {
-                "description": "Credentials are optional credentials that the function needs.",
+                "description": "Credentials are optional credentials that the operation function needs.",
                 "items": {
                   "description": "FunctionCredentials are optional credentials that a function\nneeds to run.",
                   "properties": {
@@ -95,12 +70,6 @@
                     "source"
                   ],
                   "type": "object",
-                  "x-kubernetes-validations": [
-                    {
-                      "message": "the Secret source requires a secretRef",
-                      "rule": "self.source == 'Secret' && has(self.secretRef)"
-                    }
-                  ],
                   "additionalProperties": false
                 },
                 "type": "array",
@@ -113,7 +82,7 @@
                 "description": "FunctionRef is a reference to the function this step should\nexecute.",
                 "properties": {
                   "name": {
-                    "description": "Name of the referenced Function.",
+                    "description": "Name of the referenced function.",
                     "type": "string"
                   }
                 },
@@ -124,7 +93,7 @@
                 "additionalProperties": false
               },
               "input": {
-                "description": "Input is an optional, arbitrary Kubernetes resource (i.e. a resource\nwith an apiVersion and kind) that will be passed to the function as\nthe 'input' of its RunFunctionRequest.",
+                "description": "Input is an optional, arbitrary Kubernetes resource (i.e. a resource\nwith an apiVersion and kind) that will be passed to the unction as\nthe 'input' of its RunFunctionRequest.",
                 "type": "object",
                 "x-kubernetes-embedded-resource": true,
                 "x-kubernetes-preserve-unknown-fields": true
@@ -133,35 +102,35 @@
                 "description": "Requirements are resource requirements that will be satisfied before\nthis pipeline step is called for the first time. This allows\npre-populating required resources without requiring a function to\nrequest them first.",
                 "properties": {
                   "requiredResources": {
-                    "description": "RequiredResources is a list of resources that must be fetched before\nthis function is called.",
+                    "description": "RequiredResources that will be fetched before this pipeline step\nis called for the first time.",
                     "items": {
-                      "description": "RequiredResourceSelector selects a required resource.",
+                      "description": "RequiredResourceSelector selects resources that should be fetched before\na pipeline step runs.",
                       "properties": {
                         "apiVersion": {
-                          "description": "APIVersion of the required resource.",
+                          "description": "APIVersion of resources to select.",
                           "type": "string"
                         },
                         "kind": {
-                          "description": "Kind of the required resource.",
+                          "description": "Kind of resources to select.",
                           "type": "string"
                         },
                         "matchLabels": {
                           "additionalProperties": {
                             "type": "string"
                           },
-                          "description": "MatchLabels specifies the set of labels to match for finding the\nrequired resource. When specified, Name is ignored.",
+                          "description": "MatchLabels matches resources by label selector. Only one of Name or\nMatchLabels may be specified.",
                           "type": "object"
                         },
                         "name": {
-                          "description": "Name of the required resource.",
+                          "description": "Name matches a single resource by name. Only one of Name or\nMatchLabels may be specified.",
                           "type": "string"
                         },
                         "namespace": {
-                          "description": "Namespace of the required resource if it is namespaced.",
+                          "description": "Namespace to search for resources. Optional for cluster-scoped resources.",
                           "type": "string"
                         },
                         "requirementName": {
-                          "description": "RequirementName is the unique name to identify this required resource\nin the Required Resources map in the function request.",
+                          "description": "RequirementName uniquely identifies this group of resources.\nThis name will be used as the key in RunFunctionRequest.required_resources.",
                           "type": "string"
                         }
                       },
@@ -201,32 +170,62 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 99,
+          "minItems": 1,
           "type": "array",
           "x-kubernetes-list-map-keys": [
             "step"
           ],
           "x-kubernetes-list-type": "map"
         },
-        "revision": {
-          "description": "Revision number. Newer revisions have larger numbers.\n\nThis number can change. When a Composition transitions from state A\n-> B -> A there will be only two CompositionRevisions. Crossplane will\nedit the original CompositionRevision to change its revision number from\n0 to 2.",
+        "retryLimit": {
+          "description": "RetryLimit configures how many times the operation may fail. When the\nfailure limit is exceeded, the operation will not be retried.",
           "format": "int64",
           "type": "integer"
-        },
-        "writeConnectionSecretsToNamespace": {
-          "description": "WriteConnectionSecretsToNamespace specifies the namespace in which the\nconnection secrets of composite resource dynamically provisioned using\nthis composition will be created.",
-          "type": "string"
         }
       },
       "required": [
-        "compositeTypeRef",
-        "revision"
+        "mode",
+        "pipeline"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "CompositionRevisionStatus shows the observed state of the composition\nrevision.",
+      "description": "OperationStatus represents the observed state of an operation.",
       "properties": {
+        "appliedResourceRefs": {
+          "description": "AppliedResourceRefs references all resources the Operation applied.",
+          "items": {
+            "description": "An AppliedResourceRef is a reference to a resource an Operation applied.",
+            "properties": {
+              "apiVersion": {
+                "description": "APIVersion of the applied resource.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind of the applied resource.",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name of the applied resource.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace of the applied resource.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "apiVersion",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "conditions": {
           "description": "Conditions of the resource.",
           "items": {
@@ -273,6 +272,34 @@
             "type"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "failures": {
+          "description": "Number of operation failures.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "pipeline": {
+          "description": "Pipeline represents the output of the pipeline steps that this operation\nran.",
+          "items": {
+            "description": "PipelineStepStatus represents the status of an individual pipeline step.",
+            "properties": {
+              "output": {
+                "description": "Output of this step.",
+                "type": "object",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "step": {
+                "description": "Step name. Unique within its Pipeline.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "step"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         }
       },
       "type": "object",

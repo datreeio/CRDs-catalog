@@ -18,8 +18,6 @@
         "allowCrossNamespaceImport": {
           "default": false,
           "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
-          "default": false,
-          "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
           "type": "boolean"
         },
         "editable": {
@@ -34,14 +32,25 @@
         },
         "folderRef": {
           "description": "Match GrafanaFolders CRs to infer the uid",
-          "type": "string"
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "Value is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
         },
         "folderUID": {
           "description": "UID of the folder containing this rule group\nOverrides the FolderSelector",
-          "type": "string"
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "Value is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
         },
         "instanceSelector": {
-          "description": "Selects Grafana instances for import",
           "description": "Selects Grafana instances for import",
           "properties": {
             "matchExpressions": {
@@ -88,7 +97,6 @@
           "x-kubernetes-map-type": "atomic",
           "x-kubernetes-validations": [
             {
-              "message": "spec.instanceSelector is immutable",
               "message": "spec.instanceSelector is immutable",
               "rule": "self == oldSelf"
             }
@@ -175,6 +183,7 @@
                 "type": "string"
               },
               "for": {
+                "default": "0s",
                 "format": "duration",
                 "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
                 "type": "string"
@@ -182,11 +191,21 @@
               "isPaused": {
                 "type": "boolean"
               },
+              "keepFiringFor": {
+                "format": "duration",
+                "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                "type": "string"
+              },
               "labels": {
                 "additionalProperties": {
                   "type": "string"
                 },
                 "type": "object"
+              },
+              "missingSeriesEvalsToResolve": {
+                "description": "The number of missing series evaluations that must occur before the rule is considered to be resolved.",
+                "format": "int64",
+                "type": "integer"
               },
               "noDataState": {
                 "enum": [
@@ -271,7 +290,12 @@
             "type": "object",
             "additionalProperties": false
           },
+          "minItems": 1,
           "type": "array"
+        },
+        "suspend": {
+          "description": "Suspend pauses synchronizing attempts and tells the operator to ignore changes",
+          "type": "boolean"
         }
       },
       "required": [
@@ -282,7 +306,7 @@
       "type": "object",
       "x-kubernetes-validations": [
         {
-          "message": "Only one of FolderUID or FolderRef can be set",
+          "message": "Only one of FolderUID or FolderRef can be set and one must be defined",
           "rule": "(has(self.folderUID) && !(has(self.folderRef))) || (has(self.folderRef) && !(has(self.folderUID)))"
         },
         {
@@ -290,12 +314,12 @@
           "rule": "((!has(oldSelf.editable) && !has(self.editable)) || (has(oldSelf.editable) && has(self.editable)))"
         },
         {
-          "message": "disabling spec.allowCrossNamespaceImport requires a recreate to ensure desired state",
-          "rule": "!oldSelf.allowCrossNamespaceImport || (oldSelf.allowCrossNamespaceImport && self.allowCrossNamespaceImport)"
+          "message": "spec.folderUID is immutable",
+          "rule": "((!has(oldSelf.folderUID) && !has(self.folderUID)) || (has(oldSelf.folderUID) && has(self.folderUID)))"
         },
         {
-          "message": "spec.editable is immutable",
-          "rule": "((!has(oldSelf.editable) && !has(self.editable)) || (has(oldSelf.editable) && has(self.editable)))"
+          "message": "spec.folderRef is immutable",
+          "rule": "((!has(oldSelf.folderRef) && !has(self.folderRef)) || (has(oldSelf.folderRef) && has(self.folderRef)))"
         },
         {
           "message": "disabling spec.allowCrossNamespaceImport requires a recreate to ensure desired state",
@@ -306,10 +330,8 @@
     },
     "status": {
       "description": "The most recent observed state of a Grafana resource",
-      "description": "The most recent observed state of a Grafana resource",
       "properties": {
         "conditions": {
-          "description": "Results when synchonizing resource with Grafana instances",
           "description": "Results when synchonizing resource with Grafana instances",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
@@ -364,11 +386,6 @@
             "additionalProperties": false
           },
           "type": "array"
-        },
-        "lastResync": {
-          "description": "Last time the resource was synchronized with Grafana instances",
-          "format": "date-time",
-          "type": "string"
         },
         "lastResync": {
           "description": "Last time the resource was synchronized with Grafana instances",

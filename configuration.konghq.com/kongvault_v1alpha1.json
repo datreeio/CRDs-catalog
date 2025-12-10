@@ -1,30 +1,10 @@
 {
   "type": "object",
-  "description": "KongConsumer is the Schema for the kongconsumers API.",
+  "description": "KongVault is the schema for kongvaults API which defines a custom Kong vault.\nA Kong vault is a storage to store sensitive data, where the values can be referenced in configuration of plugins.\nSee: https://docs.konghq.com/gateway/latest/kong-enterprise/secrets-management/",
   "properties": {
     "apiVersion": {
       "type": "string",
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
-    },
-    "consumerGroups": {
-      "type": "array",
-      "description": "ConsumerGroups are references to consumer groups (that consumer wants to be part of)\nprovisioned in Kong.",
-      "items": {
-        "type": "string"
-      },
-      "x-kubernetes-list-type": "set"
-    },
-    "credentials": {
-      "type": "array",
-      "description": "Credentials are references to secrets containing a credential to be\nprovisioned in Kong.",
-      "items": {
-        "type": "string"
-      },
-      "x-kubernetes-list-type": "set"
-    },
-    "custom_id": {
-      "type": "string",
-      "description": "CustomID is a Kong cluster-unique existing ID for the consumer - useful for mapping\nKong with users in your existing database."
     },
     "kind": {
       "type": "string",
@@ -35,11 +15,20 @@
     },
     "spec": {
       "type": "object",
-      "description": "KongConsumerSpec defines the specification of the KongConsumer.",
+      "description": "KongVaultSpec defines specification of a custom Kong vault.",
       "properties": {
+        "backend": {
+          "type": "string",
+          "description": "Backend is the type of the backend storing the secrets in the vault.\nThe supported backends of Kong is listed here:\nhttps://docs.konghq.com/gateway/latest/kong-enterprise/secrets-management/backends/",
+          "minLength": 1
+        },
+        "config": {
+          "description": "Config is the configuration of the vault. Varies for different backends.",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
         "controlPlaneRef": {
           "type": "object",
-          "description": "ControlPlaneRef is a reference to a ControlPlane this Consumer is associated with.",
+          "description": "ControlPlaneRef is a reference to a Konnect ControlPlane this KongVault is associated with.",
           "properties": {
             "konnectID": {
               "type": "string",
@@ -115,9 +104,18 @@
             }
           ]
         },
+        "description": {
+          "type": "string",
+          "description": "Description is the additional information about the vault."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Prefix is the prefix of vault URI for referencing values in the vault.\nIt is immutable after created.",
+          "minLength": 1
+        },
         "tags": {
           "type": "array",
-          "description": "Tags is an optional set of tags applied to the consumer.",
+          "description": "Tags are the tags associated to the vault for grouping and filtering.",
           "items": {
             "type": "string"
           },
@@ -130,26 +128,28 @@
           ]
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "prefix"
+      ]
     },
     "status": {
       "type": "object",
-      "description": "Status represents the current status of the KongConsumer resource.",
-      "default": {
-        "conditions": [
-          {
-            "lastTransitionTime": "1970-01-01T00:00:00Z",
-            "message": "Waiting for controller",
-            "reason": "Pending",
-            "status": "Unknown",
-            "type": "Programmed"
-          }
-        ]
-      },
+      "description": "KongVaultStatus represents the current status of the KongVault resource.",
       "properties": {
         "conditions": {
           "type": "array",
-          "description": "Conditions describe the current conditions of the KongConsumer.\n\nKnown condition types are:\n\n* \"Programmed\"",
+          "description": "Conditions describe the current conditions of the KongVaultStatus.\n\nKnown condition types are:\n\n* \"Programmed\"",
+          "default": [
+            {
+              "lastTransitionTime": "1970-01-01T00:00:00Z",
+              "message": "Waiting for controller",
+              "reason": "Pending",
+              "status": "Unknown",
+              "type": "Programmed"
+            }
+          ],
           "items": {
             "type": "object",
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
@@ -232,29 +232,27 @@
           "additionalProperties": false
         }
       },
-      "additionalProperties": false
-    },
-    "username": {
-      "type": "string",
-      "description": "Username is a Kong cluster-unique username of the consumer."
+      "additionalProperties": false,
+      "required": [
+        "conditions"
+      ]
     }
   },
+  "required": [
+    "spec"
+  ],
   "x-kubernetes-validations": [
     {
-      "message": "Need to provide either username or custom_id",
-      "rule": "has(self.username) || has(self.custom_id)"
+      "message": "The spec.prefix field is immutable",
+      "rule": "self.spec.prefix == oldSelf.spec.prefix"
     },
     {
       "message": "controlPlaneRef is required once set",
-      "rule": "(!has(oldSelf.spec) || !has(oldSelf.spec.controlPlaneRef)) || has(self.spec.controlPlaneRef)"
-    },
-    {
-      "message": "spec.controlPlaneRef cannot specify namespace for namespaced resource",
-      "rule": "(!has(self.spec) || !has(self.spec.controlPlaneRef) || !has(self.spec.controlPlaneRef.konnectNamespacedRef)) ? true : !has(self.spec.controlPlaneRef.konnectNamespacedRef.__namespace__)"
+      "rule": "!has(oldSelf.spec.controlPlaneRef) || has(self.spec.controlPlaneRef)"
     },
     {
       "message": "spec.controlPlaneRef is immutable when an entity is already Programmed",
-      "rule": "(!has(self.spec) || !has(self.spec.controlPlaneRef)) ? true : (!has(self.status) || !self.status.conditions.exists(c, c.type == 'Programmed' && c.status == 'True')) ? true : oldSelf.spec.controlPlaneRef == self.spec.controlPlaneRef"
+      "rule": "(!has(self.status) || !self.status.conditions.exists(c, c.type == 'Programmed' && c.status == 'True') || !has(self.spec.controlPlaneRef)) ? true : oldSelf.spec.controlPlaneRef == self.spec.controlPlaneRef"
     }
   ]
 }

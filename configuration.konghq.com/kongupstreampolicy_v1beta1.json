@@ -1,0 +1,540 @@
+{
+  "type": "object",
+  "description": "KongUpstreamPolicy allows configuring algorithm that should be used for load balancing traffic between Kong\nUpstream's Targets. It also allows configuring health checks for Kong Upstream's Targets.\n\nIts configuration is similar to Kong Upstream object (https://docs.konghq.com/gateway/latest/admin-api/#upstream-object),\nand it is applied to Kong Upstream objects created by the controller.\n\nIt can be attached to Services. To attach it to a Service, it has to be annotated with\n`konghq.com/upstream-policy: <name>`, where `<name>` is the name of the KongUpstreamPolicy\nobject in the same namespace as the Service.\n\nWhen attached to a Service, it will affect all Kong Upstreams created for the Service.\n\nWhen attached to a Service used in a Gateway API *Route rule with multiple BackendRefs, all of its Services MUST\nbe configured with the same KongUpstreamPolicy. Otherwise, the controller will *ignore* the KongUpstreamPolicy.\n\nNote: KongUpstreamPolicy doesn't implement Gateway API's GEP-713 strictly.\nIn particular, it doesn't use the TargetRef for attaching to Services and Gateway API *Routes - annotations are\nused instead. This is to allow reusing the same KongUpstreamPolicy for multiple Services and Gateway API *Routes.",
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+    },
+    "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "type": "object",
+      "description": "Spec contains the configuration of the Kong upstream.",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "description": "Algorithm is the load balancing algorithm to use.\nAccepted values are: \"round-robin\", \"consistent-hashing\", \"least-connections\", \"latency\", \"sticky-sessions\"",
+          "enum": [
+            "round-robin",
+            "consistent-hashing",
+            "least-connections",
+            "latency",
+            "sticky-sessions"
+          ]
+        },
+        "hashOn": {
+          "type": "object",
+          "description": "HashOn defines how to calculate hash for consistent-hashing or sticky-sessions load balancing algorithm.\nAlgorithm must be set to \"consistent-hashing\" or \"sticky-sessions\" for this field to have effect.",
+          "properties": {
+            "cookie": {
+              "type": "string",
+              "description": "Cookie is the name of the cookie to use as hash input."
+            },
+            "cookiePath": {
+              "type": "string",
+              "description": "CookiePath is cookie path to set in the response headers."
+            },
+            "header": {
+              "type": "string",
+              "description": "Header is the name of the header to use as hash input."
+            },
+            "input": {
+              "type": "string",
+              "description": "Input allows using one of the predefined inputs (ip, consumer, path, none).\nSet this to `none` if you want to use sticky sessions.\nFor other parameterized inputs, use one of the fields below.",
+              "enum": [
+                "ip",
+                "consumer",
+                "path",
+                "none"
+              ]
+            },
+            "queryArg": {
+              "type": "string",
+              "description": "QueryArg is the name of the query argument to use as hash input."
+            },
+            "uriCapture": {
+              "type": "string",
+              "description": "URICapture is the name of the URI capture group to use as hash input."
+            }
+          },
+          "additionalProperties": false
+        },
+        "hashOnFallback": {
+          "type": "object",
+          "description": "HashOnFallback defines how to calculate hash for consistent-hashing load balancing algorithm if the primary hash\nfunction fails.\nAlgorithm must be set to \"consistent-hashing\" for this field to have effect.",
+          "properties": {
+            "cookie": {
+              "type": "string",
+              "description": "Cookie is the name of the cookie to use as hash input."
+            },
+            "cookiePath": {
+              "type": "string",
+              "description": "CookiePath is cookie path to set in the response headers."
+            },
+            "header": {
+              "type": "string",
+              "description": "Header is the name of the header to use as hash input."
+            },
+            "input": {
+              "type": "string",
+              "description": "Input allows using one of the predefined inputs (ip, consumer, path, none).\nSet this to `none` if you want to use sticky sessions.\nFor other parameterized inputs, use one of the fields below.",
+              "enum": [
+                "ip",
+                "consumer",
+                "path",
+                "none"
+              ]
+            },
+            "queryArg": {
+              "type": "string",
+              "description": "QueryArg is the name of the query argument to use as hash input."
+            },
+            "uriCapture": {
+              "type": "string",
+              "description": "URICapture is the name of the URI capture group to use as hash input."
+            }
+          },
+          "additionalProperties": false
+        },
+        "healthchecks": {
+          "type": "object",
+          "description": "Healthchecks defines the health check configurations in Kong.",
+          "properties": {
+            "active": {
+              "type": "object",
+              "description": "Active configures active health check probing.",
+              "properties": {
+                "concurrency": {
+                  "type": "integer",
+                  "description": "Concurrency is the number of targets to check concurrently.",
+                  "minimum": 1
+                },
+                "headers": {
+                  "type": "object",
+                  "description": "Headers is a list of HTTP headers to add to the probe request.",
+                  "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "healthy": {
+                  "type": "object",
+                  "description": "Healthy configures thresholds and HTTP status codes to mark targets healthy for an upstream.",
+                  "properties": {
+                    "httpStatuses": {
+                      "type": "array",
+                      "description": "HTTPStatuses is a list of HTTP status codes that Kong considers a success.",
+                      "items": {
+                        "type": "integer",
+                        "description": "HTTPStatus is an HTTP status code.",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    },
+                    "interval": {
+                      "type": "integer",
+                      "description": "Interval is the interval between active health checks for an upstream in seconds when in a healthy state.",
+                      "minimum": 0
+                    },
+                    "successes": {
+                      "type": "integer",
+                      "description": "Successes is the number of successes to consider a target healthy.",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "httpPath": {
+                  "type": "string",
+                  "description": "HTTPPath is the path to use in GET HTTP request to run as a probe.",
+                  "pattern": "^/.*$"
+                },
+                "httpsSni": {
+                  "type": "string",
+                  "description": "HTTPSSNI is the SNI to use in GET HTTPS request to run as a probe."
+                },
+                "httpsVerifyCertificate": {
+                  "type": "boolean",
+                  "description": "HTTPSVerifyCertificate is a boolean value that indicates if the certificate should be verified."
+                },
+                "timeout": {
+                  "type": "integer",
+                  "description": "Timeout is the probe timeout in seconds.",
+                  "minimum": 0
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type determines whether to perform active health checks using HTTP or HTTPS, or just attempt a TCP connection.\nAccepted values are \"http\", \"https\", \"tcp\", \"grpc\", \"grpcs\".",
+                  "enum": [
+                    "http",
+                    "https",
+                    "tcp",
+                    "grpc",
+                    "grpcs"
+                  ]
+                },
+                "unhealthy": {
+                  "type": "object",
+                  "description": "Unhealthy configures thresholds and HTTP status codes to mark targets unhealthy for an upstream.",
+                  "properties": {
+                    "httpFailures": {
+                      "type": "integer",
+                      "description": "HTTPFailures is the number of failures to consider a target unhealthy.",
+                      "minimum": 0
+                    },
+                    "httpStatuses": {
+                      "type": "array",
+                      "description": "HTTPStatuses is a list of HTTP status codes that Kong considers a failure.",
+                      "items": {
+                        "type": "integer",
+                        "description": "HTTPStatus is an HTTP status code.",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    },
+                    "interval": {
+                      "type": "integer",
+                      "description": "Interval is the interval between active health checks for an upstream in seconds when in an unhealthy state.",
+                      "minimum": 0
+                    },
+                    "tcpFailures": {
+                      "type": "integer",
+                      "description": "TCPFailures is the number of TCP failures in a row to consider a target unhealthy.",
+                      "minimum": 0
+                    },
+                    "timeouts": {
+                      "type": "integer",
+                      "description": "Timeouts is the number of timeouts in a row to consider a target unhealthy.",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "passive": {
+              "type": "object",
+              "description": "Passive configures passive health check probing.",
+              "properties": {
+                "healthy": {
+                  "type": "object",
+                  "description": "Healthy configures thresholds and HTTP status codes to mark targets healthy for an upstream.",
+                  "properties": {
+                    "httpStatuses": {
+                      "type": "array",
+                      "description": "HTTPStatuses is a list of HTTP status codes that Kong considers a success.",
+                      "items": {
+                        "type": "integer",
+                        "description": "HTTPStatus is an HTTP status code.",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    },
+                    "interval": {
+                      "type": "integer",
+                      "description": "Interval is the interval between active health checks for an upstream in seconds when in a healthy state.",
+                      "minimum": 0
+                    },
+                    "successes": {
+                      "type": "integer",
+                      "description": "Successes is the number of successes to consider a target healthy.",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Type determines whether to perform passive health checks interpreting HTTP/HTTPS statuses,\nor just check for TCP connection success.\nAccepted values are \"http\", \"https\", \"tcp\", \"grpc\", \"grpcs\".",
+                  "enum": [
+                    "http",
+                    "https",
+                    "tcp",
+                    "grpc",
+                    "grpcs"
+                  ]
+                },
+                "unhealthy": {
+                  "type": "object",
+                  "description": "Unhealthy configures thresholds and HTTP status codes to mark targets unhealthy.",
+                  "properties": {
+                    "httpFailures": {
+                      "type": "integer",
+                      "description": "HTTPFailures is the number of failures to consider a target unhealthy.",
+                      "minimum": 0
+                    },
+                    "httpStatuses": {
+                      "type": "array",
+                      "description": "HTTPStatuses is a list of HTTP status codes that Kong considers a failure.",
+                      "items": {
+                        "type": "integer",
+                        "description": "HTTPStatus is an HTTP status code.",
+                        "minimum": 100,
+                        "maximum": 599
+                      }
+                    },
+                    "interval": {
+                      "type": "integer",
+                      "description": "Interval is the interval between active health checks for an upstream in seconds when in an unhealthy state.",
+                      "minimum": 0
+                    },
+                    "tcpFailures": {
+                      "type": "integer",
+                      "description": "TCPFailures is the number of TCP failures in a row to consider a target unhealthy.",
+                      "minimum": 0
+                    },
+                    "timeouts": {
+                      "type": "integer",
+                      "description": "Timeouts is the number of timeouts in a row to consider a target unhealthy.",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "threshold": {
+              "type": "integer",
+              "description": "Threshold is the minimum percentage of the upstream’s targets’ weight that must be available for the whole\nupstream to be considered healthy."
+            }
+          },
+          "additionalProperties": false
+        },
+        "slots": {
+          "type": "integer",
+          "description": "Slots is the number of slots in the load balancer algorithm.\nIf not set, the default value in Kong for the algorithm is used.",
+          "minimum": 10,
+          "maximum": 65536
+        },
+        "stickySessions": {
+          "type": "object",
+          "description": "StickySessions defines the sticky session configuration for the upstream.\nWhen enabled, clients will be routed to the same backend target based on a cookie.\nThis requires Kong Enterprise Gateway and setting `hash_on` to `none`.",
+          "properties": {
+            "cookie": {
+              "type": "string",
+              "description": "Cookie is the name of the cookie to use for sticky sessions.\nKong will generate this cookie if it doesn't exist in the request.",
+              "minLength": 1
+            },
+            "cookiePath": {
+              "type": "string",
+              "description": "CookiePath is the path to set in the cookie.",
+              "default": "/"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "cookie"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "status": {
+      "type": "object",
+      "description": "Status defines the current state of KongUpstreamPolicy",
+      "properties": {
+        "ancestors": {
+          "type": "array",
+          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",
+          "items": {
+            "type": "object",
+            "description": "PolicyAncestorStatus describes the status of a route with respect to an\nassociated Ancestor.\n\nAncestors refer to objects that are either the Target of a policy or above it\nin terms of object hierarchy. For example, if a policy targets a Service, the\nPolicy's Ancestors are, in order, the Service, the HTTPRoute, the Gateway, and\nthe GatewayClass. Almost always, in this hierarchy, the Gateway will be the most\nuseful object to place Policy status on, so we recommend that implementations\nSHOULD use Gateway as the PolicyAncestorStatus object unless the designers\nhave a _very_ good reason otherwise.\n\nIn the context of policy attachment, the Ancestor is used to distinguish which\nresource results in a distinct application of this policy. For example, if a policy\ntargets a Service, it may have a distinct result per attached Gateway.\n\nPolicies targeting the same resource may have different effects depending on the\nancestors of those resources. For example, different Gateways targeting the same\nService may have different capabilities, especially if they have different underlying\nimplementations.\n\nFor example, in BackendTLSPolicy, the Policy attaches to a Service that is\nused as a backend in a HTTPRoute that is itself attached to a Gateway.\nIn this case, the relevant object for status is the Gateway, and that is the\nancestor object referred to in this status.\n\nNote that a parent is also an ancestor, so for objects where the parent is the\nrelevant object for status, this struct SHOULD still be used.\n\nThis struct is intended to be used in a slice that's effectively a map,\nwith a composite key made up of the AncestorRef and the ControllerName.",
+            "properties": {
+              "ancestorRef": {
+                "type": "object",
+                "description": "AncestorRef corresponds with a ParentRef in the spec that this\nPolicyAncestorStatus struct describes the status of.",
+                "properties": {
+                  "group": {
+                    "type": "string",
+                    "description": "Group is the group of the referent.\nWhen unspecified, \"gateway.networking.k8s.io\" is inferred.\nTo set the core API group (such as for a \"Service\" kind referent),\nGroup must be explicitly set to \"\" (empty string).\n\nSupport: Core",
+                    "default": "gateway.networking.k8s.io",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "description": "Kind is kind of the referent.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nSupport for other resources is Implementation-Specific.",
+                    "default": "Gateway",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Name is the name of the referent.\n\nSupport: Core",
+                    "minLength": 1,
+                    "maxLength": 253
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Namespace is the namespace of the referent. When unspecified, this refers\nto the local namespace of the Route.\n\nNote that there are specific rules for ParentRefs which cross namespace\nboundaries. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example:\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable any other kind of cross-namespace reference.\n\n<gateway:experimental:description>\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.\n</gateway:experimental:description>\n\nSupport: Core",
+                    "minLength": 1,
+                    "maxLength": 63,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "description": "Port is the network port this Route targets. It can be interpreted\ndifferently based on the type of parent resource.\n\nWhen the parent resource is a Gateway, this targets all listeners\nlistening on the specified port that also support this kind of Route(and\nselect this Route). It's not recommended to set `Port` unless the\nnetworking behaviors specified in a Route must apply to a specific port\nas opposed to a listener(s) whose port(s) may be changed. When both Port\nand SectionName are specified, the name and port of the selected listener\nmust match both specified values.\n\n<gateway:experimental:description>\nWhen the parent resource is a Service, this targets a specific port in the\nService spec. When both Port (experimental) and SectionName are specified,\nthe name and port of the selected port must match both specified values.\n</gateway:experimental:description>\n\nImplementations MAY choose to support other parent resources.\nImplementations supporting other types of parent resources MUST clearly\ndocument how/if Port is interpreted.\n\nFor the purpose of status, an attachment is considered successful as\nlong as the parent resource accepts it partially. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment\nfrom the referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route,\nthe Route MUST be considered detached from the Gateway.\n\nSupport: Extended",
+                    "format": "int32",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "sectionName": {
+                    "type": "string",
+                    "description": "SectionName is the name of a section within the target resource. In the\nfollowing resources, SectionName is interpreted as the following:\n\n* Gateway: Listener name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n* Service: Port name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n\nImplementations MAY choose to support attaching Routes to other resources.\nIf that is the case, they MUST clearly document how SectionName is\ninterpreted.\n\nWhen unspecified (empty string), this will reference the entire resource.\nFor the purpose of status, an attachment is considered successful if at\nleast one section in the parent resource accepts it. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment from\nthe referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route, the\nRoute MUST be considered detached from the Gateway.\n\nSupport: Core",
+                    "minLength": 1,
+                    "maxLength": 253,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ]
+              },
+              "conditions": {
+                "type": "array",
+                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.",
+                "items": {
+                  "type": "object",
+                  "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "type": "string",
+                      "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                      "format": "date-time"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                      "maxLength": 32768
+                    },
+                    "observedGeneration": {
+                      "type": "integer",
+                      "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                      "format": "int64",
+                      "minimum": 0
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                      "minLength": 1,
+                      "maxLength": 1024,
+                      "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$"
+                    },
+                    "status": {
+                      "type": "string",
+                      "description": "status of the condition, one of True, False, Unknown.",
+                      "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                      ]
+                    },
+                    "type": {
+                      "type": "string",
+                      "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                      "maxLength": 316,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "lastTransitionTime",
+                    "message",
+                    "reason",
+                    "status",
+                    "type"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 8,
+                "x-kubernetes-list-type": "map",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ]
+              },
+              "controllerName": {
+                "type": "string",
+                "description": "ControllerName is a domain/path string that indicates the name of the\ncontroller that wrote this status. This corresponds with the\ncontrollerName field on GatewayClass.\n\nExample: \"example.net/gateway-controller\".\n\nThe format of this field is DOMAIN \"/\" PATH, where DOMAIN and PATH are\nvalid Kubernetes names\n(https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names).\n\nControllers MUST populate this field when writing status. Controllers should ensure that\nentries to status populated with their ControllerName are cleaned up when they are no\nlonger necessary.",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&'()*+,;=:]+$"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "ancestorRef",
+              "controllerName"
+            ]
+          },
+          "maxItems": 16
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ancestors"
+      ]
+    }
+  },
+  "x-kubernetes-validations": [
+    {
+      "message": "Only one of spec.hashOn.(input|cookie|header|uriCapture|queryArg) can be set.",
+      "rule": "has(self.spec.hashOn) ? [has(self.spec.hashOn.input), has(self.spec.hashOn.cookie), has(self.spec.hashOn.header), has(self.spec.hashOn.uriCapture), has(self.spec.hashOn.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true"
+    },
+    {
+      "message": "When spec.hashOn.cookie is set, spec.hashOn.cookiePath is required.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? has(self.spec.hashOn.cookiePath) : true"
+    },
+    {
+      "message": "When spec.hashOn.cookiePath is set, spec.hashOn.cookie is required.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookiePath) ? has(self.spec.hashOn.cookie) : true"
+    },
+    {
+      "message": "spec.algorithm must be set to either 'consistent-hashing' or 'sticky-sessions' when spec.hashOn is set.",
+      "rule": "has(self.spec.hashOn) ? has(self.spec.algorithm) && (self.spec.algorithm == \"consistent-hashing\" || self.spec.algorithm == \"sticky-sessions\") : true"
+    },
+    {
+      "message": "Only one of spec.hashOnFallback.(input|header|uriCapture|queryArg) can be set.",
+      "rule": "has(self.spec.hashOnFallback) ? [has(self.spec.hashOnFallback.input), has(self.spec.hashOnFallback.header), has(self.spec.hashOnFallback.uriCapture), has(self.spec.hashOnFallback.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true"
+    },
+    {
+      "message": "spec.algorithm must be set to \"consistent-hashing\" when spec.hashOnFallback is set.",
+      "rule": "has(self.spec.hashOnFallback) ? has(self.spec.algorithm) && self.spec.algorithm == \"consistent-hashing\" : true"
+    },
+    {
+      "message": "spec.hashOnFallback must not be set when spec.hashOn.cookie is set.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? !has(self.spec.hashOnFallback) : true"
+    },
+    {
+      "message": "spec.healthchecks.passive.healthy.interval must not be set.",
+      "rule": "has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.healthy) ? !has(self.spec.healthchecks.passive.healthy.interval) : true"
+    },
+    {
+      "message": "spec.healthchecks.passive.unhealthy.interval must not be set.",
+      "rule": "has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.unhealthy) ? !has(self.spec.healthchecks.passive.unhealthy.interval) : true"
+    },
+    {
+      "message": "When spec.stickySessions is set, spec.hashOn.input must be set to 'none' (no other hash_on fields allowed).",
+      "rule": "has(self.spec.stickySessions) ? (has(self.spec.hashOn) && has(self.spec.hashOn.input) && self.spec.hashOn.input == 'none' && !has(self.spec.hashOn.cookie) && !has(self.spec.hashOn.cookiePath) && !has(self.spec.hashOn.header) && !has(self.spec.hashOn.uriCapture) && !has(self.spec.hashOn.queryArg)) : true"
+    },
+    {
+      "message": "spec.stickySessions.cookie is required when spec.stickySessions is set.",
+      "rule": "has(self.spec.stickySessions) ? has(self.spec.stickySessions.cookie) : true"
+    },
+    {
+      "message": "spec.algorithm must be set to 'sticky-sessions' when spec.stickySessions is set.",
+      "rule": "has(self.spec.stickySessions) ? (has(self.spec.algorithm) && self.spec.algorithm == \"sticky-sessions\") : true"
+    }
+  ]
+}

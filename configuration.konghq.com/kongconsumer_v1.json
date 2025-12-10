@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "KongConsumer is the Schema for the kongconsumers API.",
   "properties": {
@@ -12,14 +11,16 @@
       "description": "ConsumerGroups are references to consumer groups (that consumer wants to be part of)\nprovisioned in Kong.",
       "items": {
         "type": "string"
-      }
+      },
+      "x-kubernetes-list-type": "set"
     },
     "credentials": {
       "type": "array",
       "description": "Credentials are references to secrets containing a credential to be\nprovisioned in Kong.",
       "items": {
         "type": "string"
-      }
+      },
+      "x-kubernetes-list-type": "set"
     },
     "custom_id": {
       "type": "string",
@@ -74,7 +75,45 @@
               "default": "kic"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "x-kubernetes-validations": [
+            {
+              "message": "'konnectID' type is not supported",
+              "rule": "self.type != 'konnectID'"
+            },
+            {
+              "message": "when type is konnectNamespacedRef, konnectNamespacedRef must be set",
+              "rule": "(has(self.type) && self.type == 'konnectNamespacedRef') ? has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is konnectNamespacedRef, konnectID must not be set",
+              "rule": "(has(self.type) && self.type == 'konnectNamespacedRef') ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is konnectID, konnectID must be set",
+              "rule": "(has(self.type) && self.type == 'konnectID') ? has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is konnectID, konnectNamespacedRef must not be set",
+              "rule": "(has(self.type) && self.type == 'konnectID') ? !has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is kic, konnectID must not be set",
+              "rule": "(has(self.type) && self.type == 'kic') ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is kic, konnectNamespacedRef must not be set",
+              "rule": "(has(self.type) && self.type == 'kic') ? !has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is unset, konnectID must not be set",
+              "rule": "!has(self.type) ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is unset, konnectNamespacedRef must not be set",
+              "rule": "!has(self.type) ? !has(self.konnectNamespacedRef) : true"
+            }
+          ]
         },
         "tags": {
           "type": "array",
@@ -82,7 +121,13 @@
           "items": {
             "type": "string"
           },
-          "maxItems": 20
+          "maxItems": 20,
+          "x-kubernetes-validations": [
+            {
+              "message": "tags entries must not be longer than 128 characters",
+              "rule": "self.all(tag, size(tag) >= 1 && size(tag) <= 128)"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -157,7 +202,11 @@
               "type"
             ]
           },
-          "maxItems": 8
+          "maxItems": 8,
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ]
         },
         "konnect": {
           "type": "object",
@@ -190,5 +239,22 @@
       "description": "Username is a Kong cluster-unique username of the consumer."
     }
   },
-  "additionalProperties": false
+  "x-kubernetes-validations": [
+    {
+      "message": "Need to provide either username or custom_id",
+      "rule": "has(self.username) || has(self.custom_id)"
+    },
+    {
+      "message": "controlPlaneRef is required once set",
+      "rule": "(!has(oldSelf.spec) || !has(oldSelf.spec.controlPlaneRef)) || has(self.spec.controlPlaneRef)"
+    },
+    {
+      "message": "spec.controlPlaneRef cannot specify namespace for namespaced resource",
+      "rule": "(!has(self.spec) || !has(self.spec.controlPlaneRef) || !has(self.spec.controlPlaneRef.konnectNamespacedRef)) ? true : !has(self.spec.controlPlaneRef.konnectNamespacedRef.__namespace__)"
+    },
+    {
+      "message": "spec.controlPlaneRef is immutable when an entity is already Programmed",
+      "rule": "(!has(self.spec) || !has(self.spec.controlPlaneRef)) ? true : (!has(self.status) || !self.status.conditions.exists(c, c.type == 'Programmed' && c.status == 'True')) ? true : oldSelf.spec.controlPlaneRef == self.spec.controlPlaneRef"
+    }
+  ]
 }

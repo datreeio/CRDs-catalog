@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "KongUpstreamPolicy allows configuring algorithm that should be used for load balancing traffic between Kong\nUpstream's Targets. It also allows configuring health checks for Kong Upstream's Targets.\n\nIts configuration is similar to Kong Upstream object (https://docs.konghq.com/gateway/latest/admin-api/#upstream-object),\nand it is applied to Kong Upstream objects created by the controller.\n\nIt can be attached to Services. To attach it to a Service, it has to be annotated with\n`konghq.com/upstream-policy: <name>`, where `<name>` is the name of the KongUpstreamPolicy\nobject in the same namespace as the Service.\n\nWhen attached to a Service, it will affect all Kong Upstreams created for the Service.\n\nWhen attached to a Service used in a Gateway API *Route rule with multiple BackendRefs, all of its Services MUST\nbe configured with the same KongUpstreamPolicy. Otherwise, the controller will *ignore* the KongUpstreamPolicy.\n\nNote: KongUpstreamPolicy doesn't implement Gateway API's GEP-713 strictly.\nIn particular, it doesn't use the TargetRef for attaching to Services and Gateway API *Routes - annotations are\nused instead. This is to allow reusing the same KongUpstreamPolicy for multiple Services and Gateway API *Routes.",
   "properties": {
@@ -459,7 +458,11 @@
                   ]
                 },
                 "minItems": 1,
-                "maxItems": 8
+                "maxItems": 8,
+                "x-kubernetes-list-type": "map",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ]
               },
               "controllerName": {
                 "type": "string",
@@ -484,5 +487,54 @@
       ]
     }
   },
-  "additionalProperties": false
+  "x-kubernetes-validations": [
+    {
+      "message": "Only one of spec.hashOn.(input|cookie|header|uriCapture|queryArg) can be set.",
+      "rule": "has(self.spec.hashOn) ? [has(self.spec.hashOn.input), has(self.spec.hashOn.cookie), has(self.spec.hashOn.header), has(self.spec.hashOn.uriCapture), has(self.spec.hashOn.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true"
+    },
+    {
+      "message": "When spec.hashOn.cookie is set, spec.hashOn.cookiePath is required.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? has(self.spec.hashOn.cookiePath) : true"
+    },
+    {
+      "message": "When spec.hashOn.cookiePath is set, spec.hashOn.cookie is required.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookiePath) ? has(self.spec.hashOn.cookie) : true"
+    },
+    {
+      "message": "spec.algorithm must be set to either 'consistent-hashing' or 'sticky-sessions' when spec.hashOn is set.",
+      "rule": "has(self.spec.hashOn) ? has(self.spec.algorithm) && (self.spec.algorithm == \"consistent-hashing\" || self.spec.algorithm == \"sticky-sessions\") : true"
+    },
+    {
+      "message": "Only one of spec.hashOnFallback.(input|header|uriCapture|queryArg) can be set.",
+      "rule": "has(self.spec.hashOnFallback) ? [has(self.spec.hashOnFallback.input), has(self.spec.hashOnFallback.header), has(self.spec.hashOnFallback.uriCapture), has(self.spec.hashOnFallback.queryArg)].filter(fieldSet, fieldSet == true).size() <= 1 : true"
+    },
+    {
+      "message": "spec.algorithm must be set to \"consistent-hashing\" when spec.hashOnFallback is set.",
+      "rule": "has(self.spec.hashOnFallback) ? has(self.spec.algorithm) && self.spec.algorithm == \"consistent-hashing\" : true"
+    },
+    {
+      "message": "spec.hashOnFallback must not be set when spec.hashOn.cookie is set.",
+      "rule": "has(self.spec.hashOn) && has(self.spec.hashOn.cookie) ? !has(self.spec.hashOnFallback) : true"
+    },
+    {
+      "message": "spec.healthchecks.passive.healthy.interval must not be set.",
+      "rule": "has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.healthy) ? !has(self.spec.healthchecks.passive.healthy.interval) : true"
+    },
+    {
+      "message": "spec.healthchecks.passive.unhealthy.interval must not be set.",
+      "rule": "has(self.spec.healthchecks) && has(self.spec.healthchecks.passive) && has(self.spec.healthchecks.passive.unhealthy) ? !has(self.spec.healthchecks.passive.unhealthy.interval) : true"
+    },
+    {
+      "message": "When spec.stickySessions is set, spec.hashOn.input must be set to 'none' (no other hash_on fields allowed).",
+      "rule": "has(self.spec.stickySessions) ? (has(self.spec.hashOn) && has(self.spec.hashOn.input) && self.spec.hashOn.input == 'none' && !has(self.spec.hashOn.cookie) && !has(self.spec.hashOn.cookiePath) && !has(self.spec.hashOn.header) && !has(self.spec.hashOn.uriCapture) && !has(self.spec.hashOn.queryArg)) : true"
+    },
+    {
+      "message": "spec.stickySessions.cookie is required when spec.stickySessions is set.",
+      "rule": "has(self.spec.stickySessions) ? has(self.spec.stickySessions.cookie) : true"
+    },
+    {
+      "message": "spec.algorithm must be set to 'sticky-sessions' when spec.stickySessions is set.",
+      "rule": "has(self.spec.stickySessions) ? (has(self.spec.algorithm) && self.spec.algorithm == \"sticky-sessions\") : true"
+    }
+  ]
 }

@@ -1,5 +1,4 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "KongVault is the schema for kongvaults API which defines a custom Kong vault.\nA Kong vault is a storage to store sensitive data, where the values can be referenced in configuration of plugins.\nSee: https://docs.konghq.com/gateway/latest/kong-enterprise/secrets-management/",
   "properties": {
@@ -65,7 +64,45 @@
               "default": "kic"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "x-kubernetes-validations": [
+            {
+              "message": "'konnectID' type is not supported",
+              "rule": "self.type != 'konnectID'"
+            },
+            {
+              "message": "when type is konnectNamespacedRef, konnectNamespacedRef must be set",
+              "rule": "(has(self.type) && self.type == 'konnectNamespacedRef') ? has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is konnectNamespacedRef, konnectID must not be set",
+              "rule": "(has(self.type) && self.type == 'konnectNamespacedRef') ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is konnectID, konnectID must be set",
+              "rule": "(has(self.type) && self.type == 'konnectID') ? has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is konnectID, konnectNamespacedRef must not be set",
+              "rule": "(has(self.type) && self.type == 'konnectID') ? !has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is kic, konnectID must not be set",
+              "rule": "(has(self.type) && self.type == 'kic') ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is kic, konnectNamespacedRef must not be set",
+              "rule": "(has(self.type) && self.type == 'kic') ? !has(self.konnectNamespacedRef) : true"
+            },
+            {
+              "message": "when type is unset, konnectID must not be set",
+              "rule": "!has(self.type) ? !has(self.konnectID) : true"
+            },
+            {
+              "message": "when type is unset, konnectNamespacedRef must not be set",
+              "rule": "!has(self.type) ? !has(self.konnectNamespacedRef) : true"
+            }
+          ]
         },
         "description": {
           "type": "string",
@@ -82,7 +119,13 @@
           "items": {
             "type": "string"
           },
-          "maxItems": 20
+          "maxItems": 20,
+          "x-kubernetes-validations": [
+            {
+              "message": "tags entries must not be longer than 128 characters",
+              "rule": "self.all(tag, size(tag) >= 1 && size(tag) <= 128)"
+            }
+          ]
         }
       },
       "additionalProperties": false,
@@ -159,7 +202,11 @@
               "type"
             ]
           },
-          "maxItems": 8
+          "maxItems": 8,
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ]
         },
         "konnect": {
           "type": "object",
@@ -191,8 +238,21 @@
       ]
     }
   },
-  "additionalProperties": false,
   "required": [
     "spec"
+  ],
+  "x-kubernetes-validations": [
+    {
+      "message": "The spec.prefix field is immutable",
+      "rule": "self.spec.prefix == oldSelf.spec.prefix"
+    },
+    {
+      "message": "controlPlaneRef is required once set",
+      "rule": "!has(oldSelf.spec.controlPlaneRef) || has(self.spec.controlPlaneRef)"
+    },
+    {
+      "message": "spec.controlPlaneRef is immutable when an entity is already Programmed",
+      "rule": "(!has(self.status) || !self.status.conditions.exists(c, c.type == 'Programmed' && c.status == 'True') || !has(self.spec.controlPlaneRef)) ? true : oldSelf.spec.controlPlaneRef == self.spec.controlPlaneRef"
+    }
   ]
 }

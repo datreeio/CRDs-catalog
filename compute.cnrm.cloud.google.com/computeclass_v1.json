@@ -1,0 +1,1469 @@
+{
+  "description": "ComputeClass is a way to impact Cluster Autoscaler scaling\ndecisions based on user preferences. It gives control over preference of\nhardware to be selected by Cluster Autoscaler.\nGiven ComputeClass affects only workloads using workload separation\nlabel equal to CCs name, except ComputeClass with name default\nwhich will be used for workloads not specifying any preferences.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Specification of the ComputeClass object.\nMore info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
+      "properties": {
+        "activeMigration": {
+          "description": "ActiveMigration describes settings related to active reconciliation of\na given ComputeClass.",
+          "properties": {
+            "ensureAllDaemonSetPodsRunning": {
+              "description": "EnsureAllDaemonSetPodsRunning defines whether node pools should be migrated\nto larger ones to ensure that all daemon sets are schedulable.",
+              "type": "boolean"
+            },
+            "optimizeRulePriority": {
+              "default": false,
+              "description": "OptimizeRulePriority defines whether workloads affected by given\nComputeClass should be migrated to nodepool defined by higher priority rule, if possible.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "optimizeRulePriority"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "autopilot": {
+          "description": "Autopilot describes the autopilot settings for a given ComputeClass.",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "description": "Enabled indicates whether nodes created for this compute class should be Autopilot managed.",
+              "type": "boolean",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Autopilot is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ]
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "Autopilot is immutable",
+              "rule": "self == oldSelf"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "autoscalingPolicy": {
+          "description": "AutoscalingPolicy describes settings related to active reconciliation of\na given ComputeClass.",
+          "properties": {
+            "consolidationDelayMinutes": {
+              "description": "ConsolidationDelayMinutes determines how long a node should be unneeded before it is eligible for scale down.\nMinimum duration is 1 minute, maximum is 24 hours or 1440 minutes",
+              "maximum": 1440,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "consolidationThreshold": {
+              "description": "ConsolidationThreshold determines resource utilization threshold below which a node can be considered for scale down.",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "gpuConsolidationThreshold": {
+              "description": "GPUConsolidationThreshold determines GPU resource utilization threshold below which a node can be considered for scale down.\nUtilization calculation only cares about GPU resource for accelerator node, CPU and memory utilization will be ignored.",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "description": {
+          "description": "Description is an arbitrary string that usually provides guidelines on\nwhen this compute class should be used.",
+          "type": "string"
+        },
+        "nodePoolAutoCreation": {
+          "default": {
+            "enabled": false
+          },
+          "description": "NodePoolAutoCreation describes the auto provisioning settings for a given\nComputeClass.",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "description": "Enabled indicates whether NodePoolAutoCreation is enabled for a given ComputeClass.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "nodePoolConfig": {
+          "description": "NodePoolConfig defines required node pool configuration. Existing node pools will be matched with the ComputeClass\nonly if their configuration match this field. Auto-provisioned node pools will be created with this configuration.",
+          "properties": {
+            "confidentialNodeType": {
+              "description": "ConfidentialNodeType: Defines the type of technology used by the\nconfidential node.\n\n\nPossible values:\n  \"CONFIDENTIAL_INSTANCE_TYPE_UNSPECIFIED\" - No type specified. Do not use\nthis value.\n  \"SEV\" - AMD Secure Encrypted Virtualization.\n  \"SEV_SNP\" - AMD Secure Encrypted Virtualization - Secure Nested Paging.\n  \"TDX\" - Intel Trust Domain eXtension.",
+              "enum": [
+                "CONFIDENTIAL_INSTANCE_TYPE_UNSPECIFIED",
+                "SEV",
+                "SEV_SNP",
+                "TDX"
+              ],
+              "type": "string"
+            },
+            "imageType": {
+              "description": "Image type used by nodes in the node pool.",
+              "enum": [
+                "cos_containerd",
+                "ubuntu_containerd"
+              ],
+              "type": "string"
+            },
+            "nodeLabels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "NodeLabels is used to add user defined Kubernetes labels to all nodes in the new node pool.\nThese labels are applied to the Kubernetes API node object and can be used in nodeSelectors for pod scheduling.\nNote: Node labels are distinct from GKE labels.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-labels",
+              "maxProperties": 100,
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Node labels cannot contain reserved prefixes.",
+                  "rule": "self.all(key, !key.matches('.*(cloud.google.com|kubernetes.io|gke.io|k8s.io|autoscaling.gke.io)'))"
+                },
+                {
+                  "message": "Node labels must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to 63 characters each.",
+                  "rule": "self.all(key, key.matches('^[a-zA-Z0-9][a-zA-Z0-9-._]{0,62}$'))"
+                }
+              ]
+            },
+            "serviceAccount": {
+              "description": "ServiceAccount used by the node pool.",
+              "type": "string"
+            },
+            "taints": {
+              "description": "Taints is used to add user defined Kubernetes taints to all nodes in the new node pool.\nThese taints are applied to the Kubernetes API node object and can be used in tolerations for pod scheduling.",
+              "items": {
+                "description": "TaintConfig applies the given kubernetes taints on all nodes in the new node pool, which can be used with tolerations for pod scheduling.\nAny workload that does not tolerate the taints specified in this object will not be scheduled to the node pool.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-taints",
+                "properties": {
+                  "effect": {
+                    "description": "It defines the taint's effect on pods that does not have the necessary toleration.\nThe following values are supported: NoSchedule, PreferNoSchedule, and NoExecute.",
+                    "enum": [
+                      "NoSchedule",
+                      "PreferNoSchedule",
+                      "NoExecute"
+                    ],
+                    "type": "string"
+                  },
+                  "key": {
+                    "description": "Node taint key. The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores up to 253 characters.",
+                    "maxLength": 253,
+                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                    "type": "string",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "Taint keys cannot contain reserved prefixes.",
+                        "rule": "!self.matches('.*(cloud.google.com|kubernetes.io|gke.io|k8s.io|autoscaling.gke.io)')"
+                      }
+                    ]
+                  },
+                  "value": {
+                    "description": "The value that matches the specified taint key.",
+                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            "workloadType": {
+              "description": "WorkloadType defines Collection or Goodput SLO for the workload. Currently\nsupported values:\n* HIGH_AVAILABILITY - for Collection SLO\n* HIGH_THROUGHPUT - for Goodput SLO\nHIGH_AVAILABILITY is desired for running serving workloads which require\nmost of the infrastructure (slices) running all the time to achieve high\navailability.\nHIGH_THROUGHPUT is desired for running batch/training jobs\nwhich require all underlying infrastructure (slices) running for most of\nthe time to make progress. HIGH_THROUGHPUT can be only set for a multi-host\nscenario, that is, when NodePoolGroup is set.",
+              "enum": [
+                "HIGH_AVAILABILITY",
+                "HIGH_THROUGHPUT"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "nodePoolGroup": {
+          "description": "NodePoolGroup defines required node pool configurations that are shared between a group of node pools.\nExisting node pools will be matched with the ComputeClass only if their configuration matches this field.\nAuto-provisioned node pools will be created with this configuration.",
+          "properties": {
+            "name": {
+              "description": "Name defines the name of the node pool group, e.g. MultiMIG",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "priorities": {
+          "default": [],
+          "description": "Priorities is a description of user preferences to be\nused by a given ComputeClass.",
+          "items": {
+            "description": "Priority is a specification of preferred machine characteristics.",
+            "minProperties": 1,
+            "properties": {
+              "capacityCheckWaitTimeSeconds": {
+                "description": "CapacityCheckWaitTimeSeconds defines for how long will this priority be attempted to scale up before moving on to the next priority.",
+                "maximum": 86400,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "flexStart": {
+                "description": "FlexStart defines Flex Start provisioning model.",
+                "properties": {
+                  "enabled": {
+                    "default": false,
+                    "description": "Enabled indicates whether Flex Start provisioning model is enabled.",
+                    "type": "boolean"
+                  },
+                  "nodeRecycling": {
+                    "description": "NodeRecycling defines node recycling config.",
+                    "properties": {
+                      "leadTimeSeconds": {
+                        "description": "LeadTimeSeconds defines how much time before node termination timestamp CA should start looking for a replacement node.",
+                        "maximum": 604800,
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "leadTimeSeconds"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "enabled"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "gpu": {
+                "description": "Gpu defines preferred GPU config for a node.",
+                "properties": {
+                  "count": {
+                    "description": "Count describes preferred count of GPUs for a node.",
+                    "format": "int64",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "driverVersion": {
+                    "default": "default",
+                    "description": "DriverVersion describes version of GPU driver for a node.",
+                    "enum": [
+                      "default",
+                      "latest"
+                    ],
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Type describes preferred GPU accelerator type for a node.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "location": {
+                "description": "Location describes CCC zonal preferences config.",
+                "properties": {
+                  "zones": {
+                    "description": "Zones lists zones considered for node autoprovisioning.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "machineFamily": {
+                "description": "Machine family describes preferred instance family for a node. If none is specified,\nthe default autoprovisioning machine family is used.",
+                "maxLength": 10,
+                "type": "string"
+              },
+              "machineType": {
+                "description": "MachineType defines preferred machine type for a node.",
+                "maxLength": 100,
+                "type": "string"
+              },
+              "maxPodsPerNode": {
+                "description": "MaxPodsPerNode describes the maximum number of pods a node can accommodate.",
+                "maximum": 256,
+                "minimum": 8,
+                "type": "integer"
+              },
+              "maxRunDurationSeconds": {
+                "description": "MaxRunDurationSeconds defines the maximum duration for the nodes to exist. If unspecified, the nodes can exist indefinitely.",
+                "type": "integer"
+              },
+              "minCores": {
+                "description": "MinCores describes a minimum number of CPU cores of a node.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "minMemoryGb": {
+                "description": "MinMemoryGb describes a minimum GBs of memory of a node.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "nodeSystemConfig": {
+                "description": "NodeSystemConfig defines node system config for a node.",
+                "properties": {
+                  "kubeletConfig": {
+                    "description": "KubeletConfig defines kubelet config for a node.",
+                    "properties": {
+                      "allowedUnsafeSysctls": {
+                        "description": "This setting defines a comma-separated allowlist of unsafe sysctls or sysctl patterns\n(ending in `*`). The unsafe namespaced sysctl groups are `kernel.shm*`, `kernel.msg*`,\n`kernel.sem`, `fs.mqueue.*`, and `net.*`. Leaving this allowlist empty means they cannot be set on Pods.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 100,
+                        "type": "array"
+                      },
+                      "containerLogMaxFiles": {
+                        "description": "This setting sets the maximum number of container log files that can be present for a\ncontainer. Default is 5 in OSS if unspecified.",
+                        "format": "int64",
+                        "maximum": 10,
+                        "minimum": 2,
+                        "type": "integer"
+                      },
+                      "containerLogMaxSize": {
+                        "description": "This setting sets the maximum size of the container log file before it is rotated.\nFormat: positive number + unit, Eg. 100Ki, 10Mi, 5Gi. Valid units are Ki,\nMi, Gi. The value must be between 10Mi and 500Mi. And the total\ncontainer log size (container_log_max_size * container_log_max_files)\ncannot exceed 1% of the total storage of the node.\nDefault is 10Mi in OSS if unspecified.",
+                        "pattern": "^([0-9]+([.][0-9]+)?(Ki|Mi|Gi))+$",
+                        "type": "string"
+                      },
+                      "cpuCfsQuota": {
+                        "description": "This setting enforces the Pod's CPU limit. Setting this value to false means that the CPU limits for Pods are ignored.\nIgnoring CPU limits might be desirable in certain scenarios where Pods are sensitive to CPU limits.\nThe risk of disabling cpuCFSQuota is that a rogue Pod can consume more CPU resources than intended.",
+                        "type": "boolean"
+                      },
+                      "cpuCfsQuotaPeriod": {
+                        "description": "This setting sets the CPU CFS quota period value, cpu.cfs_period_us, which specifies the period of how often a cgroup's access to CPU resources should be reallocated.\nThis option lets you tune the CPU throttling behavior. Value must be 1ms <= period <= 1s.",
+                        "pattern": "^([1-9][0-9]*)m?s$",
+                        "type": "string"
+                      },
+                      "cpuManagerPolicy": {
+                        "description": "This setting controls the kubelet's CPU Manager Policy. The default value is none which is the default CPU affinity scheme, providing no affinity beyond what the OS scheduler does automatically.\nSetting this value to static allows Pods in the Guaranteed QoS class with integer CPU requests to be assigned exclusive use of CPUs.",
+                        "enum": [
+                          "none",
+                          "static"
+                        ],
+                        "type": "string"
+                      },
+                      "imageGcHighThresholdPercent": {
+                        "description": "This setting sets the percent of disk usage after which image garbage collection is always\nrun. The percent is calculated as this field value out of 100. Default is 85 if unspecified.",
+                        "format": "int64",
+                        "maximum": 85,
+                        "minimum": 11,
+                        "type": "integer"
+                      },
+                      "imageGcLowThresholdPercent": {
+                        "description": "This setting sets the percent of disk usage before which image garbage collection is never\nrun. Lowest disk usage to garbage collect to. The percent is calculated as\nthis field value out of 100. Default is 80 if unspecified.",
+                        "format": "int64",
+                        "maximum": 84,
+                        "minimum": 10,
+                        "type": "integer"
+                      },
+                      "imageMaximumGcAge": {
+                        "description": "This setting sets the maximum age an image can be unused before it is garbage collected.\nThe string must be a decimal number with a unit suffix, such as \"300s\", \"1.5h\", and \"2h45m\".\nValid time units are \"ns\", \"us\" (or \"\u00b5s\"), \"ms\", \"s\", \"m\", \"h\".\nThe value must be a positive duration.\nDefault is \"0s\" if unspecified, which disables the field.",
+                        "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                        "type": "string"
+                      },
+                      "imageMinimumGcAge": {
+                        "description": "This setting sets the minimum age for an unused image before it is garbage collected.\nThe string must be a decimal number with a unit suffix, such as \"300s\", \"1.5h\", and \"2h45m\".\nValid time units are \"ns\", \"us\" (or \"\u00b5s\"), \"ms\", \"s\", \"m\", \"h\".\nThe value must be a positive duration and less than or equal to 2 minutes.\nDefault is \"2m\" if unspecified.",
+                        "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                        "type": "string"
+                      },
+                      "podPidsLimit": {
+                        "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
+                        "format": "int64",
+                        "maximum": 4194304,
+                        "minimum": 1024,
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "ImageGcLowThresholdPercent must be lower than imageGcHighThresholdPercent",
+                        "rule": "has(self.imageGcHighThresholdPercent)&&has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>self.imageGcLowThresholdPercent : true"
+                      },
+                      {
+                        "message": "ImageGcHighThresholdPercent must be higher than 80 which is default value of imageGcLowThresholdPercent",
+                        "rule": "has(self.imageGcHighThresholdPercent)&&!has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>80 : true"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "linuxNodeConfig": {
+                    "description": "LinuxNodeConfig defines linux node config for a node.",
+                    "properties": {
+                      "hugepageConfig": {
+                        "description": "HugepagesConfig defines hugepages config for a node.",
+                        "properties": {
+                          "hugepage_size1g": {
+                            "description": "Number of 1-gigabyte-sized huge pages to allocate.",
+                            "format": "int64",
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "hugepage_size2m": {
+                            "description": "Number of 2-megabyte-sized huge pages to allocate.",
+                            "format": "int64",
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "sysctls": {
+                        "description": "SysctlsConfig defines sysctls config for a node.",
+                        "properties": {
+                          "fs.aio-max-nr": {
+                            "description": "The maximum system-wide number of asynchronous io requests.",
+                            "format": "int64",
+                            "maximum": 4194304,
+                            "minimum": 65536,
+                            "type": "integer"
+                          },
+                          "fs.file-max": {
+                            "description": "Maximum number of file-handles that the Linux kernel will allocate.",
+                            "format": "int64",
+                            "maximum": 67108864,
+                            "minimum": 104857,
+                            "type": "integer"
+                          },
+                          "fs.inotify.max_user_instances": {
+                            "description": "The maximum number of inotify instances that a user can create.",
+                            "format": "int64",
+                            "maximum": 1048576,
+                            "minimum": 8192,
+                            "type": "integer"
+                          },
+                          "fs.inotify.max_user_watches": {
+                            "description": "The maximum number of inotify watches that a user can create.",
+                            "format": "int64",
+                            "maximum": 1048576,
+                            "minimum": 8192,
+                            "type": "integer"
+                          },
+                          "fs.nr_open": {
+                            "description": "The maximum number of file descriptors that can be opened by a process.",
+                            "format": "int64",
+                            "maximum": 2147483584,
+                            "minimum": 1048576,
+                            "type": "integer"
+                          },
+                          "kernel.shmall": {
+                            "description": "The maximum size (in bytes) of a single shared memory segment allowed by the kernel.\nNote that the actual range should be integer between 0 and 18446744073692774399, while kubebuilder would lose some precision on uint64 during the internal representation and parsing.",
+                            "maxLength": 20,
+                            "minLength": 1,
+                            "pattern": "^([0-9]+)$",
+                            "type": "string"
+                          },
+                          "kernel.shmmax": {
+                            "description": "The total amount of shared memory pages that can be used on the system at one time.\nNote that the actual range should be integer between 0 and 18446744073692774399, while kubebuilder would lose some precision on uint64 during the internal representation and parsing.",
+                            "maxLength": 20,
+                            "minLength": 1,
+                            "pattern": "^([0-9]+)$",
+                            "type": "string"
+                          },
+                          "kernel.shmmni": {
+                            "description": "The system-wide maximum number of shared memory segments.",
+                            "format": "int64",
+                            "maximum": 32768,
+                            "minimum": 4096,
+                            "type": "integer"
+                          },
+                          "net.core.busy_poll": {
+                            "description": "Low latency busy poll timeout for poll and select. (needs CONFIG_NET_RX_BUSY_POLL) Approximate time in us to busy loop waiting for events.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "net.core.busy_read": {
+                            "description": "Low latency busy poll timeout for socket reads. (needs CONFIG_NET_RX_BUSY_POLL) Approximate time in us to busy loop waiting for packets on the device queue.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "net.core.netdev_max_backlog": {
+                            "description": "Maximum number of packets, queued on the INPUT side, when the interface receives packets faster than kernel can process them.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "net.core.optmem_max": {
+                            "description": "Maximum ancillary buffer size allowed per socket. Ancillary data is a sequence of struct cmsghdr structures with appended data.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "net.core.rmem_default": {
+                            "description": "The default receive socket buffer size in bytes.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 2304,
+                            "type": "integer"
+                          },
+                          "net.core.rmem_max": {
+                            "description": "The maximum receive socket buffer size in bytes.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 2304,
+                            "type": "integer"
+                          },
+                          "net.core.somaxconn": {
+                            "description": "Limit of socket listen() backlog, known in userspace as SOMAXCONN. Defaults to 128. See also tcp_max_syn_backlog for additional tuning for TCP sockets.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 128,
+                            "type": "integer"
+                          },
+                          "net.core.wmem_default": {
+                            "description": "The default setting (in bytes) of the socket send buffer.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 4608,
+                            "type": "integer"
+                          },
+                          "net.core.wmem_max": {
+                            "description": "The maximum send socket buffer size in bytes.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 4608,
+                            "type": "integer"
+                          },
+                          "net.ipv4.tcp_rmem": {
+                            "description": "Minimal size of receive buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for receiving data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
+                            "type": "string"
+                          },
+                          "net.ipv4.tcp_tw_reuse": {
+                            "description": "Allow to reuse TIME-WAIT sockets for new connections when it is safe from protocol viewpoint. It should not be changed without advice/request of technical experts.",
+                            "format": "int64",
+                            "maximum": 2,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "net.ipv4.tcp_wmem": {
+                            "description": "Minimal size of send buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for sending data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
+                            "type": "string"
+                          },
+                          "net.ipv6.conf.all.disable_ipv6": {
+                            "description": "Changing this value is same as changing conf/default/disable_ipv6 setting and also all per-interface disable_ipv6 settings to the same value.",
+                            "type": "boolean"
+                          },
+                          "net.ipv6.conf.default.disable_ipv6": {
+                            "description": "Disable IPv6 operation.",
+                            "type": "boolean"
+                          },
+                          "net.netfilter.nf_conntrack_acct": {
+                            "description": "Whether to enable connection tracking flow accounting.",
+                            "type": "boolean"
+                          },
+                          "net.netfilter.nf_conntrack_buckets": {
+                            "description": "The size of hash table for connection tracking.",
+                            "format": "int64",
+                            "maximum": 524288,
+                            "minimum": 65536,
+                            "type": "integer"
+                          },
+                          "net.netfilter.nf_conntrack_max": {
+                            "description": "The size of connection tracking table.",
+                            "format": "int64",
+                            "maximum": 4194304,
+                            "minimum": 65536,
+                            "type": "integer"
+                          },
+                          "net.netfilter.nf_conntrack_tcp_timeout_close_wait": {
+                            "description": "The period for which the TCP connections can remain in the CLOSE_WAIT state, and stay in the table.",
+                            "format": "int64",
+                            "maximum": 3600,
+                            "minimum": 60,
+                            "type": "integer"
+                          },
+                          "net.netfilter.nf_conntrack_tcp_timeout_established": {
+                            "description": "The duration of dead connections before deleted automatically from connection tracking table.",
+                            "format": "int64",
+                            "maximum": 86400,
+                            "minimum": 600,
+                            "type": "integer"
+                          },
+                          "net.netfilter.nf_conntrack_tcp_timeout_time_wait": {
+                            "description": "The period for which the TCP connections can remain in the TIME_WAIT state, and stay in the table.",
+                            "format": "int64",
+                            "maximum": 600,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "vm.dirty_background_ratio": {
+                            "description": "Percentage of system memory that can be filled with dirty pages (modified but not yet written to disk) before background kernel flusher threads begin writeback.\nThis value should be less than 'vm.dirty_ratio'.",
+                            "format": "int64",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "vm.dirty_expire_centisecs": {
+                            "description": "Maximum age (in hundredths of a second) that dirty data can remain in memory before kernel flusher threads write it to disk.\nLower values result in faster, more frequent writebacks.",
+                            "format": "int64",
+                            "maximum": 6000,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "vm.dirty_ratio": {
+                            "description": "Percentage of system memory that can be filled with dirty pages before processes performing writes are forced to block and write out dirty data synchronously.\nThis value should be greater than 'vm.dirty_background_ratio'.",
+                            "format": "int64",
+                            "maximum": 100,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "vm.dirty_writeback_centisecs": {
+                            "description": "Interval (in hundredths of a second) at which kernel flusher threads wake up to write 'old' dirty data to disk.",
+                            "format": "int64",
+                            "maximum": 1000,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "vm.max_map_count": {
+                            "description": "Maximum number of memory map areas a process may have.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 65536,
+                            "type": "integer"
+                          },
+                          "vm.overcommit_memory": {
+                            "description": "Determines the kernel's memory overcommit handling strategy.\nSupported values:\n0: Rejects allocations that are obviously too large.\n1: Allows overcommit until memory is exhausted.\n2 (strict): Prevents overcommit beyond swap space plus a percentage of RAM defined by 'vm.overcommit_ratio'.",
+                            "enum": [
+                              0,
+                              1,
+                              2
+                            ],
+                            "format": "int64",
+                            "type": "integer"
+                          },
+                          "vm.overcommit_ratio": {
+                            "description": "Specifies the percentage of physical RAM allowed for overcommit when 'vm.overcommit_memory' is set to 2.\nThe total committed address space cannot exceed swap plus this RAM percentage.",
+                            "format": "int64",
+                            "maximum": 100,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "vm.vfs_cache_pressure": {
+                            "description": "Adjusts the kernel's preference for reclaiming memory used for dentry (directory) and inode caches.",
+                            "format": "int64",
+                            "maximum": 100,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "nodepools": {
+                "description": "Nodepools describes preference of specific, preexisting nodepools.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "placement": {
+                "description": "Placement defines resource policy used for BYOPP and BYOWP.",
+                "properties": {
+                  "policyName": {
+                    "description": "PolicyName defines the name of the resource policy, e.g. my-resource-policy.",
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "policyName"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "podFamily": {
+                "description": "PodFamily represents pod-based provisioning and billing config.",
+                "enum": [
+                  "general-purpose"
+                ],
+                "type": "string"
+              },
+              "reservations": {
+                "description": "Reservations defines reservations config for a node.",
+                "properties": {
+                  "affinity": {
+                    "description": "ReservationAffinity affects reservations considered and the way how they are consumed.\n\"Specific\" means that only specific reservations are considered with no fallback possible.\n\"AnyBestEffort\" affinity would consider any non-specific reservation available\nto be claimed with a fallback to on-demand nodes in case of none claimable.\n\"None\" affinity would prevent reservations from being used",
+                    "enum": [
+                      "Specific",
+                      "AnyBestEffort",
+                      "None"
+                    ],
+                    "type": "string"
+                  },
+                  "specific": {
+                    "description": "Specific is a non prioritized list of specific reservations to be considered by the priority rule.",
+                    "items": {
+                      "description": "SpecificReservation defines a single specific reservation to be consumed by the created node.",
+                      "properties": {
+                        "name": {
+                          "description": "Name of the reservation to be used.",
+                          "type": "string"
+                        },
+                        "project": {
+                          "description": "Project is the project where the specific reservation lives.",
+                          "type": "string"
+                        },
+                        "reservationBlock": {
+                          "description": "ReservationBlock is the block of the reservation.",
+                          "properties": {
+                            "name": {
+                              "description": "Name is the name of the block.",
+                              "type": "string"
+                            },
+                            "reservationSubBlock": {
+                              "description": "ReservationSubBlock is the subBlock of the reservation block.",
+                              "properties": {
+                                "name": {
+                                  "description": "Name is the name of the subBlock.",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minItems": 0,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "affinity"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "Unable to set specific reservations for non specific affinity",
+                    "rule": "has(self.specific) && self.specific.size() > 0 ? self.affinity == \"Specific\" : true"
+                  },
+                  {
+                    "message": "At least 1 specific reservation required for specific affinity",
+                    "rule": "self.affinity == \"Specific\" ? has(self.specific) && self.specific.size() > 0 : true"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "spot": {
+                "description": "Spot if set to true specifies that a node should be a spot instance, on-demand otherwise.",
+                "type": "boolean"
+              },
+              "storage": {
+                "description": "Storage describes storage config of a node.",
+                "properties": {
+                  "bootDiskKMSKey": {
+                    "description": "BootDiskKMSKey defines a key used to encrypt the boot disk attached.",
+                    "pattern": "projects/[^/]+/locations/[^/]+/keyRings/[^/]+/cryptoKeys/[^/]+",
+                    "type": "string"
+                  },
+                  "bootDiskSize": {
+                    "description": "BootDiskSize defines the size of a disk attached to node, specified in GB.",
+                    "minimum": 10,
+                    "type": "integer"
+                  },
+                  "bootDiskType": {
+                    "description": "BootDiskType defines type of the disk attached to the node.\nNote that available boot disk types depend on the machine family / machine type selected.\nCurrently supported types:\n* pd-balanced\n* pd-standard\n* pd-ssd\n* hyperdisk-balanced",
+                    "enum": [
+                      "pd-balanced",
+                      "pd-standard",
+                      "pd-ssd",
+                      "hyperdisk-balanced"
+                    ],
+                    "type": "string"
+                  },
+                  "localSSDCount": {
+                    "description": "LocalSSDCount defines a number of local SSDs attached to node.",
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "secondaryBootDisks": {
+                    "description": "SecondaryBootDisks represent persistent disks attached to a node with special configurations based on their modes.",
+                    "items": {
+                      "description": "SecondaryBootDisk represents a persistent disk attached to a node with special configurations based on its mode.",
+                      "properties": {
+                        "diskImageName": {
+                          "description": "The name of the disk image.",
+                          "type": "string"
+                        },
+                        "mode": {
+                          "description": "Currently supported modes:\n* MODE_UNSPECIFIED - MODE_UNSPECIFIED is when mode is not set.\n* CONTAINER_IMAGE_CACHE - it is for using the secondary boot disk as a container image cache.",
+                          "enum": [
+                            "MODE_UNSPECIFIED",
+                            "CONTAINER_IMAGE_CACHE"
+                          ],
+                          "type": "string"
+                        },
+                        "project": {
+                          "description": "The name of the project that the disk image belongs to.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "diskImageName"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "tpu": {
+                "description": "Tpu defines preferred TPU config for a node.",
+                "properties": {
+                  "count": {
+                    "description": "Count describes preferred count of TPU chips for a node.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "topology": {
+                    "description": "Topology describes preferred TPU topology of a node.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Type describes preferred TPU type for a node.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "Nodepool field cannot be set along with other fields",
+                "rule": "has(self.nodepools) ? (size(dyn(self)) == 1) : true"
+              },
+              {
+                "message": "MachineFamily and MachineType cannot be set together",
+                "rule": "!(has(self.machineFamily) && has(self.machineType))"
+              },
+              {
+                "message": "MachineType cannot be set together with MinCores/MinMemoryGb",
+                "rule": "!(has(self.machineType) && (has(self.minCores) || has(self.minMemoryGb)))"
+              },
+              {
+                "message": "Non-TPU reservations can be used only with machine type or machine family defined",
+                "rule": "has(self.reservations) && !has(self.tpu) ? has(self.machineFamily) || has(self.machineType) : true"
+              },
+              {
+                "message": "MachineFamily cannot be equal to 'ek'",
+                "rule": "!(has(self.machineFamily) && self.machineFamily == 'ek')"
+              },
+              {
+                "message": "MachineType cannot start with 'ek' prefix",
+                "rule": "!(has(self.machineType) && self.machineType.startsWith('ek'))"
+              },
+              {
+                "message": "Flex Start provisioning model is incompatible with Spot",
+                "rule": "!(has(self.flexStart) && has(self.spot) && self.spot == true && self.flexStart.enabled == true)"
+              },
+              {
+                "message": "Spot selection is the only configurable priority setting when using podFamily",
+                "rule": "has(self.podFamily) ? (has(self.spot) ? (size(dyn(self)) == 2) : (size(dyn(self)) == 1)) : true"
+              },
+              {
+                "message": "capacityCheckWaitTimeSeconds is only supported for Flex Start and for multi-host TPUs",
+                "rule": "!has(self.capacityCheckWaitTimeSeconds) || has(self.tpu) || (has(self.flexStart) && self.flexStart.enabled)"
+              }
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 1000,
+          "minItems": 0,
+          "type": "array"
+        },
+        "priorityDefaults": {
+          "description": "PriorityDefaults define the default rules for all priorities if the rule doesn't exist in some priority.\nNote: PriorityDefaults doesn't apply to priorities with only Nodepools.",
+          "properties": {
+            "location": {
+              "description": "Location describes CCC zonal preferences config.",
+              "properties": {
+                "zones": {
+                  "description": "Zones lists zones considered for node autoprovisioning.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "nodeSystemConfig": {
+              "description": "NodeSystemConfig defines node system config for a node.",
+              "properties": {
+                "kubeletConfig": {
+                  "description": "KubeletConfig defines kubelet config for a node.",
+                  "properties": {
+                    "allowedUnsafeSysctls": {
+                      "description": "This setting defines a comma-separated allowlist of unsafe sysctls or sysctl patterns\n(ending in `*`). The unsafe namespaced sysctl groups are `kernel.shm*`, `kernel.msg*`,\n`kernel.sem`, `fs.mqueue.*`, and `net.*`. Leaving this allowlist empty means they cannot be set on Pods.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 100,
+                      "type": "array"
+                    },
+                    "containerLogMaxFiles": {
+                      "description": "This setting sets the maximum number of container log files that can be present for a\ncontainer. Default is 5 in OSS if unspecified.",
+                      "format": "int64",
+                      "maximum": 10,
+                      "minimum": 2,
+                      "type": "integer"
+                    },
+                    "containerLogMaxSize": {
+                      "description": "This setting sets the maximum size of the container log file before it is rotated.\nFormat: positive number + unit, Eg. 100Ki, 10Mi, 5Gi. Valid units are Ki,\nMi, Gi. The value must be between 10Mi and 500Mi. And the total\ncontainer log size (container_log_max_size * container_log_max_files)\ncannot exceed 1% of the total storage of the node.\nDefault is 10Mi in OSS if unspecified.",
+                      "pattern": "^([0-9]+([.][0-9]+)?(Ki|Mi|Gi))+$",
+                      "type": "string"
+                    },
+                    "cpuCfsQuota": {
+                      "description": "This setting enforces the Pod's CPU limit. Setting this value to false means that the CPU limits for Pods are ignored.\nIgnoring CPU limits might be desirable in certain scenarios where Pods are sensitive to CPU limits.\nThe risk of disabling cpuCFSQuota is that a rogue Pod can consume more CPU resources than intended.",
+                      "type": "boolean"
+                    },
+                    "cpuCfsQuotaPeriod": {
+                      "description": "This setting sets the CPU CFS quota period value, cpu.cfs_period_us, which specifies the period of how often a cgroup's access to CPU resources should be reallocated.\nThis option lets you tune the CPU throttling behavior. Value must be 1ms <= period <= 1s.",
+                      "pattern": "^([1-9][0-9]*)m?s$",
+                      "type": "string"
+                    },
+                    "cpuManagerPolicy": {
+                      "description": "This setting controls the kubelet's CPU Manager Policy. The default value is none which is the default CPU affinity scheme, providing no affinity beyond what the OS scheduler does automatically.\nSetting this value to static allows Pods in the Guaranteed QoS class with integer CPU requests to be assigned exclusive use of CPUs.",
+                      "enum": [
+                        "none",
+                        "static"
+                      ],
+                      "type": "string"
+                    },
+                    "imageGcHighThresholdPercent": {
+                      "description": "This setting sets the percent of disk usage after which image garbage collection is always\nrun. The percent is calculated as this field value out of 100. Default is 85 if unspecified.",
+                      "format": "int64",
+                      "maximum": 85,
+                      "minimum": 11,
+                      "type": "integer"
+                    },
+                    "imageGcLowThresholdPercent": {
+                      "description": "This setting sets the percent of disk usage before which image garbage collection is never\nrun. Lowest disk usage to garbage collect to. The percent is calculated as\nthis field value out of 100. Default is 80 if unspecified.",
+                      "format": "int64",
+                      "maximum": 84,
+                      "minimum": 10,
+                      "type": "integer"
+                    },
+                    "imageMaximumGcAge": {
+                      "description": "This setting sets the maximum age an image can be unused before it is garbage collected.\nThe string must be a decimal number with a unit suffix, such as \"300s\", \"1.5h\", and \"2h45m\".\nValid time units are \"ns\", \"us\" (or \"\u00b5s\"), \"ms\", \"s\", \"m\", \"h\".\nThe value must be a positive duration.\nDefault is \"0s\" if unspecified, which disables the field.",
+                      "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                      "type": "string"
+                    },
+                    "imageMinimumGcAge": {
+                      "description": "This setting sets the minimum age for an unused image before it is garbage collected.\nThe string must be a decimal number with a unit suffix, such as \"300s\", \"1.5h\", and \"2h45m\".\nValid time units are \"ns\", \"us\" (or \"\u00b5s\"), \"ms\", \"s\", \"m\", \"h\".\nThe value must be a positive duration and less than or equal to 2 minutes.\nDefault is \"2m\" if unspecified.",
+                      "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                      "type": "string"
+                    },
+                    "podPidsLimit": {
+                      "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
+                      "format": "int64",
+                      "maximum": 4194304,
+                      "minimum": 1024,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "ImageGcLowThresholdPercent must be lower than imageGcHighThresholdPercent",
+                      "rule": "has(self.imageGcHighThresholdPercent)&&has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>self.imageGcLowThresholdPercent : true"
+                    },
+                    {
+                      "message": "ImageGcHighThresholdPercent must be higher than 80 which is default value of imageGcLowThresholdPercent",
+                      "rule": "has(self.imageGcHighThresholdPercent)&&!has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>80 : true"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "linuxNodeConfig": {
+                  "description": "LinuxNodeConfig defines linux node config for a node.",
+                  "properties": {
+                    "hugepageConfig": {
+                      "description": "HugepagesConfig defines hugepages config for a node.",
+                      "properties": {
+                        "hugepage_size1g": {
+                          "description": "Number of 1-gigabyte-sized huge pages to allocate.",
+                          "format": "int64",
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "hugepage_size2m": {
+                          "description": "Number of 2-megabyte-sized huge pages to allocate.",
+                          "format": "int64",
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "sysctls": {
+                      "description": "SysctlsConfig defines sysctls config for a node.",
+                      "properties": {
+                        "fs.aio-max-nr": {
+                          "description": "The maximum system-wide number of asynchronous io requests.",
+                          "format": "int64",
+                          "maximum": 4194304,
+                          "minimum": 65536,
+                          "type": "integer"
+                        },
+                        "fs.file-max": {
+                          "description": "Maximum number of file-handles that the Linux kernel will allocate.",
+                          "format": "int64",
+                          "maximum": 67108864,
+                          "minimum": 104857,
+                          "type": "integer"
+                        },
+                        "fs.inotify.max_user_instances": {
+                          "description": "The maximum number of inotify instances that a user can create.",
+                          "format": "int64",
+                          "maximum": 1048576,
+                          "minimum": 8192,
+                          "type": "integer"
+                        },
+                        "fs.inotify.max_user_watches": {
+                          "description": "The maximum number of inotify watches that a user can create.",
+                          "format": "int64",
+                          "maximum": 1048576,
+                          "minimum": 8192,
+                          "type": "integer"
+                        },
+                        "fs.nr_open": {
+                          "description": "The maximum number of file descriptors that can be opened by a process.",
+                          "format": "int64",
+                          "maximum": 2147483584,
+                          "minimum": 1048576,
+                          "type": "integer"
+                        },
+                        "kernel.shmall": {
+                          "description": "The maximum size (in bytes) of a single shared memory segment allowed by the kernel.\nNote that the actual range should be integer between 0 and 18446744073692774399, while kubebuilder would lose some precision on uint64 during the internal representation and parsing.",
+                          "maxLength": 20,
+                          "minLength": 1,
+                          "pattern": "^([0-9]+)$",
+                          "type": "string"
+                        },
+                        "kernel.shmmax": {
+                          "description": "The total amount of shared memory pages that can be used on the system at one time.\nNote that the actual range should be integer between 0 and 18446744073692774399, while kubebuilder would lose some precision on uint64 during the internal representation and parsing.",
+                          "maxLength": 20,
+                          "minLength": 1,
+                          "pattern": "^([0-9]+)$",
+                          "type": "string"
+                        },
+                        "kernel.shmmni": {
+                          "description": "The system-wide maximum number of shared memory segments.",
+                          "format": "int64",
+                          "maximum": 32768,
+                          "minimum": 4096,
+                          "type": "integer"
+                        },
+                        "net.core.busy_poll": {
+                          "description": "Low latency busy poll timeout for poll and select. (needs CONFIG_NET_RX_BUSY_POLL) Approximate time in us to busy loop waiting for events.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "net.core.busy_read": {
+                          "description": "Low latency busy poll timeout for socket reads. (needs CONFIG_NET_RX_BUSY_POLL) Approximate time in us to busy loop waiting for packets on the device queue.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "net.core.netdev_max_backlog": {
+                          "description": "Maximum number of packets, queued on the INPUT side, when the interface receives packets faster than kernel can process them.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "net.core.optmem_max": {
+                          "description": "Maximum ancillary buffer size allowed per socket. Ancillary data is a sequence of struct cmsghdr structures with appended data.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "net.core.rmem_default": {
+                          "description": "The default receive socket buffer size in bytes.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 2304,
+                          "type": "integer"
+                        },
+                        "net.core.rmem_max": {
+                          "description": "The maximum receive socket buffer size in bytes.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 2304,
+                          "type": "integer"
+                        },
+                        "net.core.somaxconn": {
+                          "description": "Limit of socket listen() backlog, known in userspace as SOMAXCONN. Defaults to 128. See also tcp_max_syn_backlog for additional tuning for TCP sockets.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 128,
+                          "type": "integer"
+                        },
+                        "net.core.wmem_default": {
+                          "description": "The default setting (in bytes) of the socket send buffer.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 4608,
+                          "type": "integer"
+                        },
+                        "net.core.wmem_max": {
+                          "description": "The maximum send socket buffer size in bytes.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 4608,
+                          "type": "integer"
+                        },
+                        "net.ipv4.tcp_rmem": {
+                          "description": "Minimal size of receive buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for receiving data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
+                          "type": "string"
+                        },
+                        "net.ipv4.tcp_tw_reuse": {
+                          "description": "Allow to reuse TIME-WAIT sockets for new connections when it is safe from protocol viewpoint. It should not be changed without advice/request of technical experts.",
+                          "format": "int64",
+                          "maximum": 2,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "net.ipv4.tcp_wmem": {
+                          "description": "Minimal size of send buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for sending data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
+                          "type": "string"
+                        },
+                        "net.ipv6.conf.all.disable_ipv6": {
+                          "description": "Changing this value is same as changing conf/default/disable_ipv6 setting and also all per-interface disable_ipv6 settings to the same value.",
+                          "type": "boolean"
+                        },
+                        "net.ipv6.conf.default.disable_ipv6": {
+                          "description": "Disable IPv6 operation.",
+                          "type": "boolean"
+                        },
+                        "net.netfilter.nf_conntrack_acct": {
+                          "description": "Whether to enable connection tracking flow accounting.",
+                          "type": "boolean"
+                        },
+                        "net.netfilter.nf_conntrack_buckets": {
+                          "description": "The size of hash table for connection tracking.",
+                          "format": "int64",
+                          "maximum": 524288,
+                          "minimum": 65536,
+                          "type": "integer"
+                        },
+                        "net.netfilter.nf_conntrack_max": {
+                          "description": "The size of connection tracking table.",
+                          "format": "int64",
+                          "maximum": 4194304,
+                          "minimum": 65536,
+                          "type": "integer"
+                        },
+                        "net.netfilter.nf_conntrack_tcp_timeout_close_wait": {
+                          "description": "The period for which the TCP connections can remain in the CLOSE_WAIT state, and stay in the table.",
+                          "format": "int64",
+                          "maximum": 3600,
+                          "minimum": 60,
+                          "type": "integer"
+                        },
+                        "net.netfilter.nf_conntrack_tcp_timeout_established": {
+                          "description": "The duration of dead connections before deleted automatically from connection tracking table.",
+                          "format": "int64",
+                          "maximum": 86400,
+                          "minimum": 600,
+                          "type": "integer"
+                        },
+                        "net.netfilter.nf_conntrack_tcp_timeout_time_wait": {
+                          "description": "The period for which the TCP connections can remain in the TIME_WAIT state, and stay in the table.",
+                          "format": "int64",
+                          "maximum": 600,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "vm.dirty_background_ratio": {
+                          "description": "Percentage of system memory that can be filled with dirty pages (modified but not yet written to disk) before background kernel flusher threads begin writeback.\nThis value should be less than 'vm.dirty_ratio'.",
+                          "format": "int64",
+                          "maximum": 100,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "vm.dirty_expire_centisecs": {
+                          "description": "Maximum age (in hundredths of a second) that dirty data can remain in memory before kernel flusher threads write it to disk.\nLower values result in faster, more frequent writebacks.",
+                          "format": "int64",
+                          "maximum": 6000,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "vm.dirty_ratio": {
+                          "description": "Percentage of system memory that can be filled with dirty pages before processes performing writes are forced to block and write out dirty data synchronously.\nThis value should be greater than 'vm.dirty_background_ratio'.",
+                          "format": "int64",
+                          "maximum": 100,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "vm.dirty_writeback_centisecs": {
+                          "description": "Interval (in hundredths of a second) at which kernel flusher threads wake up to write 'old' dirty data to disk.",
+                          "format": "int64",
+                          "maximum": 1000,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "vm.max_map_count": {
+                          "description": "Maximum number of memory map areas a process may have.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 65536,
+                          "type": "integer"
+                        },
+                        "vm.overcommit_memory": {
+                          "description": "Determines the kernel's memory overcommit handling strategy.\nSupported values:\n0: Rejects allocations that are obviously too large.\n1: Allows overcommit until memory is exhausted.\n2 (strict): Prevents overcommit beyond swap space plus a percentage of RAM defined by 'vm.overcommit_ratio'.",
+                          "enum": [
+                            0,
+                            1,
+                            2
+                          ],
+                          "format": "int64",
+                          "type": "integer"
+                        },
+                        "vm.overcommit_ratio": {
+                          "description": "Specifies the percentage of physical RAM allowed for overcommit when 'vm.overcommit_memory' is set to 2.\nThe total committed address space cannot exceed swap plus this RAM percentage.",
+                          "format": "int64",
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "vm.vfs_cache_pressure": {
+                          "description": "Adjusts the kernel's preference for reclaiming memory used for dentry (directory) and inode caches.",
+                          "format": "int64",
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "whenUnsatisfiable": {
+          "default": "DoNotScaleUp",
+          "description": "WhenUnsatisfiable describes autoscaler behaviour in case none\nof the provided priorities is satisfiable.\nCurrently supported values:\n* ScaleUpAnyway\n* DoNotScaleUp",
+          "enum": [
+            "ScaleUpAnyway",
+            "DoNotScaleUp"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "whenUnsatisfiable"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "Autopilot is required once set",
+          "rule": "!has(oldSelf.autopilot) || has(self.autopilot)"
+        },
+        {
+          "message": "Nodepools priority cannot be used when Autopilot is enabled",
+          "rule": "(has(self.autopilot) && self.autopilot.enabled) ? !self.priorities.exists(priority, has(priority.nodepools)) : true"
+        },
+        {
+          "message": "NodePoolAutoCreation cannot be disabled when Autopilot is enabled",
+          "rule": "(has(self.autopilot) && self.autopilot.enabled) ? !(has(self.nodePoolAutoCreation) && !self.nodePoolAutoCreation.enabled) : true"
+        },
+        {
+          "message": "Only cos_containerd image type can be used when Autopilot is enabled",
+          "rule": "(has(self.autopilot) && self.autopilot.enabled) ? !(has(self.nodePoolConfig) && self.nodePoolConfig.imageType != \"cos_containerd\") : true"
+        },
+        {
+          "message": "If NodePoolGroup is not specified NodePoolConfig.WorkloadType can only be HIGH_AVAILABILITY if set",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.workloadType) && !has(self.nodePoolGroup)) ? self.nodePoolConfig.workloadType == \"HIGH_AVAILABILITY\" : true"
+        },
+        {
+          "message": "In GKE Standard, pod family can be used only if Autopilot is enabled",
+          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? (has(self.autopilot) && self.autopilot.enabled) : true"
+        },
+        {
+          "message": "Pod family cannot be used with nodePoolConfig",
+          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? !(has(self.nodePoolConfig)) : true"
+        },
+        {
+          "message": "Pod family cannot be used with priorityDefaults",
+          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? !(has(self.priorityDefaults)) : true"
+        },
+        {
+          "message": "Pod family cannot be used with ScaleUpAnyway",
+          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? (self.whenUnsatisfiable != \"ScaleUpAnyway\") : true"
+        },
+        {
+          "message": "Pod family priorities cannot be mixed with non-pod family priorities",
+          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? self.priorities.all(priority, has(priority.podFamily)) : true"
+        },
+        {
+          "message": "If using NodePoolConfig.ConfidentialNodeType, each priority must specify either MachineFamily or MachineType.",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType)) ? self.priorities.all(priority, has(priority.machineFamily) || has(priority.machineType)) : true"
+        },
+        {
+          "message": "ConfidentialNodeType SEV only supports N2D, C2D, C3D, C4D",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['n2d', 'c2d', 'c3d', 'c4d']) || (has(priority.machineType) && priority.machineType.split('-')[0] in ['n2d', 'c2d', 'c3d', 'c4d']))) : true"
+        },
+        {
+          "message": "ConfidentialNodeType SEV_SNP only supports N2D",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV_SNP\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['n2d']) || (has(priority.machineType) && priority.machineType.split('-')[0] in ['n2d']))) : true"
+        },
+        {
+          "message": "ConfidentialNodeType TDX only supports C3 standard and A3 highgpu 1",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['c3', 'a3']) || (has(priority.machineType) && (priority.machineType.startsWith('c3-standard-') || priority.machineType == 'a3-highgpu-1g')) || (has(priority.gpu) && has(priority.gpu.type) && priority.gpu.type == 'nvidia-h100-80gb'))) : true"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status of the ComputeClass.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions represent the observations of a ComputeClass's current state.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.\n---\nThis struct is intended for direct use as an array at the field path .status.conditions.  For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the observations of a foo's current state.\n\t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t    // other fields\n\t}",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\n---\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions can be\nuseful (see .node.status.conditions), the ability to deconflict is important.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

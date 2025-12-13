@@ -1,5 +1,5 @@
 {
-  "description": "ApisixTls defines configuration for TLS and mutual TLS (mTLS).",
+  "description": "Consumer defines configuration for a consumer.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,91 +13,124 @@
       "type": "object"
     },
     "spec": {
-      "description": "ApisixTlsSpec defines the TLS configuration.",
+      "description": "ConsumerSpec defines configuration for a consumer, including consumer name,\nauthentication credentials, and plugin settings.",
       "properties": {
-        "client": {
-          "description": "Client defines mutual TLS (mTLS) settings, such as the CA certificate and verification depth.",
-          "properties": {
-            "caSecret": {
-              "description": "CASecret references the secret containing the CA certificate for client certificate validation.",
-              "properties": {
-                "name": {
-                  "description": "Name is the name of the Kubernetes Secret.",
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "namespace": {
-                  "description": "Namespace is the namespace where the Kubernetes Secret is located.",
-                  "minLength": 1,
-                  "type": "string"
-                }
+        "credentials": {
+          "description": "Credentials specifies the credential details of a consumer.",
+          "items": {
+            "oneOf": [
+              {
+                "required": [
+                  "config"
+                ]
               },
-              "required": [
-                "name",
-                "namespace"
-              ],
-              "type": "object",
-              "additionalProperties": false
-            },
-            "depth": {
-              "description": "Depth specifies the maximum verification depth for the client certificate chain.",
-              "type": "integer"
-            },
-            "skip_mtls_uri_regex": {
-              "description": "SkipMTLSUriRegex contains RegEx patterns for URIs to skip mutual TLS verification.",
-              "items": {
+              {
+                "required": [
+                  "secretRef"
+                ]
+              }
+            ],
+            "properties": {
+              "config": {
+                "description": "Config specifies the credential details for authentication.",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "name": {
+                "description": "Name is the name of the credential.",
                 "type": "string"
               },
-              "type": "array"
-            }
+              "secretRef": {
+                "description": "SecretRef references to the Secret that contains the credentials.",
+                "properties": {
+                  "name": {
+                    "description": "Name is the name of the secret.",
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the secret.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": {
+                "description": "Type specifies the type of authentication to configure credentials for.\nCan be `jwt-auth`, `basic-auth`, `key-auth`, or `hmac-auth`.",
+                "enum": [
+                  "jwt-auth",
+                  "basic-auth",
+                  "key-auth",
+                  "hmac-auth"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
           },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "hosts": {
-          "description": "Hosts lists the SNI (Server Name Indication) hostnames that this TLS configuration applies to.\nMust contain at least one host.",
-          "items": {
-            "pattern": "^\\*?[0-9a-zA-Z-.]+$",
-            "type": "string"
-          },
-          "minItems": 1,
           "type": "array"
         },
-        "ingressClassName": {
-          "description": "IngressClassName specifies which IngressClass this resource is associated with.\nThe APISIX controller only processes this resource if the class matches its own.",
-          "type": "string"
-        },
-        "secret": {
-          "description": "Secret refers to the Kubernetes TLS secret containing the certificate and private key.\nThis secret must exist in the specified namespace and contain valid TLS data.",
+        "gatewayRef": {
+          "description": "GatewayRef specifies the gateway details.",
           "properties": {
+            "group": {
+              "default": "gateway.networking.k8s.io",
+              "description": "Group is the API group the resource belongs to. Default is `gateway.networking.k8s.io`.",
+              "type": "string"
+            },
+            "kind": {
+              "default": "Gateway",
+              "description": "Kind is the type of Kubernetes object. Default is `Gateway`.",
+              "type": "string"
+            },
             "name": {
-              "description": "Name is the name of the Kubernetes Secret.",
+              "description": "Name is the name of the gateway.",
               "minLength": 1,
               "type": "string"
             },
             "namespace": {
-              "description": "Namespace is the namespace where the Kubernetes Secret is located.",
-              "minLength": 1,
+              "description": "Namespace is namespace of the resource.",
               "type": "string"
             }
           },
           "required": [
-            "name",
-            "namespace"
+            "name"
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "plugins": {
+          "description": "Plugins define the plugins associated with a consumer.",
+          "items": {
+            "properties": {
+              "config": {
+                "description": "Config is plugin configuration details.",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "name": {
+                "description": "Name is the name of the plugin.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         }
       },
-      "required": [
-        "hosts",
-        "secret"
-      ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "ApisixStatus is the status report for Apisix ingress Resources",
       "properties": {
         "conditions": {
           "items": {

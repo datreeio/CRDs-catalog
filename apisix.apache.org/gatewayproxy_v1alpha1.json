@@ -1,0 +1,204 @@
+{
+  "description": "GatewayProxy defines configuration for the gateway proxy instances used to route traffic to services.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "GatewayProxySpec defines configuration of gateway proxy instances,\nincluding networking settings, global plugins, and plugin metadata.",
+      "properties": {
+        "pluginMetadata": {
+          "additionalProperties": {
+            "x-kubernetes-preserve-unknown-fields": true
+          },
+          "description": "PluginMetadata configures common configuration shared by all plugin instances of the same name.",
+          "type": "object"
+        },
+        "plugins": {
+          "description": "Plugins configure global plugins.",
+          "items": {
+            "description": "GatewayProxyPlugin contains plugin configuration.",
+            "properties": {
+              "config": {
+                "description": "Config defines the plugin's configuration details.",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "enabled": {
+                "description": "Enabled defines whether the plugin is enabled.",
+                "type": "boolean"
+              },
+              "name": {
+                "description": "Name is the name of the plugin.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "provider": {
+          "description": "Provider configures the provider details.",
+          "properties": {
+            "controlPlane": {
+              "description": "ControlPlane specifies the configuration for control plane provider.",
+              "properties": {
+                "auth": {
+                  "description": "Auth specifies the authentication configuration.",
+                  "properties": {
+                    "adminKey": {
+                      "description": "AdminKey specifies the admin key authentication configuration.",
+                      "properties": {
+                        "value": {
+                          "description": "Value sets the admin key value explicitly (not recommended for production).",
+                          "type": "string"
+                        },
+                        "valueFrom": {
+                          "description": "ValueFrom specifies the source of the admin key.",
+                          "properties": {
+                            "secretKeyRef": {
+                              "description": "SecretKeyRef references a key in a Secret.",
+                              "properties": {
+                                "key": {
+                                  "description": "Key is the key in the secret to retrieve the secret from.",
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "description": "Name is the name of the secret.",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "name"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "exactly one of value or valueFrom must be specified",
+                          "rule": "has(self.value) != has(self.valueFrom)"
+                        }
+                      ],
+                      "additionalProperties": false
+                    },
+                    "type": {
+                      "description": "Type specifies the type of authentication.\nCan only be `AdminKey`.",
+                      "enum": [
+                        "AdminKey"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "adminKey must be specified when type is AdminKey",
+                      "rule": "self.type == 'AdminKey' ? has(self.adminKey) : true"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "endpoints": {
+                  "description": "Endpoints specifies the list of control plane endpoints.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "service": {
+                  "properties": {
+                    "name": {
+                      "description": "Name is the name of the provider.",
+                      "type": "string"
+                    },
+                    "port": {
+                      "description": "Port is the port of the provider.",
+                      "format": "int32",
+                      "maximum": 65535,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "tlsVerify": {
+                  "description": "TlsVerify specifies whether to verify the TLS certificate of the control plane.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "auth"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "rule": "has(self.endpoints) != has(self.service)"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "type": {
+              "description": "Type specifies the type of provider. Can only be `ControlPlane`.",
+              "enum": [
+                "ControlPlane"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "controlPlane must be specified when type is ControlPlane",
+              "rule": "self.type == 'ControlPlane' ? has(self.controlPlane) : true"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "publishService": {
+          "description": "PublishService specifies the LoadBalancer-type Service whose external address the controller uses to\nupdate the status of Ingress resources.",
+          "type": "string"
+        },
+        "statusAddress": {
+          "description": "StatusAddress specifies the external IP addresses that the controller uses to populate the status field\nof GatewayProxy or Ingress resources for developers to access.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

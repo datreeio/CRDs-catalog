@@ -43,7 +43,7 @@
               "description": "XForwardedForSettings provides configuration for using X-Forwarded-For headers for determining the client IP address.",
               "properties": {
                 "numTrustedHops": {
-                  "description": "NumTrustedHops controls the number of additional ingress proxy hops from the right side of XFF HTTP\nheaders to trust when determining the origin client's IP address.\nOnly one of NumTrustedHops and TrustedCIDRs must be set.",
+                  "description": "NumTrustedHops specifies how many trusted hops to count from the rightmost side of\nthe X-Forwarded-For (XFF) header when determining the original client\u2019s IP address.\n\nIf NumTrustedHops is set to N, the client IP is taken from the Nth address from the\nright end of the XFF header.\n\nExample:\n  XFF = \"203.0.113.128, 203.0.113.10, 203.0.113.1\"\n  NumTrustedHops = 2\n  \u2192 Trusted client address = 203.0.113.10\n\nOnly one of NumTrustedHops or TrustedCIDRs should be configured.",
                   "format": "int32",
                   "type": "integer"
                 },
@@ -105,6 +105,21 @@
               "properties": {
                 "closeDelay": {
                   "description": "CloseDelay defines the delay to use before closing connections that are rejected\nonce the limit value is reached.\nDefault: none.",
+                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                  "type": "string"
+                },
+                "maxConnectionDuration": {
+                  "description": "MaxConnectionDuration is the maximum amount of time a connection can remain established\n(usually via TCP/HTTP Keepalive packets) before being drained and/or closed.\nIf not specified, there is no limit.",
+                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                  "type": "string"
+                },
+                "maxRequestsPerConnection": {
+                  "description": "MaxRequestsPerConnection defines the maximum number of requests allowed over a single connection.\nIf not specified, there is no limit. Setting this parameter to 1 will effectively disable keep alive.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "maxStreamDuration": {
+                  "description": "MaxStreamDuration is the maximum amount of time to keep alive an http stream. When the limit is reached\nthe stream will be reset independent of any other timeouts. If not specified, no value is set.",
                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                   "type": "string"
                 },
@@ -248,12 +263,94 @@
               "description": "EnableEnvoyHeaders configures Envoy Proxy to add the \"X-Envoy-\" headers to requests\nand responses.",
               "type": "boolean"
             },
+            "lateResponseHeaders": {
+              "description": "LateResponseHeaders defines settings for global response header modification.",
+              "properties": {
+                "add": {
+                  "description": "Add adds the given header(s) (name, value) to the request\nbefore the action. It appends to any existing values associated\nwith the header name.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  add:\n  - name: \"my-header\"\n    value: \"bar,baz\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: foo,bar,baz",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "remove": {
+                  "description": "Remove the given header(s) from the HTTP request before the action. The\nvalue of Remove is a list of HTTP header names. Note that the header\nnames are case-insensitive (see\nhttps://datatracker.ietf.org/doc/html/rfc2616#section-4.2).\n\nInput:\n  GET /foo HTTP/1.1\n  my-header1: foo\n  my-header2: bar\n  my-header3: baz\n\nConfig:\n  remove: [\"my-header1\", \"my-header3\"]\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header2: bar",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "set": {
+                  "description": "Set overwrites the request with the given header (name, value)\nbefore the action.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  set:\n  - name: \"my-header\"\n    value: \"bar\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: bar",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 64,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "preserveXRequestID": {
-              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nDefaults to false and cannot be combined with RequestID.\nDeprecated: use RequestID=Preserve instead",
+              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nDefaults to false and cannot be combined with RequestID.\nDeprecated: use RequestID=PreserveOrGenerate instead",
               "type": "boolean"
             },
             "requestID": {
-              "description": "RequestID configures Envoy's behavior for handling the `X-Request-ID` header.\nDefaults to `Generate` and builds the `X-Request-ID` for every request and ignores pre-existing values from the edge.\n(An \"edge request\" refers to a request from an external client to the Envoy entrypoint.)",
+              "description": "RequestID configures Envoy's behavior for handling the `X-Request-ID` header.\nWhen omitted default behavior is `Generate` which builds the `X-Request-ID` for every request\n and ignores pre-existing values from the edge.\n(An \"edge request\" refers to a request from an external client to the Envoy entrypoint.)",
               "enum": [
                 "PreserveOrGenerate",
                 "Preserve",
@@ -340,6 +437,10 @@
         "http1": {
           "description": "HTTP1 provides HTTP/1 configuration on the listener.",
           "properties": {
+            "disableSafeMaxConnectionDuration": {
+              "description": "DisableSafeMaxConnectionDuration controls the close behavior for HTTP/1 connections.\nBy default, connection closure is delayed until the next request arrives after maxConnectionDuration is exceeded.\nIt then adds a Connection: close header and gracefully closes the connection after the response completes.\nWhen set to true (disabled), Envoy uses its default drain behavior, closing the connection shortly after maxConnectionDuration elapses.\nHas no effect unless maxConnectionDuration is set.",
+              "type": "boolean"
+            },
             "enableTrailers": {
               "description": "EnableTrailers defines if HTTP/1 trailers should be proxied by Envoy.",
               "type": "boolean"
@@ -348,7 +449,7 @@
               "description": "HTTP10 turns on support for HTTP/1.0 and HTTP/0.9 requests.",
               "properties": {
                 "useDefaultHost": {
-                  "description": "UseDefaultHost defines if the HTTP/1.0 request is missing the Host header,\nthen the hostname associated with the listener should be injected into the\nrequest.\nIf this is not set and an HTTP/1.0 request arrives without a host, then\nit will be rejected.",
+                  "description": "UseDefaultHost specifies whether a default Host header should be injected\ninto HTTP/1.0 requests that do not include one.\n\nWhen set to true, Envoy Gateway injects the hostname associated with the\nlistener or route into the request, in the following order:\n\n  1. If the targeted listener has a non-wildcard hostname, use that hostname.\n  2. If there is exactly one HTTPRoute with a non-wildcard hostname under\n     the targeted listener, use that hostname.\n\n Note: Setting this field to true without a non-wildcard hostname makes the\nClientTrafficPolicy invalid.",
                   "type": "boolean"
                 }
               },
@@ -677,14 +778,9 @@
           "description": "TLS settings configure TLS termination settings with the downstream client.",
           "properties": {
             "alpnProtocols": {
-              "description": "ALPNProtocols supplies the list of ALPN protocols that should be\nexposed by the listener or used by the proxy to connect to the backend.\nDefaults:\n1. HTTPS Routes: h2 and http/1.1 are enabled in listener context.\n2. Other Routes: ALPN is disabled.\n3. Backends: proxy uses the appropriate ALPN options for the backend protocol.\nWhen an empty list is provided, the ALPN TLS extension is disabled.\nSupported values are:\n- http/1.0\n- http/1.1\n- h2",
+              "description": "ALPNProtocols supplies the list of ALPN protocols that should be\nexposed by the listener or used by the proxy to connect to the backend.\nDefaults:\n1. HTTPS Routes: h2 and http/1.1 are enabled in listener context.\n2. Other Routes: ALPN is disabled.\n3. Backends: proxy uses the appropriate ALPN options for the backend protocol.\nWhen an empty list is provided, the ALPN TLS extension is disabled.\n\nDefaults to [h2, http/1.1] if not specified.\n\nTypical Supported values are:\n- http/1.0\n- http/1.1\n- h2",
               "items": {
                 "description": "ALPNProtocol specifies the protocol to be negotiated using ALPN",
-                "enum": [
-                  "http/1.0",
-                  "http/1.1",
-                  "h2"
-                ],
                 "type": "string"
               },
               "type": "array"
@@ -748,6 +844,64 @@
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "crl": {
+                  "description": "Crl specifies the crl configuration that can be used to validate the client initiating the TLS connection",
+                  "properties": {
+                    "onlyVerifyLeafCertificate": {
+                      "description": "If this option is set to true,  Envoy will only verify the certificate at the end of the certificate chain against the CRL.\nDefaults to false, which will verify the entire certificate chain against the CRL.",
+                      "type": "boolean"
+                    },
+                    "refs": {
+                      "description": "Refs contains one or more references to a Kubernetes ConfigMap or a Kubernetes Secret,\ncontaining the certificate revocation list in PEM format\nExpects the content in a key named `ca.crl`.\n\nReferences to a resource in different namespace are invalid UNLESS there\nis a ReferenceGrant in the target namespace that allows the crl\nto be attached.",
+                      "items": {
+                        "description": "SecretObjectReference identifies an API object including its namespace,\ndefaulting to Secret.\n\nThe API object must be valid in the cluster; the Group and Kind must\nbe registered in the cluster for this reference to be valid.\n\nReferences to objects with invalid Group and Kind are not valid, and must\nbe rejected by the implementation, with appropriate Conditions set\non the containing object.",
+                        "properties": {
+                          "group": {
+                            "default": "",
+                            "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                            "maxLength": 253,
+                            "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "default": "Secret",
+                            "description": "Kind is kind of the referent. For example \"Secret\".",
+                            "maxLength": 63,
+                            "minLength": 1,
+                            "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                            "type": "string"
+                          },
+                          "name": {
+                            "description": "Name is the name of the referent.",
+                            "maxLength": 253,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "namespace": {
+                            "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                            "maxLength": 63,
+                            "minLength": 1,
+                            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "maxItems": 8,
+                      "minItems": 1,
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "refs"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
                 },
                 "optional": {
                   "description": "Optional set to true accepts connections even when a client doesn't present a certificate.\nDefaults to false, which rejects connections without a valid client certificate.",
@@ -1089,7 +1243,7 @@
                 "additionalProperties": false
               },
               "conditions": {
-                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.",
+                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.\n\n<gateway:util:excludeFromCRD>\n\nNotes for implementors:\n\nConditions are a listType `map`, which means that they function like a\nmap with a key of the `type` field _in the k8s apiserver_.\n\nThis means that implementations must obey some rules when updating this\nsection.\n\n* Implementations MUST perform a read-modify-write cycle on this field\n  before modifying it. That is, when modifying this field, implementations\n  must be confident they have fetched the most recent version of this field,\n  and ensure that changes they make are on that recent version.\n* Implementations MUST NOT remove or reorder Conditions that they are not\n  directly responsible for. For example, if an implementation sees a Condition\n  with type `special.io/SomeField`, it MUST NOT remove, change or update that\n  Condition.\n* Implementations MUST always _merge_ changes into Conditions of the same Type,\n  rather than creating more than one Condition of the same Type.\n* Implementations MUST always update the `observedGeneration` field of the\n  Condition to the `metadata.generation` of the Gateway at the time of update creation.\n* If the `observedGeneration` of a Condition is _greater than_ the value the\n  implementation knows about, then it MUST NOT perform the update on that Condition,\n  but must wait for a future reconciliation and status update. (The assumption is that\n  the implementation's copy of the object is stale and an update will be re-triggered\n  if relevant.)\n\n</gateway:util:excludeFromCRD>",
                 "items": {
                   "description": "Condition contains details for one aspect of the current state of this API Resource.",
                   "properties": {
@@ -1160,13 +1314,15 @@
             },
             "required": [
               "ancestorRef",
+              "conditions",
               "controllerName"
             ],
             "type": "object",
             "additionalProperties": false
           },
           "maxItems": 16,
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [

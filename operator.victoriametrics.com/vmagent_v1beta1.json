@@ -514,7 +514,7 @@
                     "type": "string"
                   },
                   "volumeAttributesClassName": {
-                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
                     "type": "string"
                   },
                   "volumeMode": {
@@ -627,11 +627,11 @@
                     "x-kubernetes-list-type": "map"
                   },
                   "currentVolumeAttributesClassName": {
-                    "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                    "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                     "type": "string"
                   },
                   "modifyVolumeStatus": {
-                    "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                    "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
                     "properties": {
                       "status": {
                         "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",
@@ -708,7 +708,7 @@
           "description": "ConfigReloaderResources config-reloader container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
@@ -871,7 +871,7 @@
             "description": "EnvVar represents an environment variable present in a Container.",
             "properties": {
               "name": {
-                "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                "description": "Name of the environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "value": {
@@ -891,7 +891,7 @@
         "extraEnvsFrom": {
           "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
           "items": {
-            "description": "EnvFromSource represents the source of a set of ConfigMaps",
+            "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
             "properties": {
               "configMapRef": {
                 "description": "The ConfigMap to select from",
@@ -911,7 +911,7 @@
                 "additionalProperties": false
               },
               "prefix": {
-                "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                "description": "Optional text to prepend to the name of each environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "secretRef": {
@@ -930,6 +930,144 @@
                 "type": "object",
                 "x-kubernetes-map-type": "atomic",
                 "additionalProperties": false
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "globalScrapeMetricRelabelConfigs": {
+          "description": "GlobalScrapeMetricRelabelConfigs is a global metric relabel configuration, which is applied to each scrape job.",
+          "items": {
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
+            "properties": {
+              "action": {
+                "description": "Action to perform based on regex matching. Default is 'replace'",
+                "type": "string"
+              },
+              "if": {
+                "description": "If represents metricsQL match expression (or list of expressions): '{__name__=~\"foo_.*\"}'",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Labels is used together with Match for `action: graphite`",
+                "type": "object"
+              },
+              "match": {
+                "description": "Match is used together with Labels for `action: graphite`",
+                "type": "string"
+              },
+              "modulus": {
+                "description": "Modulus to take of the hash of the source label values.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "regex": {
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "replacement": {
+                "description": "Replacement value against which a regex replace is performed if the\nregular expression matches. Regex capture groups are available. Default is '$1'",
+                "type": "string"
+              },
+              "separator": {
+                "description": "Separator placed between concatenated source label values. default is ';'.",
+                "type": "string"
+              },
+              "source_labels": {
+                "description": "UnderScoreSourceLabels - additional form of source labels source_labels\nfor compatibility with original relabel config.\nif set  both sourceLabels and source_labels, sourceLabels has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sourceLabels": {
+                "description": "The source labels select values from existing labels. Their content is concatenated\nusing the configured separator and matched against the configured regular expression\nfor the replace, keep, and drop actions.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "target_label": {
+                "description": "UnderScoreTargetLabel - additional form of target label - target_label\nfor compatibility with original relabel config.\nif set  both targetLabel and target_label, targetLabel has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "type": "string"
+              },
+              "targetLabel": {
+                "description": "Label to which the resulting value is written in a replace action.\nIt is mandatory for replace actions. Regex capture groups are available.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "globalScrapeRelabelConfigs": {
+          "description": "GlobalScrapeRelabelConfigs is a global relabel configuration, which is applied to each samples of each scrape job during service discovery.",
+          "items": {
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
+            "properties": {
+              "action": {
+                "description": "Action to perform based on regex matching. Default is 'replace'",
+                "type": "string"
+              },
+              "if": {
+                "description": "If represents metricsQL match expression (or list of expressions): '{__name__=~\"foo_.*\"}'",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Labels is used together with Match for `action: graphite`",
+                "type": "object"
+              },
+              "match": {
+                "description": "Match is used together with Labels for `action: graphite`",
+                "type": "string"
+              },
+              "modulus": {
+                "description": "Modulus to take of the hash of the source label values.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "regex": {
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "replacement": {
+                "description": "Replacement value against which a regex replace is performed if the\nregular expression matches. Regex capture groups are available. Default is '$1'",
+                "type": "string"
+              },
+              "separator": {
+                "description": "Separator placed between concatenated source label values. default is ';'.",
+                "type": "string"
+              },
+              "source_labels": {
+                "description": "UnderScoreSourceLabels - additional form of source labels source_labels\nfor compatibility with original relabel config.\nif set  both sourceLabels and source_labels, sourceLabels has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "sourceLabels": {
+                "description": "The source labels select values from existing labels. Their content is concatenated\nusing the configured separator and matched against the configured regular expression\nfor the replace, keep, and drop actions.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "target_label": {
+                "description": "UnderScoreTargetLabel - additional form of target label - target_label\nfor compatibility with original relabel config.\nif set  both targetLabel and target_label, targetLabel has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                "type": "string"
+              },
+              "targetLabel": {
+                "description": "Label to which the resulting value is written in a replace action.\nIt is mandatory for replace actions. Regex capture groups are available.",
+                "type": "string"
               }
             },
             "type": "object",
@@ -1052,7 +1190,7 @@
         "inlineRelabelConfig": {
           "description": "InlineRelabelConfig - defines GlobalRelabelConfig for vmagent, can be defined directly at CRD.",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -1079,7 +1217,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -1146,14 +1284,14 @@
           "additionalProperties": false
         },
         "license": {
-          "description": "License allows to configure license key to be used for enterprise features.\nUsing license key is supported starting from VictoriaMetrics v1.94.0.\nSee [here](https://docs.victoriametrics.com/enterprise)",
+          "description": "License allows to configure license key to be used for enterprise features.\nUsing license key is supported starting from VictoriaMetrics v1.94.0.\nSee [here](https://docs.victoriametrics.com/victoriametrics/enterprise/)",
           "properties": {
             "forceOffline": {
               "description": "Enforce offline verification of the license key.",
               "type": "boolean"
             },
             "key": {
-              "description": "Enterprise license key. This flag is available only in [VictoriaMetrics enterprise](https://docs.victoriametrics.com/enterprise).\nTo request a trial license, [go to](https://victoriametrics.com/products/enterprise/trial)",
+              "description": "Enterprise license key. This flag is available only in [VictoriaMetrics enterprise](https://docs.victoriametrics.com/victoriametrics/enterprise/).\nTo request a trial license, [go to](https://victoriametrics.com/products/enterprise/trial)",
               "type": "string"
             },
             "keyRef": {
@@ -1296,7 +1434,7 @@
         "nodeScrapeRelabelTemplate": {
           "description": "NodeScrapeRelabelTemplate defines relabel config, that will be added to each VMNodeScrape.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -1323,7 +1461,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -1428,6 +1566,21 @@
           "description": "Paused If set to true all actions on the underlying managed objects are not\ngoing to be performed, except for delete actions.",
           "type": "boolean"
         },
+        "persistentVolumeClaimRetentionPolicy": {
+          "description": "PersistentVolumeClaimRetentionPolicy allows configuration of PVC retention policy",
+          "properties": {
+            "whenDeleted": {
+              "description": "WhenDeleted specifies what happens to PVCs created from StatefulSet\nVolumeClaimTemplates when the StatefulSet is deleted. The default policy\nof `Retain` causes PVCs to not be affected by StatefulSet deletion. The\n`Delete` policy causes those PVCs to be deleted.",
+              "type": "string"
+            },
+            "whenScaled": {
+              "description": "WhenScaled specifies what happens to PVCs created from StatefulSet\nVolumeClaimTemplates when the StatefulSet is scaled down. The default\npolicy of `Retain` causes PVCs to not be affected by a scaledown. The\n`Delete` policy causes the associated PVCs for any excess pods above\nthe replica count to be deleted.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "podDisruptionBudget": {
           "description": "PodDisruptionBudget created by operator",
           "properties": {
@@ -1461,6 +1614,14 @@
               },
               "description": "replaces default labels selector generated by operator\nit's useful when you need to create custom budget",
               "type": "object"
+            },
+            "unhealthyPodEvictionPolicy": {
+              "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods\n\nValid policies are IfHealthyBudget and AlwaysAllow.\nIf no policy is specified, the default behavior will be used,\nwhich corresponds to the IfHealthyBudget policy.\nAvailable from operator v0.64.0",
+              "enum": [
+                "IfHealthyBudget",
+                "AlwaysAllow"
+              ],
+              "type": "string"
             }
           },
           "type": "object",
@@ -1541,7 +1702,7 @@
         "podScrapeRelabelTemplate": {
           "description": "PodScrapeRelabelTemplate defines relabel config, that will be added to each VMPodScrape.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -1568,7 +1729,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -1712,7 +1873,7 @@
         "probeScrapeRelabelTemplate": {
           "description": "ProbeScrapeRelabelTemplate defines relabel config, that will be added to each VMProbeScrape.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -1739,7 +1900,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -1873,10 +2034,41 @@
           "additionalProperties": false
         },
         "remoteWrite": {
-          "description": "RemoteWrite list of victoria metrics /some other remote write system\nfor vm it must looks like: http://victoria-metrics-single:8429/api/v1/write\nor for cluster different url\nhttps://github.com/VictoriaMetrics/VictoriaMetrics/tree/master/app/vmagent#splitting-data-streams-among-multiple-systems",
+          "description": "RemoteWrite list of victoria metrics /some other remote write system\nfor vm it must looks like: http://victoria-metrics-single:8428/api/v1/write\nor for cluster different url\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#splitting-data-streams-among-multiple-systems",
           "items": {
             "description": "VMAgentRemoteWriteSpec defines the remote storage configuration for VmAgent",
             "properties": {
+              "aws": {
+                "description": "AWS describes params specific to AWS cloud",
+                "properties": {
+                  "ec2Endpoint": {
+                    "description": "EC2Endpoint is an optional AWS EC2 API endpoint to use for the corresponding -remoteWrite.url if -remoteWrite.aws.useSigv4 is set",
+                    "type": "string"
+                  },
+                  "region": {
+                    "description": "Region is an optional AWS region to use for the corresponding -remoteWrite.url if -remoteWrite.aws.useSigv4 is set",
+                    "type": "string"
+                  },
+                  "roleARN": {
+                    "description": "RoleARN is an optional AWS region to use for the corresponding -remoteWrite.url if -remoteWrite.aws.useSigv4 is set",
+                    "type": "string"
+                  },
+                  "service": {
+                    "description": "Service is an optional AWS Service to use for the corresponding -remoteWrite.url if -remoteWrite.aws.useSigv4 is set",
+                    "type": "string"
+                  },
+                  "stsEndpoint": {
+                    "description": "STSEndpoint is an optional AWS STS API endpoint to use for the corresponding -remoteWrite.url if -remoteWrite.aws.useSigv4 is set",
+                    "type": "string"
+                  },
+                  "useSigv4": {
+                    "description": "UseSigv4 enables SigV4 request signing for the corresponding -remoteWrite.url",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "basicAuth": {
                 "description": "BasicAuth allow an endpoint to authenticate over basic authentication",
                 "properties": {
@@ -1974,7 +2166,7 @@
               "inlineUrlRelabelConfig": {
                 "description": "InlineUrlRelabelConfig defines relabeling config for remoteWriteURL, it can be defined at crd spec.",
                 "items": {
-                  "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+                  "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
                   "properties": {
                     "action": {
                       "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -2001,7 +2193,7 @@
                       "type": "integer"
                     },
                     "regex": {
-                      "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                      "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                       "x-kubernetes-preserve-unknown-fields": true
                     },
                     "replacement": {
@@ -2224,6 +2416,10 @@
                     "description": "IgnoreFirstIntervals instructs to ignore first interval",
                     "type": "integer"
                   },
+                  "ignoreFirstSampleInterval": {
+                    "description": "IgnoreFirstSampleInterval sets interval for total and prometheus_total during which first samples will be ignored",
+                    "type": "string"
+                  },
                   "ignoreOldSamples": {
                     "description": "IgnoreOldSamples instructs to ignore samples with old timestamps outside the current aggregation interval.",
                     "type": "boolean"
@@ -2270,10 +2466,14 @@
                           "description": "IgnoreOldSamples instructs to ignore samples with old timestamps outside the current aggregation interval.",
                           "type": "boolean"
                         },
+                        "ignoreFirstSampleInterval": {
+                          "description": "IgnoreFirstSampleInterval sets interval for total and prometheus_total during which first samples will be ignored",
+                          "type": "string"
+                        },
                         "input_relabel_configs": {
                           "description": "InputRelabelConfigs is an optional relabeling rules, which are applied on the input\nbefore aggregation.",
                           "items": {
-                            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+                            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
                             "properties": {
                               "action": {
                                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -2300,7 +2500,7 @@
                                 "type": "integer"
                               },
                               "regex": {
-                                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                                 "x-kubernetes-preserve-unknown-fields": true
                               },
                               "replacement": {
@@ -2358,7 +2558,7 @@
                         "output_relabel_configs": {
                           "description": "OutputRelabelConfigs is an optional relabeling rules, which are applied\non the aggregated output before being sent to remote storage.",
                           "items": {
-                            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+                            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
                             "properties": {
                               "action": {
                                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -2385,7 +2585,7 @@
                                 "type": "integer"
                               },
                               "regex": {
-                                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                                 "x-kubernetes-preserve-unknown-fields": true
                               },
                               "replacement": {
@@ -2692,7 +2892,7 @@
               "type": "string"
             },
             "useMultiTenantMode": {
-              "description": "Configures vmagent accepting data via the same multitenant endpoints as vminsert at VictoriaMetrics cluster does,\nsee [here](https://docs.victoriametrics.com/vmagent/#multitenancy).\nit's global setting and affects all remote storage configurations",
+              "description": "Configures vmagent accepting data via the same multitenant endpoints as vminsert at VictoriaMetrics cluster does,\nsee [here](https://docs.victoriametrics.com/victoriametrics/vmagent/#multitenancy).\nit's global setting and affects all remote storage configurations",
               "type": "boolean"
             }
           },
@@ -2708,7 +2908,7 @@
           "description": "Resources container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
@@ -2813,6 +3013,590 @@
           "description": "SchedulerName - defines kubernetes scheduler name",
           "type": "string"
         },
+        "scrapeClasses": {
+          "description": "ScrapeClasses defines the list of scrape classes to expose to scraping objects such as\nPodScrapes, ServiceScrapes, Probes and ScrapeConfigs.",
+          "items": {
+            "properties": {
+              "attachMetadata": {
+                "description": "AttachMetadata defines additional metadata to the discovered targets.\nWhen the scrape object defines its own configuration, it takes\nprecedence over the scrape class configuration.",
+                "properties": {
+                  "node": {
+                    "description": "Node instructs vmagent to add node specific metadata from service discovery\nValid for roles: pod, endpoints, endpointslice.",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "authorization": {
+                "description": "Authorization with http header Authorization",
+                "properties": {
+                  "credentials": {
+                    "description": "Reference to the secret with value for authorization",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "credentialsFile": {
+                    "description": "File with value for authorization",
+                    "type": "string"
+                  },
+                  "type": {
+                    "description": "Type of authorization, default to bearer",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "basicAuth": {
+                "description": "BasicAuth allow an endpoint to authenticate over basic authentication",
+                "properties": {
+                  "password": {
+                    "description": "Password defines reference for secret with password value\nThe secret needs to be in the same namespace as scrape object",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "password_file": {
+                    "description": "PasswordFile defines path to password file at disk\nmust be pre-mounted",
+                    "type": "string"
+                  },
+                  "username": {
+                    "description": "Username defines reference for secret with username value\nThe secret needs to be in the same namespace as scrape object",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "bearerTokenFile": {
+                "description": "File to read bearer token for scraping targets.",
+                "type": "string"
+              },
+              "bearerTokenSecret": {
+                "description": "Secret to mount to read bearer token for scraping targets. The secret\nneeds to be in the same namespace as the scrape object and accessible by\nthe victoria-metrics operator.",
+                "nullable": true,
+                "properties": {
+                  "key": {
+                    "description": "The key of the secret to select from.  Must be a valid secret key.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret or its key must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "key"
+                ],
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "default": {
+                "description": "default defines that the scrape applies to all scrape objects that\ndon't configure an explicit scrape class name.\n\nOnly one scrape class can be set as the default.",
+                "type": "boolean"
+              },
+              "metricRelabelConfigs": {
+                "description": "MetricRelabelConfigs to apply to samples after scrapping.",
+                "items": {
+                  "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
+                  "properties": {
+                    "action": {
+                      "description": "Action to perform based on regex matching. Default is 'replace'",
+                      "type": "string"
+                    },
+                    "if": {
+                      "description": "If represents metricsQL match expression (or list of expressions): '{__name__=~\"foo_.*\"}'",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels is used together with Match for `action: graphite`",
+                      "type": "object"
+                    },
+                    "match": {
+                      "description": "Match is used together with Labels for `action: graphite`",
+                      "type": "string"
+                    },
+                    "modulus": {
+                      "description": "Modulus to take of the hash of the source label values.",
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "regex": {
+                      "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "replacement": {
+                      "description": "Replacement value against which a regex replace is performed if the\nregular expression matches. Regex capture groups are available. Default is '$1'",
+                      "type": "string"
+                    },
+                    "separator": {
+                      "description": "Separator placed between concatenated source label values. default is ';'.",
+                      "type": "string"
+                    },
+                    "source_labels": {
+                      "description": "UnderScoreSourceLabels - additional form of source labels source_labels\nfor compatibility with original relabel config.\nif set  both sourceLabels and source_labels, sourceLabels has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "sourceLabels": {
+                      "description": "The source labels select values from existing labels. Their content is concatenated\nusing the configured separator and matched against the configured regular expression\nfor the replace, keep, and drop actions.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "target_label": {
+                      "description": "UnderScoreTargetLabel - additional form of target label - target_label\nfor compatibility with original relabel config.\nif set  both targetLabel and target_label, targetLabel has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                      "type": "string"
+                    },
+                    "targetLabel": {
+                      "description": "Label to which the resulting value is written in a replace action.\nIt is mandatory for replace actions. Regex capture groups are available.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "name": {
+                "description": "name of the scrape class.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "oauth2": {
+                "description": "OAuth2 defines auth configuration",
+                "properties": {
+                  "client_id": {
+                    "description": "The secret or configmap containing the OAuth2 client id",
+                    "properties": {
+                      "configMap": {
+                        "description": "ConfigMap containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key to select.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the ConfigMap or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "secret": {
+                        "description": "Secret containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key of the secret to select from.  Must be a valid secret key.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "client_secret": {
+                    "description": "The secret containing the OAuth2 client secret",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "client_secret_file": {
+                    "description": "ClientSecretFile defines path for client secret file.",
+                    "type": "string"
+                  },
+                  "endpoint_params": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Parameters to append to the token URL",
+                    "type": "object"
+                  },
+                  "proxy_url": {
+                    "description": "The proxy URL for token_url connection\n( available from v0.55.0).\nIs only supported by Scrape objects family",
+                    "type": "string"
+                  },
+                  "scopes": {
+                    "description": "OAuth2 scopes used for the token request",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "tls_config": {
+                    "description": "TLSConfig for token_url connection\n( available from v0.55.0).\nIs only supported by Scrape objects family",
+                    "x-kubernetes-preserve-unknown-fields": true
+                  },
+                  "token_url": {
+                    "description": "The URL to fetch the token from",
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_id",
+                  "token_url"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "relabelConfigs": {
+                "description": "RelabelConfigs to apply to samples during service discovery.",
+                "items": {
+                  "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
+                  "properties": {
+                    "action": {
+                      "description": "Action to perform based on regex matching. Default is 'replace'",
+                      "type": "string"
+                    },
+                    "if": {
+                      "description": "If represents metricsQL match expression (or list of expressions): '{__name__=~\"foo_.*\"}'",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Labels is used together with Match for `action: graphite`",
+                      "type": "object"
+                    },
+                    "match": {
+                      "description": "Match is used together with Labels for `action: graphite`",
+                      "type": "string"
+                    },
+                    "modulus": {
+                      "description": "Modulus to take of the hash of the source label values.",
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "regex": {
+                      "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "replacement": {
+                      "description": "Replacement value against which a regex replace is performed if the\nregular expression matches. Regex capture groups are available. Default is '$1'",
+                      "type": "string"
+                    },
+                    "separator": {
+                      "description": "Separator placed between concatenated source label values. default is ';'.",
+                      "type": "string"
+                    },
+                    "source_labels": {
+                      "description": "UnderScoreSourceLabels - additional form of source labels source_labels\nfor compatibility with original relabel config.\nif set  both sourceLabels and source_labels, sourceLabels has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "sourceLabels": {
+                      "description": "The source labels select values from existing labels. Their content is concatenated\nusing the configured separator and matched against the configured regular expression\nfor the replace, keep, and drop actions.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "target_label": {
+                      "description": "UnderScoreTargetLabel - additional form of target label - target_label\nfor compatibility with original relabel config.\nif set  both targetLabel and target_label, targetLabel has priority.\nfor details https://github.com/VictoriaMetrics/operator/issues/131",
+                      "type": "string"
+                    },
+                    "targetLabel": {
+                      "description": "Label to which the resulting value is written in a replace action.\nIt is mandatory for replace actions. Regex capture groups are available.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "tlsConfig": {
+                "description": "TLSConfig configuration to use when scraping the endpoint",
+                "properties": {
+                  "ca": {
+                    "description": "Struct containing the CA cert to use for the targets.",
+                    "properties": {
+                      "configMap": {
+                        "description": "ConfigMap containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key to select.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the ConfigMap or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "secret": {
+                        "description": "Secret containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key of the secret to select from.  Must be a valid secret key.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "caFile": {
+                    "description": "Path to the CA cert in the container to use for the targets.",
+                    "type": "string"
+                  },
+                  "cert": {
+                    "description": "Struct containing the client cert file for the targets.",
+                    "properties": {
+                      "configMap": {
+                        "description": "ConfigMap containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key to select.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the ConfigMap or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "secret": {
+                        "description": "Secret containing data to use for the targets.",
+                        "properties": {
+                          "key": {
+                            "description": "The key of the secret to select from.  Must be a valid secret key.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "certFile": {
+                    "description": "Path to the client cert file in the container for the targets.",
+                    "type": "string"
+                  },
+                  "insecureSkipVerify": {
+                    "description": "Disable target certificate validation.",
+                    "type": "boolean"
+                  },
+                  "keyFile": {
+                    "description": "Path to the client key file in the container for the targets.",
+                    "type": "string"
+                  },
+                  "keySecret": {
+                    "description": "Secret containing the client key file for the targets.",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "serverName": {
+                    "description": "Used to verify the hostname for the targets.",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "scrapeConfigNamespaceSelector": {
           "description": "ScrapeConfigNamespaceSelector defines Namespaces to be selected for VMScrapeConfig discovery.\nWorks in combination with Selector.\nNamespaceSelector nil - only objects at VMAgent namespace.\nSelector nil - only objects at NamespaceSelector namespaces.\nIf both nil - behaviour controlled by selectAllByDefault",
           "properties": {
@@ -2863,7 +3647,7 @@
         "scrapeConfigRelabelTemplate": {
           "description": "ScrapeConfigRelabelTemplate defines relabel config, that will be added to each VMScrapeConfig.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -2890,7 +3674,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -3056,7 +3840,7 @@
         "serviceScrapeRelabelTemplate": {
           "description": "ServiceScrapeRelabelTemplate defines relabel config, that will be added to each VMServiceScrape.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -3083,7 +3867,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -3222,7 +4006,7 @@
           "additionalProperties": false
         },
         "shardCount": {
-          "description": "ShardCount - numbers of shards of VMAgent\nin this case operator will use 1 deployment/sts per shard with\nreplicas count according to spec.replicas,\nsee [here](https://docs.victoriametrics.com/vmagent/#scraping-big-number-of-targets)",
+          "description": "ShardCount - numbers of shards of VMAgent\nin this case operator will use 1 deployment/sts per shard with\nreplicas count according to spec.replicas,\nsee [here](https://docs.victoriametrics.com/victoriametrics/vmagent/#scraping-big-number-of-targets)",
           "type": "integer"
         },
         "startupProbe": {
@@ -3270,7 +4054,7 @@
               "additionalProperties": false
             },
             "volumeClaimTemplate": {
-              "description": "A PVC spec to be used by the VMAlertManager StatefulSets.",
+              "description": "A PVC spec to be used by the StatefulSets/Deployments.",
               "properties": {
                 "apiVersion": {
                   "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -3458,7 +4242,7 @@
                       "type": "string"
                     },
                     "volumeAttributesClassName": {
-                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
                       "type": "string"
                     },
                     "volumeMode": {
@@ -3571,11 +4355,11 @@
                       "x-kubernetes-list-type": "map"
                     },
                     "currentVolumeAttributesClassName": {
-                      "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                      "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                       "type": "string"
                     },
                     "modifyVolumeStatus": {
-                      "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                      "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
                       "properties": {
                         "status": {
                           "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",
@@ -3658,7 +4442,7 @@
         "staticScrapeRelabelTemplate": {
           "description": "StaticScrapeRelabelTemplate defines relabel config, that will be added to each VMStaticScrape.\nit's useful for adding specific labels to all targets",
           "items": {
-            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+            "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
             "properties": {
               "action": {
                 "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -3685,7 +4469,7 @@
                 "type": "integer"
               },
               "regex": {
-                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                 "x-kubernetes-preserve-unknown-fields": true
               },
               "replacement": {
@@ -3821,6 +4605,10 @@
               "description": "IgnoreFirstIntervals instructs to ignore first interval",
               "type": "integer"
             },
+            "ignoreFirstSampleInterval": {
+              "description": "IgnoreFirstSampleInterval sets interval for total and prometheus_total during which first samples will be ignored",
+              "type": "string"
+            },
             "ignoreOldSamples": {
               "description": "IgnoreOldSamples instructs to ignore samples with old timestamps outside the current aggregation interval.",
               "type": "boolean"
@@ -3867,10 +4655,14 @@
                     "description": "IgnoreOldSamples instructs to ignore samples with old timestamps outside the current aggregation interval.",
                     "type": "boolean"
                   },
+                  "ignoreFirstSampleInterval": {
+                    "description": "IgnoreFirstSampleInterval sets interval for total and prometheus_total during which first samples will be ignored",
+                    "type": "string"
+                  },
                   "input_relabel_configs": {
                     "description": "InputRelabelConfigs is an optional relabeling rules, which are applied on the input\nbefore aggregation.",
                     "items": {
-                      "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+                      "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
                       "properties": {
                         "action": {
                           "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -3897,7 +4689,7 @@
                           "type": "integer"
                         },
                         "regex": {
-                          "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                          "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                           "x-kubernetes-preserve-unknown-fields": true
                         },
                         "replacement": {
@@ -3955,7 +4747,7 @@
                   "output_relabel_configs": {
                     "description": "OutputRelabelConfigs is an optional relabeling rules, which are applied\non the aggregated output before being sent to remote storage.",
                     "items": {
-                      "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/#relabeling",
+                      "description": "RelabelConfig allows dynamic rewriting of the label set\nMore info: https://docs.victoriametrics.com/victoriametrics/#relabeling",
                       "properties": {
                         "action": {
                           "description": "Action to perform based on regex matching. Default is 'replace'",
@@ -3982,7 +4774,7 @@
                           "type": "integer"
                         },
                         "regex": {
-                          "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/vmagent/#relabeling-enhancements",
+                          "description": "Regular expression against which the extracted value is matched. Default is '(.*)'\nvictoriaMetrics supports multiline regex joined with |\nhttps://docs.victoriametrics.com/victoriametrics/vmagent/#relabeling-enhancements",
                           "x-kubernetes-preserve-unknown-fields": true
                         },
                         "replacement": {

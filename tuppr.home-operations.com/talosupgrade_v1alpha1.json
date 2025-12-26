@@ -1,0 +1,237 @@
+{
+  "description": "TalosUpgrade is the Schema for the talosupgrades API",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "TalosUpgradeSpec defines the desired state of TalosUpgrade",
+      "properties": {
+        "healthChecks": {
+          "description": "HealthChecks defines a list of CEL-based health checks to perform before each node upgrade",
+          "items": {
+            "description": "HealthCheck defines a CEL-based health check",
+            "properties": {
+              "apiVersion": {
+                "description": "APIVersion of the resource to check",
+                "type": "string"
+              },
+              "description": {
+                "description": "Description of what this check validates (for status/logging)",
+                "type": "string"
+              },
+              "expr": {
+                "description": "CEL expression that must evaluate to true for the check to pass\nThe resource object is available as 'object' and status as 'status'",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind of the resource to check",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name of the specific resource (optional, if empty checks all resources of this kind)",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace of the resource (optional, for namespaced resources)",
+                "type": "string"
+              },
+              "timeout": {
+                "description": "Timeout for this health check",
+                "minLength": 2,
+                "pattern": "^([0-9]+[smh])+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "apiVersion",
+              "expr",
+              "kind"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "policy": {
+          "description": "Policy configures upgrade behavior",
+          "properties": {
+            "debug": {
+              "default": true,
+              "description": "Debug enables debug mode for the upgrade",
+              "type": "boolean"
+            },
+            "force": {
+              "default": false,
+              "description": "Force the upgrade (skip checks on etcd health and members)",
+              "type": "boolean"
+            },
+            "placement": {
+              "default": "soft",
+              "description": "Placement controls how strictly upgrade jobs avoid the target node\nhard: required avoidance (job will fail if can't avoid target node)\nsoft: preferred avoidance (job prefers to avoid but can run on target node)",
+              "enum": [
+                "hard",
+                "soft"
+              ],
+              "type": "string"
+            },
+            "rebootMode": {
+              "default": "default",
+              "description": "RebootMode select the reboot mode during upgrade",
+              "enum": [
+                "default",
+                "powercycle"
+              ],
+              "type": "string"
+            },
+            "stage": {
+              "default": false,
+              "description": "Stage the upgrade to perform it after a reboot",
+              "type": "boolean"
+            },
+            "timeout": {
+              "default": "30m",
+              "description": "Timeout for the per-node talosctl upgrade command",
+              "pattern": "^([0-9]+[smh])+$",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "talos": {
+          "description": "Talos specifies the talos configuration for upgrade operations",
+          "properties": {
+            "version": {
+              "description": "Version is the target Talos version to upgrade to (e.g., \"v1.11.0\")",
+              "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9\\-\\.]+)?$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "version"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "talosctl": {
+          "description": "Talosctl specifies the talosctl configuration for upgrade operations",
+          "properties": {
+            "image": {
+              "description": "Image specifies the talosctl container image",
+              "properties": {
+                "pullPolicy": {
+                  "default": "IfNotPresent",
+                  "description": "PullPolicy describes a policy for if/when to pull a container image",
+                  "enum": [
+                    "Always",
+                    "Never",
+                    "IfNotPresent"
+                  ],
+                  "type": "string"
+                },
+                "repository": {
+                  "default": "ghcr.io/siderolabs/talosctl",
+                  "description": "Repository is the talosctl container image repository",
+                  "type": "string"
+                },
+                "tag": {
+                  "description": "Tag is the talosctl container image tag\nIf not specified, defaults to the target version",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "TalosUpgradeStatus defines the observed state of TalosUpgrade",
+      "properties": {
+        "completedNodes": {
+          "description": "CompletedNodes are nodes that have been successfully upgraded",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "currentNode": {
+          "description": "CurrentNode is the node currently being upgraded",
+          "type": "string"
+        },
+        "failedNodes": {
+          "description": "FailedNodes are nodes that failed to upgrade",
+          "items": {
+            "description": "NodeUpgradeStatus tracks the upgrade status of individual nodes",
+            "properties": {
+              "jobName": {
+                "description": "JobName is the name of the job handling this node's upgrade",
+                "type": "string"
+              },
+              "lastError": {
+                "description": "LastError contains the last error message",
+                "type": "string"
+              },
+              "nodeName": {
+                "description": "NodeName is the name of the node",
+                "type": "string"
+              },
+              "retries": {
+                "description": "Retries is the number of times upgrade was attempted",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "nodeName"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "lastUpdated": {
+          "description": "LastUpdated timestamp of last status update",
+          "format": "date-time",
+          "type": "string"
+        },
+        "message": {
+          "description": "Message provides details about the current state",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration reflects the generation of the most recently observed spec",
+          "format": "int64",
+          "type": "integer"
+        },
+        "phase": {
+          "description": "Phase represents the current phase of the upgrade",
+          "enum": [
+            "Pending",
+            "InProgress",
+            "Completed",
+            "Failed"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

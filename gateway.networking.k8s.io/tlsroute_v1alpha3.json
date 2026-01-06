@@ -1,5 +1,5 @@
 {
-  "description": "TCPRoute provides a way to route TCP requests. When combined with a Gateway\nlistener, it can be used to forward connections on the port specified by the\nlistener to a set of backends specified by the TCPRoute.",
+  "description": "The TLSRoute resource is similar to TCPRoute, but can be configured\nto match against TLS-specific metadata. This allows more flexibility\nin matching streams for a given TLS listener.\n\nIf you need to forward traffic to a single target for a TLS listener, you\ncould choose to use a TCPRoute with a TLS listener.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,8 +13,22 @@
       "type": "object"
     },
     "spec": {
-      "description": "Spec defines the desired state of TCPRoute.",
+      "description": "Spec defines the desired state of TLSRoute.",
       "properties": {
+        "hostnames": {
+          "description": "Hostnames defines a set of SNI hostnames that should match against the\nSNI attribute of TLS ClientHello message in TLS handshake. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n1. IPs are not allowed in SNI hostnames per RFC 6066.\n2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n   label must appear by itself as the first label.\n\nIf a hostname is specified by both the Listener and TLSRoute, there\nmust be at least one intersecting hostname for the TLSRoute to be\nattached to the Listener. For example:\n\n* A Listener with `test.example.com` as the hostname matches TLSRoutes\n  that have specified at least one of `test.example.com` or\n  `*.example.com`.\n* A Listener with `*.example.com` as the hostname matches TLSRoutes\n  that have specified at least one hostname that matches the Listener\n  hostname. For example, `test.example.com` and `*.example.com` would both\n  match. On the other hand, `example.com` and `test.example.net` would not\n  match.\n\nIf both the Listener and TLSRoute have specified hostnames, any\nTLSRoute hostnames that do not match the Listener hostname MUST be\nignored. For example, if a Listener specified `*.example.com`, and the\nTLSRoute specified `test.example.com` and `test.example.net`,\n`test.example.net` must not be considered for a match.\n\nIf both the Listener and TLSRoute have specified hostnames, and none\nmatch with the criteria above, then the TLSRoute is not accepted. The\nimplementation must raise an 'Accepted' Condition with a status of\n`False` in the corresponding RouteParentStatus.\n\nSupport: Core",
+          "items": {
+            "description": "Hostname is the fully qualified domain name of a network host. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n 1. IPs are not allowed.\n 2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n    label must appear by itself as the first label.\n\nHostname can be \"precise\" which is a domain name without the terminating\ndot of a network host (e.g. \"foo.example.com\") or \"wildcard\", which is a\ndomain name prefixed with a single wildcard label (e.g. `*.example.com`).\n\nNote that as per RFC1035 and RFC1123, a *label* must consist of lower case\nalphanumeric characters or '-', and must start and end with an alphanumeric\ncharacter. No other punctuation is allowed.",
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^(\\*\\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "parentRefs": {
           "description": "ParentRefs references the resources (usually Gateways) that a Route wants\nto be attached to. Note that the referenced parent resource needs to\nallow this for the attachment to be complete. For Gateways, that means\nthe Gateway needs to allow attachment from Routes of this kind and\nnamespace. For Services, that means the Service must either be in the same\nnamespace for a \"producer\" route, or the mesh implementation must support\nand allow \"consumer\" routes for the referenced Service. ReferenceGrant is\nnot applicable for governing ParentRefs to Services - it is not possible to\ncreate a \"producer\" route for a Service in a different namespace from the\nRoute.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nThis API may be extended in the future to support additional kinds of parent\nresources.\n\nParentRefs must be _distinct_. This means either that:\n\n* They select different objects.  If this is the case, then parentRef\n  entries are distinct. In terms of fields, this means that the\n  multi-part key defined by `group`, `kind`, `namespace`, and `name` must\n  be unique across all parentRef entries in the Route.\n* They do not select different objects, but for each optional field used,\n  each ParentRef that selects the same object must set the same set of\n  optional fields to different values. If one ParentRef sets a\n  combination of optional fields, all must set the same combination.\n\nSome examples:\n\n* If one ParentRef sets `sectionName`, all ParentRefs referencing the\n  same object must also set `sectionName`.\n* If one ParentRef sets `port`, all ParentRefs referencing the same\n  object must also set `port`.\n* If one ParentRef sets `sectionName` and `port`, all ParentRefs\n  referencing the same object must also set `sectionName` and `port`.\n\nIt is possible to separately reference multiple distinct objects that may\nbe collapsed by an implementation. For example, some implementations may\nchoose to merge compatible Gateway Listeners together. If that is the\ncase, the list of routes attached to those resources should also be\nmerged.\n\nNote that for ParentRefs that cross namespace boundaries, there are specific\nrules. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example,\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable other kinds of cross-namespace reference.\n\n\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.",
           "items": {
@@ -84,12 +98,12 @@
           ]
         },
         "rules": {
-          "description": "Rules are a list of TCP matchers and actions.",
+          "description": "Rules are a list of actions.",
           "items": {
-            "description": "TCPRouteRule is the configuration for a given rule.",
+            "description": "TLSRouteRule is the configuration for a given rule.",
             "properties": {
               "backendRefs": {
-                "description": "BackendRefs defines the backend(s) where matching requests should be\nsent. If unspecified or invalid (refers to a nonexistent resource or a\nService with no endpoints), the underlying implementation MUST actively\nreject connection attempts to this backend. Connection rejections must\nrespect weight; if an invalid backend is requested to have 80% of\nconnections, then 80% of connections must be rejected instead.\n\nSupport: Core for Kubernetes Service\n\nSupport: Extended for Kubernetes ServiceImport\n\nSupport: Implementation-specific for any other resource\n\nSupport for weight: Extended",
+                "description": "BackendRefs defines the backend(s) where matching requests should be\nsent. If unspecified or invalid (refers to a nonexistent resource or\na Service with no endpoints), the rule performs no forwarding; if no\nfilters are specified that would result in a response being sent, the\nunderlying implementation must actively reject request attempts to this\nbackend, by rejecting the connection or returning a 500 status code.\nRequest rejections must respect weight; if an invalid backend is\nrequested to have 80% of requests, then 80% of requests must be rejected\ninstead.\n\nSupport: Core for Kubernetes Service\n\nSupport: Extended for Kubernetes ServiceImport\n\nSupport: Implementation-specific for any other resource\n\nSupport for weight: Extended",
                 "items": {
                   "description": "BackendRef defines how a Route should forward a request to a Kubernetes\nresource.\n\nNote that when a namespace different than the local namespace is specified, a\nReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\n\nWhen the BackendRef points to a Kubernetes Service, implementations SHOULD\nhonor the appProtocol field if it is set for the target Service Port.\n\nImplementations supporting appProtocol SHOULD recognize the Kubernetes\nStandard Application Protocols defined in KEP-3726.\n\nIf a Service appProtocol isn't specified, an implementation MAY infer the\nbackend protocol through its own means. Implementations MAY infer the\nprotocol from the Route type referring to the backend Service.\n\nIf a Route is not able to send traffic to the backend using the specified\nprotocol then the backend is considered invalid. Implementations MUST set the\n\"ResolvedRefs\" condition to \"False\" with the \"UnsupportedProtocol\" reason.\n\n\nNote that when the BackendTLSPolicy object is enabled by the implementation,\nthere are some extra rules about validity to consider here. See the fields\nwhere this struct is used for more information about the exact behavior.",
                   "properties": {
@@ -168,7 +182,7 @@
             "type": "object",
             "additionalProperties": false
           },
-          "maxItems": 16,
+          "maxItems": 1,
           "minItems": 1,
           "type": "array",
           "x-kubernetes-list-type": "atomic",
@@ -189,13 +203,14 @@
         }
       },
       "required": [
+        "hostnames",
         "rules"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Status defines the current state of TCPRoute.",
+      "description": "Status defines the current state of TLSRoute.",
       "properties": {
         "parents": {
           "description": "Parents is a list of parent resources (usually Gateways) that are\nassociated with the route, and the status of the route with respect to\neach parent. When this route attaches to a parent, the controller that\nmanages the parent must add an entry to this list when the controller\nfirst sees the route and should update the entry as appropriate when the\nroute or gateway is modified.\n\nNote that parent references that cannot be resolved by an implementation\nof this API will not be added to this list. Implementations of this API\ncan only populate Route status for the Gateways/parent resources they are\nresponsible for.\n\nA maximum of 32 Gateways will be represented in this list. An empty list\nmeans the route has not been attached to any Gateway.",

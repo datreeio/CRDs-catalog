@@ -1,5 +1,5 @@
 {
-  "description": "RuleGroup is the Schema for the RuleGroups API. Manages Grafana Alerting rule groups. Official documentation https://grafana.com/docs/grafana/latest/alerting/alerting-rules/HTTP API https://grafana.com/docs/grafana/latest/developers/http_api/alerting_provisioning/#alert-rules This resource requires Grafana 9.1.0 or later.",
+  "description": "RuleGroup is the Schema for the RuleGroups API. Manages Grafana Alerting rule groups. Official documentation https://grafana.com/docs/grafana/latest/developers/http_api/alerting_provisioning/#alert-rules This resource requires Grafana 9.1.0 or later.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -214,7 +214,7 @@
                     "additionalProperties": {
                       "type": "string"
                     },
-                    "description": "value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to `map[]`.",
+                    "description": "value pairs of metadata to attach to the alert rule. They add additional information, such as a summary or runbook_url, to help identify and investigate alerts. The __dashboardUid__ and __panelId__ annotations, which link alerts to a panel, must be set together. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule. They add additional information, such as a `summary` or `runbook_url`, to help identify and investigate alerts. The `__dashboardUid__` and `__panelId__` annotations, which link alerts to a panel, must be set together. Defaults to `map[]`.",
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
@@ -267,7 +267,7 @@
                     "type": "array"
                   },
                   "execErrState": {
-                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to Alerting.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to `Alerting`.",
+                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.",
                     "type": "string"
                   },
                   "for": {
@@ -278,6 +278,10 @@
                     "description": "(Boolean) Sets whether the alert should be paused or not. Defaults to false.\nSets whether the alert should be paused or not. Defaults to `false`.",
                     "type": "boolean"
                   },
+                  "keepFiringFor": {
+                    "description": "(String) The amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.\nThe amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.",
+                    "type": "string"
+                  },
                   "labels": {
                     "additionalProperties": {
                       "type": "string"
@@ -286,21 +290,112 @@
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
+                  "missingSeriesEvalsToResolve": {
+                    "description": "(Number) The number of missing series evaluations that must occur before the rule is considered to be resolved.\nThe number of missing series evaluations that must occur before the rule is considered to be resolved.",
+                    "type": "number"
+                  },
                   "name": {
                     "description": "(String) The name of the rule group.\nThe name of the alert rule.",
                     "type": "string"
                   },
                   "noDataState": {
-                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to `NoData`.",
+                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.",
                     "type": "string"
                   },
                   "notificationSettings": {
-                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled.",
+                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled.",
                     "items": {
                       "properties": {
+                        "activeTimings": {
+                          "description": "(List of String) A list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later\nA list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
                         "contactPoint": {
                           "description": "(String) The contact point to route notifications that match this rule to.\nThe contact point to route notifications that match this rule to.",
                           "type": "string"
+                        },
+                        "contactPointRef": {
+                          "description": "Reference to a ContactPoint in alerting to populate contactPoint.",
+                          "properties": {
+                            "name": {
+                              "description": "Name of the referenced object.",
+                              "type": "string"
+                            },
+                            "policy": {
+                              "description": "Policies for referencing.",
+                              "properties": {
+                                "resolution": {
+                                  "default": "Required",
+                                  "description": "Resolution specifies whether resolution of this reference is required.\nThe default is 'Required', which means the reconcile will fail if the\nreference cannot be resolved. 'Optional' means this reference will be\na no-op if it cannot be resolved.",
+                                  "enum": [
+                                    "Required",
+                                    "Optional"
+                                  ],
+                                  "type": "string"
+                                },
+                                "resolve": {
+                                  "description": "Resolve specifies when this reference should be resolved. The default\nis 'IfNotPresent', which will attempt to resolve the reference only when\nthe corresponding field is not present. Use 'Always' to resolve the\nreference on every reconcile.",
+                                  "enum": [
+                                    "Always",
+                                    "IfNotPresent"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "contactPointSelector": {
+                          "description": "Selector for a ContactPoint in alerting to populate contactPoint.",
+                          "properties": {
+                            "matchControllerRef": {
+                              "description": "MatchControllerRef ensures an object with the same controller reference\nas the selecting object is selected.",
+                              "type": "boolean"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "MatchLabels ensures an object with matching labels is selected.",
+                              "type": "object"
+                            },
+                            "policy": {
+                              "description": "Policies for selection.",
+                              "properties": {
+                                "resolution": {
+                                  "default": "Required",
+                                  "description": "Resolution specifies whether resolution of this reference is required.\nThe default is 'Required', which means the reconcile will fail if the\nreference cannot be resolved. 'Optional' means this reference will be\na no-op if it cannot be resolved.",
+                                  "enum": [
+                                    "Required",
+                                    "Optional"
+                                  ],
+                                  "type": "string"
+                                },
+                                "resolve": {
+                                  "description": "Resolve specifies when this reference should be resolved. The default\nis 'IfNotPresent', which will attempt to resolve the reference only when\nthe corresponding field is not present. Use 'Always' to resolve the\nreference on every reconcile.",
+                                  "enum": [
+                                    "Always",
+                                    "IfNotPresent"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
                         },
                         "groupBy": {
                           "description": "(List of String) A list of alert labels to group alerts into notifications by. Use the special label ... to group alerts by all labels, effectively disabling grouping. If empty, no grouping is used. If specified, requires labels 'alertname' and 'grafana_folder' to be included.\nA list of alert labels to group alerts into notifications by. Use the special label `...` to group alerts by all labels, effectively disabling grouping. If empty, no grouping is used. If specified, requires labels 'alertname' and 'grafana_folder' to be included.",
@@ -333,6 +428,32 @@
                       "additionalProperties": false
                     },
                     "type": "array"
+                  },
+                  "record": {
+                    "description": "(Block List, Max: 1) Settings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled. (see below for nested schema)\nSettings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled.",
+                    "items": {
+                      "properties": {
+                        "from": {
+                          "description": "(Number) The number of seconds in the past, relative to when the rule is evaluated, at which the time range begins.\nThe ref id of the query node in the data field to use as the source of the metric.",
+                          "type": "string"
+                        },
+                        "metric": {
+                          "description": "(String) The name of the metric to write to.\nThe name of the metric to write to.",
+                          "type": "string"
+                        },
+                        "targetDatasourceUid": {
+                          "description": "(String) The UID of the datasource to write the metric to.\nThe UID of the datasource to write the metric to.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "uid": {
+                    "description": "(String) The unique identifier of the alert rule.\nThe unique identifier of the alert rule.",
+                    "type": "string"
                   }
                 },
                 "type": "object",
@@ -535,7 +656,7 @@
                     "additionalProperties": {
                       "type": "string"
                     },
-                    "description": "value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to `map[]`.",
+                    "description": "value pairs of metadata to attach to the alert rule. They add additional information, such as a summary or runbook_url, to help identify and investigate alerts. The __dashboardUid__ and __panelId__ annotations, which link alerts to a panel, must be set together. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule. They add additional information, such as a `summary` or `runbook_url`, to help identify and investigate alerts. The `__dashboardUid__` and `__panelId__` annotations, which link alerts to a panel, must be set together. Defaults to `map[]`.",
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
@@ -588,7 +709,7 @@
                     "type": "array"
                   },
                   "execErrState": {
-                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to Alerting.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to `Alerting`.",
+                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.",
                     "type": "string"
                   },
                   "for": {
@@ -599,6 +720,10 @@
                     "description": "(Boolean) Sets whether the alert should be paused or not. Defaults to false.\nSets whether the alert should be paused or not. Defaults to `false`.",
                     "type": "boolean"
                   },
+                  "keepFiringFor": {
+                    "description": "(String) The amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.\nThe amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.",
+                    "type": "string"
+                  },
                   "labels": {
                     "additionalProperties": {
                       "type": "string"
@@ -607,21 +732,112 @@
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
+                  "missingSeriesEvalsToResolve": {
+                    "description": "(Number) The number of missing series evaluations that must occur before the rule is considered to be resolved.\nThe number of missing series evaluations that must occur before the rule is considered to be resolved.",
+                    "type": "number"
+                  },
                   "name": {
                     "description": "(String) The name of the rule group.\nThe name of the alert rule.",
                     "type": "string"
                   },
                   "noDataState": {
-                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to `NoData`.",
+                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.",
                     "type": "string"
                   },
                   "notificationSettings": {
-                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled.",
+                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled.",
                     "items": {
                       "properties": {
+                        "activeTimings": {
+                          "description": "(List of String) A list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later\nA list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
                         "contactPoint": {
                           "description": "(String) The contact point to route notifications that match this rule to.\nThe contact point to route notifications that match this rule to.",
                           "type": "string"
+                        },
+                        "contactPointRef": {
+                          "description": "Reference to a ContactPoint in alerting to populate contactPoint.",
+                          "properties": {
+                            "name": {
+                              "description": "Name of the referenced object.",
+                              "type": "string"
+                            },
+                            "policy": {
+                              "description": "Policies for referencing.",
+                              "properties": {
+                                "resolution": {
+                                  "default": "Required",
+                                  "description": "Resolution specifies whether resolution of this reference is required.\nThe default is 'Required', which means the reconcile will fail if the\nreference cannot be resolved. 'Optional' means this reference will be\na no-op if it cannot be resolved.",
+                                  "enum": [
+                                    "Required",
+                                    "Optional"
+                                  ],
+                                  "type": "string"
+                                },
+                                "resolve": {
+                                  "description": "Resolve specifies when this reference should be resolved. The default\nis 'IfNotPresent', which will attempt to resolve the reference only when\nthe corresponding field is not present. Use 'Always' to resolve the\nreference on every reconcile.",
+                                  "enum": [
+                                    "Always",
+                                    "IfNotPresent"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "contactPointSelector": {
+                          "description": "Selector for a ContactPoint in alerting to populate contactPoint.",
+                          "properties": {
+                            "matchControllerRef": {
+                              "description": "MatchControllerRef ensures an object with the same controller reference\nas the selecting object is selected.",
+                              "type": "boolean"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "MatchLabels ensures an object with matching labels is selected.",
+                              "type": "object"
+                            },
+                            "policy": {
+                              "description": "Policies for selection.",
+                              "properties": {
+                                "resolution": {
+                                  "default": "Required",
+                                  "description": "Resolution specifies whether resolution of this reference is required.\nThe default is 'Required', which means the reconcile will fail if the\nreference cannot be resolved. 'Optional' means this reference will be\na no-op if it cannot be resolved.",
+                                  "enum": [
+                                    "Required",
+                                    "Optional"
+                                  ],
+                                  "type": "string"
+                                },
+                                "resolve": {
+                                  "description": "Resolve specifies when this reference should be resolved. The default\nis 'IfNotPresent', which will attempt to resolve the reference only when\nthe corresponding field is not present. Use 'Always' to resolve the\nreference on every reconcile.",
+                                  "enum": [
+                                    "Always",
+                                    "IfNotPresent"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
                         },
                         "groupBy": {
                           "description": "(List of String) A list of alert labels to group alerts into notifications by. Use the special label ... to group alerts by all labels, effectively disabling grouping. If empty, no grouping is used. If specified, requires labels 'alertname' and 'grafana_folder' to be included.\nA list of alert labels to group alerts into notifications by. Use the special label `...` to group alerts by all labels, effectively disabling grouping. If empty, no grouping is used. If specified, requires labels 'alertname' and 'grafana_folder' to be included.",
@@ -654,6 +870,32 @@
                       "additionalProperties": false
                     },
                     "type": "array"
+                  },
+                  "record": {
+                    "description": "(Block List, Max: 1) Settings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled. (see below for nested schema)\nSettings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled.",
+                    "items": {
+                      "properties": {
+                        "from": {
+                          "description": "(Number) The number of seconds in the past, relative to when the rule is evaluated, at which the time range begins.\nThe ref id of the query node in the data field to use as the source of the metric.",
+                          "type": "string"
+                        },
+                        "metric": {
+                          "description": "(String) The name of the metric to write to.\nThe name of the metric to write to.",
+                          "type": "string"
+                        },
+                        "targetDatasourceUid": {
+                          "description": "(String) The UID of the datasource to write the metric to.\nThe UID of the datasource to write the metric to.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "uid": {
+                    "description": "(String) The unique identifier of the alert rule.\nThe unique identifier of the alert rule.",
+                    "type": "string"
                   }
                 },
                 "type": "object",
@@ -882,7 +1124,7 @@
                     "additionalProperties": {
                       "type": "string"
                     },
-                    "description": "value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing. Defaults to `map[]`.",
+                    "description": "value pairs of metadata to attach to the alert rule. They add additional information, such as a summary or runbook_url, to help identify and investigate alerts. The __dashboardUid__ and __panelId__ annotations, which link alerts to a panel, must be set together. Defaults to map[].\nKey-value pairs of metadata to attach to the alert rule. They add additional information, such as a `summary` or `runbook_url`, to help identify and investigate alerts. The `__dashboardUid__` and `__panelId__` annotations, which link alerts to a panel, must be set together. Defaults to `map[]`.",
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
@@ -935,7 +1177,7 @@
                     "type": "array"
                   },
                   "execErrState": {
-                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to Alerting.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting. Defaults to `Alerting`.",
+                    "description": "(String) Describes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.\nDescribes what state to enter when the rule's query is invalid and the rule cannot be executed. Options are OK, Error, KeepLast, and Alerting.  Defaults to Alerting if not set.",
                     "type": "string"
                   },
                   "for": {
@@ -946,6 +1188,10 @@
                     "description": "(Boolean) Sets whether the alert should be paused or not. Defaults to false.\nSets whether the alert should be paused or not. Defaults to `false`.",
                     "type": "boolean"
                   },
+                  "keepFiringFor": {
+                    "description": "(String) The amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.\nThe amount of time for which the rule will considered to be Recovering after initially Firing. Before this time has elapsed, the rule will continue to fire once it's been triggered.",
+                    "type": "string"
+                  },
                   "labels": {
                     "additionalProperties": {
                       "type": "string"
@@ -954,18 +1200,29 @@
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
+                  "missingSeriesEvalsToResolve": {
+                    "description": "(Number) The number of missing series evaluations that must occur before the rule is considered to be resolved.\nThe number of missing series evaluations that must occur before the rule is considered to be resolved.",
+                    "type": "number"
+                  },
                   "name": {
                     "description": "(String) The name of the rule group.\nThe name of the alert rule.",
                     "type": "string"
                   },
                   "noDataState": {
-                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to `NoData`.",
+                    "description": "(String) Describes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.\nDescribes what state to enter when the rule's query returns No Data. Options are OK, NoData, KeepLast, and Alerting. Defaults to NoData if not set.",
                     "type": "string"
                   },
                   "notificationSettings": {
-                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' enabled.",
+                    "description": "(Block List, Max: 1) Notification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled. (see below for nested schema)\nNotification settings for the rule. If specified, it overrides the notification policies. Available since Grafana 10.4, requires feature flag 'alertingSimplifiedRouting' to be enabled.",
                     "items": {
                       "properties": {
+                        "activeTimings": {
+                          "description": "(List of String) A list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later\nA list of time interval names to apply to alerts that match this policy to suppress them unless they are sent at the specified time. Supported in Grafana 12.1.0 and later",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
                         "contactPoint": {
                           "description": "(String) The contact point to route notifications that match this rule to.\nThe contact point to route notifications that match this rule to.",
                           "type": "string"
@@ -994,6 +1251,28 @@
                         },
                         "repeatInterval": {
                           "description": "sending a notification if an alert is still firing. Default is 4 hours.\nMinimum time interval for re-sending a notification if an alert is still firing. Default is 4 hours.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "record": {
+                    "description": "(Block List, Max: 1) Settings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled. (see below for nested schema)\nSettings for a recording rule. Available since Grafana 11.2, requires feature flag 'grafanaManagedRecordingRules' to be enabled.",
+                    "items": {
+                      "properties": {
+                        "from": {
+                          "description": "(Number) The number of seconds in the past, relative to when the rule is evaluated, at which the time range begins.\nThe ref id of the query node in the data field to use as the source of the metric.",
+                          "type": "string"
+                        },
+                        "metric": {
+                          "description": "(String) The name of the metric to write to.\nThe name of the metric to write to.",
+                          "type": "string"
+                        },
+                        "targetDatasourceUid": {
+                          "description": "(String) The UID of the datasource to write the metric to.\nThe UID of the datasource to write the metric to.",
                           "type": "string"
                         }
                       },

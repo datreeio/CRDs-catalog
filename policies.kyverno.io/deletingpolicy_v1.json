@@ -12,81 +12,10 @@
       "type": "object"
     },
     "spec": {
-      "description": "GeneratingPolicySpec is the specification of the desired behavior of the GeneratingPolicy.",
+      "description": "DeletingPolicySpec is the specification of the desired behavior of the DeletingPolicy.",
       "properties": {
-        "evaluation": {
-          "description": "EvaluationConfiguration defines the configuration for the policy evaluation.",
-          "properties": {
-            "admission": {
-              "description": "Admission controls policy evaluation during admission.",
-              "properties": {
-                "enabled": {
-                  "default": true,
-                  "description": "Enabled controls if rules are applied during admission.\nOptional. Default value is \"true\".",
-                  "type": "boolean"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "generateExisting": {
-              "description": "GenerateExisting defines the configuration for generating resources for existing triggeres.",
-              "properties": {
-                "enabled": {
-                  "default": false,
-                  "description": "Enabled controls whether to trigger the policy for existing resources\nIf is set to \"true\" the policy will be triggered and applied to existing matched resources.\nOptional. Defaults to \"false\" if not specified.",
-                  "type": "boolean"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "orphanDownstreamOnPolicyDelete": {
-              "description": "OrphanDownstreamOnPolicyDelete defines the configuration for orphaning downstream resources on policy delete.",
-              "properties": {
-                "enabled": {
-                  "default": false,
-                  "description": "Enabled controls whether generated resources should be deleted when the policy that generated\nthem is deleted with synchronization enabled. This option is only applicable to generate rules of the data type.\nOptional. Defaults to \"false\" if not specified.",
-                  "type": "boolean"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "synchronize": {
-              "description": "Synchronization defines the configuration for the synchronization of generated resources.",
-              "properties": {
-                "enabled": {
-                  "default": false,
-                  "description": "Enabled controls if generated resources should be kept in-sync with their source resource.\nIf Synchronize is set to \"true\" changes to generated resources will be overwritten with resource\ndata from Data or the resource specified in the Clone declaration.\nOptional. Defaults to \"false\" if not specified.",
-                  "type": "boolean"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "generate": {
-          "description": "Generation defines a set of CEL expressions that will be evaluated to generate resources.\nRequired.",
-          "items": {
-            "description": "Generation defines the configuration for the generation of resources.",
-            "properties": {
-              "expression": {
-                "description": "Expression is a CEL expression that takes a list of resources to be generated.",
-                "type": "string"
-              }
-            },
-            "type": "object",
-            "additionalProperties": false
-          },
-          "minItems": 1,
-          "type": "array"
-        },
-        "matchConditions": {
-          "description": "MatchConditions is a list of conditions that must be met for a request to be validated.\nMatch conditions filter requests that have already been matched by the rules,\nnamespaceSelector, and objectSelector. An empty list of matchConditions matches all requests.\nThere are a maximum of 64 match conditions allowed.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
+        "conditions": {
+          "description": "Conditions is a list of conditions that must be met for a resource to be deleted.\nConditions filter resources that have already been matched by the match constraints,\nnamespaceSelector, and objectSelector. An empty list of conditions matches all resources.\nThere are a maximum of 64 conditions allowed.\n\nThe exact matching logic is (in order):\n  1. If ANY condition evaluates to FALSE, the policy is skipped.\n  2. If ALL conditions evaluate to TRUE, the policy is executed.",
           "items": {
             "description": "MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.",
             "properties": {
@@ -112,8 +41,17 @@
           ],
           "x-kubernetes-list-type": "map"
         },
+        "deletionPropagationPolicy": {
+          "description": "DeletionPropagationPolicy defines how resources will be deleted (Foreground, Background, Orphan).",
+          "enum": [
+            "Foreground",
+            "Background",
+            "Orphan"
+          ],
+          "type": "string"
+        },
         "matchConstraints": {
-          "description": "MatchConstraints specifies what resources will trigger this policy.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nRequired.",
+          "description": "MatchConstraints specifies what resources this policy is designed to validate.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nRequired.",
           "properties": {
             "excludeResourceRules": {
               "description": "ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.\nThe exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
@@ -334,6 +272,10 @@
           "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
+        "schedule": {
+          "description": "The schedule in Cron format\nRequired.",
+          "type": "string"
+        },
         "variables": {
           "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy\nexcept MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",
           "items": {
@@ -361,22 +303,10 @@
             "name"
           ],
           "x-kubernetes-list-type": "map"
-        },
-        "webhookConfiguration": {
-          "description": "WebhookConfiguration defines the configuration for the webhook.",
-          "properties": {
-            "timeoutSeconds": {
-              "description": "TimeoutSeconds specifies the maximum time in seconds allowed to apply this policy.\nAfter the configured time expires, the admission request may fail, or may simply ignore the policy results,\nbased on the failure policy. The default timeout is 10s, the value must be between 1 and 30 seconds.",
-              "format": "int32",
-              "type": "integer"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
         }
       },
       "required": [
-        "generate"
+        "schedule"
       ],
       "type": "object",
       "additionalProperties": false
@@ -453,6 +383,10 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "lastExecutionTime": {
+          "format": "date-time",
+          "type": "string"
         }
       },
       "type": "object",

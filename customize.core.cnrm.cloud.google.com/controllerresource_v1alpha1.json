@@ -2,11 +2,11 @@
   "description": "ControllerResource is the Schema for resource customization API for config connector controllers.",
   "properties": {
     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
       "type": "string"
     },
     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
       "type": "string"
     },
     "metadata": {
@@ -36,17 +36,22 @@
           "required": [
             "replicas"
           ]
+        },
+        {
+          "required": [
+            "verticalPodAutoscalerMode"
+          ]
         }
       ],
-      "description": "ControllerResourceSpec is the specification of the resource customization for containers of a config connector controller.",
+      "description": "ControllerResourceSpec is the specification of the resource customization for containers of\na config connector controller.",
       "properties": {
         "containers": {
           "description": "The list of containers whose resource requirements to be customized.",
           "items": {
-            "description": "ContainerResourceSpec is the specification of the resource customization for a container of a config connector controller.",
+            "description": "ContainerResourceSpec is the specification of the resource customization for a container of\na config connector controller.",
             "properties": {
               "name": {
-                "description": "The name of the container whose resource requirements will be customized. Required",
+                "description": "The name of the container whose resource requirements will be customized.\nRequired",
                 "enum": [
                   "manager",
                   "webhook",
@@ -58,7 +63,7 @@
                 "type": "string"
               },
               "resources": {
-                "description": "Resources specifies the resource customization of this container. Required",
+                "description": "Resources specifies the resource customization of this container.\nRequired",
                 "properties": {
                   "limits": {
                     "additionalProperties": {
@@ -73,7 +78,7 @@
                       "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                       "x-kubernetes-int-or-string": true
                     },
-                    "description": "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                    "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
                     "type": "object"
                   },
                   "requests": {
@@ -89,7 +94,7 @@
                       "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                       "x-kubernetes-int-or-string": true
                     },
-                    "description": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                    "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
                     "type": "object"
                   }
                 },
@@ -106,13 +111,32 @@
           },
           "type": "array"
         },
+        "metadataHost": {
+          "description": "MetadataHost overrides the GCP metadata server hostname (injected as GCE_METADATA_HOST).\nUseful for IPv6-only clusters where the default 169.254.169.254 is unreachable.",
+          "type": "string"
+        },
         "replicas": {
-          "description": "The number of desired replicas of the config connector controller. This field takes effect only if the controller name is \"cnrm-webhook-manager\".",
+          "description": "The number of desired replicas of the config connector controller.\nThis field takes effect only if the controller name is \"cnrm-webhook-manager\".",
           "format": "int64",
           "type": "integer"
+        },
+        "verticalPodAutoscalerMode": {
+          "default": "Disabled",
+          "description": "VerticalPodAutoscalerMode indicates the mode of Vertical Pod Autoscaler for the controller.",
+          "enum": [
+            "Enabled",
+            "Disabled"
+          ],
+          "type": "string"
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "VerticalPodAutoscalerMode cannot be Enabled when Containers are specified",
+          "rule": "!has(self.verticalPodAutoscalerMode) || self.verticalPodAutoscalerMode == 'Disabled' || !has(self.containers) || size(self.containers) == 0"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
@@ -127,12 +151,18 @@
         "healthy": {
           "type": "boolean"
         },
+        "observedGeneration": {
+          "default": 0,
+          "format": "int64",
+          "type": "integer"
+        },
         "phase": {
           "type": "string"
         }
       },
       "required": [
-        "healthy"
+        "healthy",
+        "observedGeneration"
       ],
       "type": "object",
       "additionalProperties": false

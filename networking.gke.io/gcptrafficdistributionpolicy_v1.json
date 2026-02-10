@@ -1,5 +1,5 @@
 {
-  "description": "GCPBackendPolicy provides a way to apply LoadBalancer policy configuration with\nthe GKE implementation of the Gateway API.",
+  "description": "GCPTrafficDistributionPolicy contains settings that configure how traffic should\nbe distributed to its targeting service(s).",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,176 +13,116 @@
       "type": "object"
     },
     "spec": {
-      "description": "Spec defines the desired state of GCPBackendPolicy.",
+      "description": "Spec defines the desired state for traffic distribution policy settings.",
       "properties": {
         "default": {
           "description": "Default defines default policy configuration for the targeted resource.",
           "properties": {
-            "backendPreference": {
-              "description": "BackendPreference indicates whether the backend should be fully\nutilized before sending traffic to backends with default preference.\nCan only be configured for multi-cluster service backends when\nGCPBackendPolicy targets ServiceExport.\nThe default value is DEFAULT.",
+            "autoCapacityDrain": {
+              "description": "AutoCapacityDrain contains configurations for auto draining.",
+              "properties": {
+                "enableAutoCapacityDrain": {
+                  "description": "If set to 'True', backends in a certain (cluster, zone) will be\ndrained(considered to have 0 capacity) when less than 25% of the endpoints\nthere are healthy. Default to false.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "failoverConfig": {
+              "description": "FailoverConfig contains configurations for failover behaviors.",
+              "properties": {
+                "failoverHealthThreshold": {
+                  "description": "The percentage threshold that a load balancer will begin to send traffic\nto failover backends. When not specified, the dataplane uses its own\nbuiltin default value. For Envoy the default value is 70. Proxyless gRPC\ndefaults to 50.",
+                  "format": "int32",
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "localityLbAlgorithm": {
+              "description": "The load balancing algorithm used within the scope of the locality. This algorithm\naffects how an individual endpoint is selected for a particular request.\nLocalityLbAlgorithm works together with ServiceLbAlgorithm.\nRefer to https://cloud.google.com/load-balancing/docs/service-lb-policy for a\nmore detailed explanation of how they work together.\nDefault to ROUND_ROBIN.",
               "enum": [
-                "DEFAULT",
-                "PREFERRED"
+                "ROUND_ROBIN",
+                "LEAST_REQUEST",
+                "RING_HASH",
+                "RANDOM",
+                "ORIGINAL_DESTINATION",
+                "MAGLEV",
+                "WEIGHTED_ROUND_ROBIN"
               ],
               "type": "string"
             },
-            "connectionDraining": {
-              "description": "ConnectionDraining contains configuration for connection draining",
-              "properties": {
-                "drainingTimeoutSec": {
-                  "description": "DrainingTimeoutSec is a BackendService parameter.\nIt is used during removal of VMs from instance groups. This guarantees that for\nthe specified time all existing connections to a VM will remain untouched,\nbut no new connections will be accepted. Set timeout to zero to disable\nconnection draining. Enable the feature by specifying a timeout of up to\none hour. If the field is omitted, a default value (0s) will be used.\nSee https://cloud.google.com/compute/docs/reference/rest/v1/backendServices",
-                  "format": "int64",
-                  "maximum": 3600,
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "iap": {
-              "description": "IAP contains the configurations for Identity-Aware Proxy.\nSee https://cloud.google.com/compute/docs/reference/rest/v1/backendServices\nIdentity-Aware Proxy manages access control policies for backend services associated with a HTTPRoute,\nso they can be accessed only by authenticated users or applications with correct Identity and Access Management (IAM) role.",
-              "properties": {
-                "clientID": {
-                  "description": "ClientID is the OAuth2 client ID to use for the authentication flow.\nSee iap.oauth2ClientId in https://cloud.google.com/compute/docs/reference/rest/v1/backendServices\nClientID must be set if Enabled is set to true.",
-                  "type": "string"
-                },
-                "enabled": {
-                  "description": "Enabled denotes whether the serving infrastructure will authenticate and authorize all incoming requests.\nIf true, the ClientID and Oauth2ClientSecret fields must be non-empty.\nIf not specified, this defaults to false, which means Identity-Aware Proxy is disabled by default.",
-                  "type": "boolean"
-                },
-                "oauth2ClientSecret": {
-                  "description": "Oauth2ClientSecret contains the OAuth2 client secret to use for the authentication flow.\nOauth2ClientSecret must be set if Enabled is set to true.",
-                  "properties": {
-                    "name": {
-                      "description": "Name is the reference to the secret resource.",
-                      "type": "string"
-                    }
-                  },
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "logging": {
-              "description": "LoggingConfig contains configuration for logging.",
-              "properties": {
-                "enabled": {
-                  "description": "Enabled denotes whether to enable logging for the load balancer traffic\nserved by this backend service. If not specified, this defaults to false,\nwhich means logging is disabled by default.",
-                  "type": "boolean"
-                },
-                "sampleRate": {
-                  "description": "This field can only be specified if logging is enabled for this backend\nservice. The value of the field must be in range [0, 1e6]. This is\nconverted to a floating point value in the range [0, 1] by dividing by 1e6\nfor use with the GCE api and interpreted as the proportion of requests that\nwill be logged. By default all requests will be logged.",
-                  "format": "int32",
-                  "maximum": 1000000,
-                  "minimum": 0,
-                  "type": "integer"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "maxRatePerEndpoint": {
-              "description": "MaxRatePerEndpoint configures the target capacity for backends.\nIf the field is omitted, a default value (1e8) will be used.\nIn the future we may add selector based settings for MaxRatePerEndpoint but they will co-exist",
-              "format": "int64",
-              "maximum": 1000000000,
-              "minimum": 1,
-              "type": "integer"
-            },
-            "securityPolicy": {
-              "description": "SecurityPolicy is a reference to a GCP Cloud Armor SecurityPolicy resource.",
+            "serviceLbAlgorithm": {
+              "description": "The load balancing algorithm used to determine traffic distribution weighting at\ncluster/zone level.\nServiceLbAlgorithm works together with LocalityLbAlgorithm.\nRefer to https://cloud.google.com/load-balancing/docs/service-lb-policy for a\nmore detailed explanation of how they work together.\nSupported values: SPRAY_TO_REGION / WATERFALL_BY_ZONE / WATERFALL_BY_REGION\nRefer to https://cloud.google.com/load-balancing/docs/service-lb-policy#lb-algos\nexplanation of the algorithms.\nDefault to WATERFALL_BY_REGION.",
+              "enum": [
+                "SPRAY_TO_REGION",
+                "WATERFALL_BY_ZONE",
+                "WATERFALL_BY_REGION"
+              ],
               "type": "string"
-            },
-            "sessionAffinity": {
-              "description": "SessionAffinityConfig contains configuration for stickiness parameters.",
-              "properties": {
-                "cookieTtlSec": {
-                  "description": "CookieTTLSec specifies the lifetime of cookies in seconds. This setting\nrequires GENERATED_COOKIE or HTTP_COOKIE session affinity. If set to 0, the\ncookie is non-persistent and lasts only until the end of the browser\nsession (or equivalent). The maximum allowed value is two weeks\n(1,209,600).",
-                  "format": "int64",
-                  "maximum": 1209600,
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": {
-                  "description": "Type specifies the type of session affinity to use. If not specified, this\ndefaults to NONE.",
-                  "enum": [
-                    "CLIENT_IP",
-                    "CLIENT_IP_PORT_PROTO",
-                    "CLIENT_IP_PROTO",
-                    "GENERATED_COOKIE",
-                    "HEADER_FIELD",
-                    "HTTP_COOKIE",
-                    "NONE"
-                  ],
-                  "type": "string"
-                }
-              },
-              "type": "object",
-              "additionalProperties": false
-            },
-            "timeoutSec": {
-              "description": "TimeoutSec is a BackendService parameter.\nSee https://cloud.google.com/compute/docs/reference/rest/v1/backendServices.\nIf the field is omitted, a default value (30s) will be used.",
-              "format": "int64",
-              "maximum": 2147483647,
-              "minimum": 1,
-              "type": "integer"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
-        "targetRef": {
-          "description": "TargetRef identifies an API object to apply policy to.",
-          "properties": {
-            "group": {
-              "description": "Group is the group of the target resource.",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-              "type": "string"
+        "targetRefs": {
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
             },
-            "kind": {
-              "description": "Kind is kind of the target resource.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
-              "type": "string"
-            },
-            "name": {
-              "description": "Name is the name of the target resource.",
-              "maxLength": 253,
-              "minLength": 1,
-              "type": "string"
-            },
-            "namespace": {
-              "description": "Namespace is the namespace of the referent. When unspecified, the local\nnamespace is inferred. Even when policy targets a resource in a different\nnamespace, it MUST only apply to traffic originating from the same\nnamespace as the policy.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-              "type": "string"
-            }
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
           },
-          "required": [
-            "group",
-            "kind",
-            "name"
-          ],
-          "type": "object",
-          "additionalProperties": false
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "TargetRefs must reference Service",
+              "rule": "self.all(x, x.kind == 'Service' && x.group == '')"
+            }
+          ]
         }
       },
       "required": [
-        "targetRef"
+        "targetRefs"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Status defines the current state of GCPBackendPolicy.",
+      "description": "Status provides the current state of GCPTrafficDistributionPolicy.",
       "properties": {
         "ancestors": {
-          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor.",
+          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",
           "items": {
             "description": "PolicyAncestorStatus describes the status of a route with respect to an\nassociated Ancestor.\n\n\nAncestors refer to objects that are either the Target of a policy or above it\nin terms of object hierarchy. For example, if a policy targets a Service, the\nPolicy's Ancestors are, in order, the Service, the HTTPRoute, the Gateway, and\nthe GatewayClass. Almost always, in this hierarchy, the Gateway will be the most\nuseful object to place Policy status on, so we recommend that implementations\nSHOULD use Gateway as the PolicyAncestorStatus object unless the designers\nhave a _very_ good reason otherwise.\n\n\nIn the context of policy attachment, the Ancestor is used to distinguish which\nresource results in a distinct application of this policy. For example, if a policy\ntargets a Service, it may have a distinct result per attached Gateway.\n\n\nPolicies targeting the same resource may have different effects depending on the\nancestors of those resources. For example, different Gateways targeting the same\nService may have different capabilities, especially if they have different underlying\nimplementations.\n\n\nFor example, in BackendTLSPolicy, the Policy attaches to a Service that is\nused as a backend in a HTTPRoute that is itself attached to a Gateway.\nIn this case, the relevant object for status is the Gateway, and that is the\nancestor object referred to in this status.\n\n\nNote that a parent is also an ancestor, so for objects where the parent is the\nrelevant object for status, this struct SHOULD still be used.\n\n\nThis struct is intended to be used in a slice that's effectively a map,\nwith a composite key made up of the AncestorRef and the ControllerName.",
             "properties": {
@@ -317,69 +257,11 @@
           },
           "maxItems": 16,
           "type": "array"
-        },
-        "conditions": {
-          "description": "Conditions describe the current conditions of the GCPBackendPolicy.",
-          "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource.\n---\nThis struct is intended for direct use as an array at the field path .status.conditions.  For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the observations of a foo's current state.\n\t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t    // other fields\n\t}",
-            "properties": {
-              "lastTransitionTime": {
-                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
-                "format": "date-time",
-                "type": "string"
-              },
-              "message": {
-                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
-                "maxLength": 32768,
-                "type": "string"
-              },
-              "observedGeneration": {
-                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
-                "format": "int64",
-                "minimum": 0,
-                "type": "integer"
-              },
-              "reason": {
-                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
-                "maxLength": 1024,
-                "minLength": 1,
-                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
-                "type": "string"
-              },
-              "status": {
-                "description": "status of the condition, one of True, False, Unknown.",
-                "enum": [
-                  "True",
-                  "False",
-                  "Unknown"
-                ],
-                "type": "string"
-              },
-              "type": {
-                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\n---\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions can be\nuseful (see .node.status.conditions), the ability to deconflict is important.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
-                "maxLength": 316,
-                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
-                "type": "string"
-              }
-            },
-            "required": [
-              "lastTransitionTime",
-              "message",
-              "reason",
-              "status",
-              "type"
-            ],
-            "type": "object",
-            "additionalProperties": false
-          },
-          "maxItems": 8,
-          "type": "array",
-          "x-kubernetes-list-map-keys": [
-            "type"
-          ],
-          "x-kubernetes-list-type": "map"
         }
       },
+      "required": [
+        "ancestors"
+      ],
       "type": "object",
       "additionalProperties": false
     }

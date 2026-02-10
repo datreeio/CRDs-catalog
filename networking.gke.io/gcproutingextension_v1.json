@@ -1,0 +1,565 @@
+{
+  "description": "GCPRoutingExtension is the CRD for the Routing Extension.\nIt provides a way to add custom logic into Cloud Load Balancers\nto control where traffic is routed to for a given request.\nIt is only supported for Regional External Managed and\nRegional Internal Managed Load Balancers.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the desired state of GCPRoutingExtension.",
+      "properties": {
+        "extensionChains": {
+          "description": "ExtensionChains is a set of ordered extension chains that contain\nthe match conditions and extensions to execute. Match conditions for each\nextension chain are evaluated in sequence for a given request. The first\nextension chain that has conditions that match the request is executed.\nAny subsequent extension chains do not execute.\nLimited to 5 ExtensionChains.",
+          "items": {
+            "description": "ExtensionChain is single extension chain wrapper that contains the match conditions\nand extensions to execute.",
+            "properties": {
+              "extensions": {
+                "description": "Extensions is a set of extensions to execute for the matching request.\nUp to 3 Extensions can be defined for each ExtensionChain\nfor the GCPTrafficExtension.\nGCPRoutingExtension chains are limited to 1 Extension per ExtensionChain.",
+                "items": {
+                  "description": "Extension is a single extension in the chain to execute for the matching request.",
+                  "properties": {
+                    "authority": {
+                      "description": "Authority is the `:authority` header in the gRPC request sent from Envoy\nto the callout extension backend service.\nRequired for extensions with callout backend service.",
+                      "maxLength": 1000,
+                      "pattern": "^[A-Za-z0-9-_:%\\.\\[\\]]*$",
+                      "type": "string"
+                    },
+                    "backendRef": {
+                      "description": "BackendRef identifies an API object that runs the extension.\nExactly one of BackendRef or GoogleAPIServiceName should be set.\nValid Kinds are:\n- \"Service\"\n- \"GCPWasmPlugin\"",
+                      "properties": {
+                        "group": {
+                          "default": "",
+                          "description": "Group is the group of the referent.",
+                          "enum": [
+                            "",
+                            "networking.gke.io"
+                          ],
+                          "maxLength": 253,
+                          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "default": "Service",
+                          "description": "Kind is kind of the referent.",
+                          "enum": [
+                            "Service",
+                            "GCPWasmPlugin"
+                          ],
+                          "maxLength": 63,
+                          "minLength": 1,
+                          "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of the referent.",
+                          "maxLength": 253,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "port": {
+                          "description": "Port is the port of the referent.",
+                          "format": "int32",
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "group",
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "Group must be empty if kind is Service",
+                          "rule": "self.kind == 'Service' ? size(self.group) == 0 : true"
+                        },
+                        {
+                          "message": "Group must be set to `networking.gke.io` if kind is GCPWasmPlugin",
+                          "rule": "self.kind == 'GCPWasmPlugin' ? self.group == 'networking.gke.io' : true"
+                        },
+                        {
+                          "message": "Port has to be set if kind is Service",
+                          "rule": "self.kind == 'Service' ? has(self.port) : true"
+                        },
+                        {
+                          "message": "Port has to be empty if kind is GCPWasmPlugin",
+                          "rule": "self.kind == 'GCPWasmPlugin' ? !has(self.port) : true"
+                        }
+                      ],
+                      "additionalProperties": false
+                    },
+                    "failOpen": {
+                      "description": "FailOpen determines how the proxy behaves if the call to the extension\nfails or times out.\n\nWhen set to `TRUE`, request or response processing continues without\nerror. Any subsequent extensions in the extension chain are also\nexecuted. When set to `FALSE` or the default setting of `FALSE` is used,\none of the following happens:\n\n* If response headers have not been delivered to the downstream client,\na generic 500 error is returned to the client. The error response can be\ntailored by configuring a custom error response in the load balancer.\n\n* If response headers have been delivered, then the HTTP stream to the\ndownstream client is reset.",
+                      "type": "boolean"
+                    },
+                    "forwardHeaders": {
+                      "description": "ForwardHeaders is a list of the HTTP headers to forward to the extension\n(from the client or backend). If omitted, all headers are sent.\nEach element indicates the header name.",
+                      "items": {
+                        "description": "HTTPHeaderName is the name of the HTTP header.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "maxItems": 50,
+                      "type": "array"
+                    },
+                    "googleAPIServiceName": {
+                      "description": "GoogleAPIServiceName is the name of the Google API service that runs the extension.\nThe name must be in one of the following formats:\n- <serviceName>.<region>.rep.googleapis.com in regional case.\nExactly one of BackendRef or GoogleAPIServiceName should be set.",
+                      "maxLength": 100,
+                      "pattern": "^((modelarmor|dlp)\\.([a-z0-9-]+\\.rep\\.)?googleapis\\.com|(staging-modelarmor|staging-dlp)\\.([a-z0-9-]+\\.rep\\.)?sandbox\\.googleapis\\.com)$",
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": {
+                        "description": "MetadataValue is the value of an metadata in GCP Extensions.",
+                        "maxLength": 1023,
+                        "minLength": 1,
+                        "pattern": "^([A-Za-z0-9\\/\\-._~%!$&'()*+,;=:\"\\s\\[\\]\\{\\}])*$",
+                        "type": "string"
+                      },
+                      "description": "Metadata provided here is included as part of the\n`metadata_context` (of type `google.protobuf.Struct`) in the\n`ProcessingRequest` message sent to the extension\nserver. The metadata is available under the namespace\n`com.google.<extension_type>.<resource_name>.<extension_chain_name>.<extension_name>`.\nFor example:\n`com.google.lb_traffic_extension.lbtrafficextension1.chain1.ext1`.\n\nThe following variables are supported in the metadata:\n\n`{forwarding_rule_id}` - substituted with the forwarding rule's fully\n  qualified resource name.",
+                      "maxProperties": 16,
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "Metadata keys must only contain valid characters (matching ^([A-Za-z0-9\\/\\-._~%!$&'()*+,;=:\\s\\[\\]\\{\\}]{1,63})$) and must be up to 63 characters long.",
+                          "rule": "self.all(key, key.matches(r\"\"\"^([A-Za-z0-9\\/\\-._~%!$&'()*+,;=:\\s\\{\\}\\[\\]]{1,63})$\"\"\"))"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "description": "Name is the name for this chain.\nThe name is logged as part of the HTTP request logs.\nThe name must conform with RFC-1034, is restricted to lower-cased\nletters, numbers and hyphens, and can have a maximum length of 63\ncharacters. Additionally, the first character must be a letter and the\nlast a letter or a number.",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$",
+                      "type": "string"
+                    },
+                    "requestBodySendMode": {
+                      "description": "RequestBodySendMode configures processing mode for request processing. If not specified\nand RequestBody event is supported, the default value STREAMED is used.\nSupported by both `GCPTrafficExtension` and `GCPRoutingExtension` resources\nand only for extensions with `backendRef`.\nWhen this field is set to `FullDuplexStreamed`, `supportedEvents`\nmust include both `RequestBody` and `RequestTrailers`.",
+                      "enum": [
+                        "Streamed",
+                        "FullDuplexStreamed"
+                      ],
+                      "type": "string"
+                    },
+                    "responseBodySendMode": {
+                      "description": "ResponseBodySendMode configures processing mode for response processing.\nIf not specified and RequestBody event is supported, the default value STREAMED is used.\nSupported only by `GCPTrafficExtension` resource\nand only for extensions with `backendRef`.\nWhen this field is set to `FullDuplexStreamed`, `supportedEvents`\nmust include both `ResponseBody` and `ResponseTrailers`.",
+                      "enum": [
+                        "Streamed",
+                        "FullDuplexStreamed"
+                      ],
+                      "type": "string"
+                    },
+                    "supportedEvents": {
+                      "description": "SupportedEvents is a set of events during request or response\nprocessing for which this extension is called.\n\nThis field is required for the `GCPTrafficExtension` resource.\nThis field is optional for the `GCPRoutingExtension` resource.\n\nIf requestBodySendMode is set for the `GCPRoutingExtension` resource,\nthen the `supportedEvents` list can only contain `RequestHeaders` events.\nIf requestBodySendMode is set to `FullDuplexStreamed` for the `GCPRoutingExtension` resource,\nthen the `supportedEvents` list can only contain `RequestHeaders`, `RequestBody`\nand `RequestTrailers` events.\n\nIf unspecified, `RequestHeaders` event is assumed as supported.\nLimited to 6 events.",
+                      "items": {
+                        "description": "EventType identifies the part of the request or response for which the extension is called.",
+                        "enum": [
+                          "RequestHeaders",
+                          "RequestBody",
+                          "ResponseHeaders",
+                          "ResponseBody",
+                          "RequestTrailers",
+                          "ResponseTrailers"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 6,
+                      "type": "array"
+                    },
+                    "timeout": {
+                      "description": "Timeout specifies the timeout for each individual message on the stream.\nThe timeout must be between 10-10000 milliseconds.\nIf omitted, the default timeout is 1000 milliseconds.",
+                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "timeout must be between 10-10000 milliseconds",
+                      "rule": "has(self.timeout) ? duration(self.timeout) >= duration('10ms') && duration(self.timeout) <= duration('10000ms') : true"
+                    },
+                    {
+                      "message": "Extensions with backendRef kind GCPWasmPlugin do not support timeout",
+                      "rule": "has(self.backendRef) && self.backendRef.kind == 'GCPWasmPlugin' ? !has(self.timeout) : true"
+                    },
+                    {
+                      "message": "authority must be set if backendRef kind is set to Service",
+                      "rule": "has(self.backendRef) && self.backendRef.kind == 'Service' ? has(self.authority) && size(self.authority) != 0 : true"
+                    },
+                    {
+                      "message": "Extension with googleAPIServiceName do not support authority",
+                      "rule": "has(self.googleAPIServiceName) ? !has(self.authority) : true"
+                    },
+                    {
+                      "message": "Extensions with backendRef kind GCPWasmPlugin do not support authority",
+                      "rule": "has(self.backendRef) && self.backendRef.kind == 'GCPWasmPlugin' ? !has(self.authority) : true"
+                    },
+                    {
+                      "message": "Exactly one of backendRef or googleAPIServiceName should be set",
+                      "rule": "!(has(self.backendRef) && has(self.googleAPIServiceName)) && (has(self.backendRef) || has(self.googleAPIServiceName))"
+                    },
+                    {
+                      "message": "Extensions with backendRef kind GCPWasmPlugin support only RequestHeaders, RequestBody, ResponseHeaders and ResponseBody events",
+                      "rule": "has(self.backendRef) && self.backendRef.kind == 'GCPWasmPlugin' ? self.supportedEvents.all(e, e in ['RequestHeaders', 'RequestBody', 'ResponseHeaders', 'ResponseBody']) : true"
+                    },
+                    {
+                      "message": "Extension with backendRef kind GCPWasmPlugin do not support metadata",
+                      "rule": "has(self.backendRef) && self.backendRef.kind == 'GCPWasmPlugin' ? !has(self.metadata) : true"
+                    },
+                    {
+                      "message": "requestBodySendMode can be configured only for extensions using backendRef with kind Service",
+                      "rule": "has(self.requestBodySendMode) ? has(self.backendRef) && self.backendRef.kind == 'Service' : true"
+                    },
+                    {
+                      "message": "responseBodySendMode can be configured only for extensions using backendRef with kind Service",
+                      "rule": "has(self.responseBodySendMode) ? has(self.backendRef) && self.backendRef.kind == 'Service' : true"
+                    },
+                    {
+                      "message": "If requestBodySendMode is set to `Streamed`, then the `supportedEvents` list must contain `RequestBody` event",
+                      "rule": "has(self.requestBodySendMode) && self.requestBodySendMode == 'Streamed' ? self.supportedEvents.exists(e, e == 'RequestBody') : true"
+                    },
+                    {
+                      "message": "If responseBodySendMode is set to `Streamed`, then the `supportedEvents` list must contain `ResponseBody` event",
+                      "rule": "has(self.responseBodySendMode) && self.responseBodySendMode == 'Streamed' ? self.supportedEvents.exists(e, e == 'ResponseBody') : true"
+                    },
+                    {
+                      "message": "If requestBodySendMode is set to `FullDuplexStreamed`, then the `supportedEvents` list must contain at least both: `RequestBody` and `RequestTrailers\u201c events",
+                      "rule": "has(self.requestBodySendMode) && self.requestBodySendMode == 'FullDuplexStreamed' ? self.supportedEvents.exists(e, e == 'RequestBody') && self.supportedEvents.exists(e, e == 'RequestTrailers') : true"
+                    },
+                    {
+                      "message": "If responseBodySendMode is set to `FullDuplexStreamed`, then the `supportedEvents` list must contain at least both: `ResponseBody` and `ResponseTrailers\u201c events",
+                      "rule": "has(self.responseBodySendMode) && self.responseBodySendMode == 'FullDuplexStreamed' ? self.supportedEvents.exists(e, e == 'ResponseBody') && self.supportedEvents.exists(e, e == 'ResponseTrailers') : true"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              },
+              "matchCondition": {
+                "description": "MatchCondition is the condition under which this chain is invoked for a request.",
+                "properties": {
+                  "celExpressions": {
+                    "description": "CELExpressions are expressions that are used to match requests for which\nthe extension chain is executed.\nLimited to 10 CELExpressions.\n\nExpressions are ORed together.",
+                    "items": {
+                      "description": "CELExpression contains the conditions under which the extension chain is invoked\nfor a request.\n\nCELMatcher and BackendRef are ANDed together.",
+                      "properties": {
+                        "backendRefs": {
+                          "description": "BackendRefs are Kubernetes Services that are used to match requests\nfor which the extension chain is executed.",
+                          "items": {
+                            "description": "ExtensionServiceReference defines a reference to the Service\nwithin the namespace of the referrer.",
+                            "properties": {
+                              "group": {
+                                "default": "",
+                                "description": "Group is the group of the referent.",
+                                "enum": [
+                                  "",
+                                  "networking.gke.io"
+                                ],
+                                "maxLength": 253,
+                                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                                "type": "string"
+                              },
+                              "kind": {
+                                "default": "Service",
+                                "description": "Kind is kind of the referent.",
+                                "enum": [
+                                  "Service",
+                                  "GCPWasmPlugin"
+                                ],
+                                "maxLength": 63,
+                                "minLength": 1,
+                                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "Name is the name of the referent.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "port": {
+                                "description": "Port is the port of the referent.",
+                                "format": "int32",
+                                "maximum": 65535,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "group",
+                              "kind",
+                              "name"
+                            ],
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "Group must be empty if kind is Service",
+                                "rule": "self.kind == 'Service' ? size(self.group) == 0 : true"
+                              },
+                              {
+                                "message": "Group must be set to `networking.gke.io` if kind is GCPWasmPlugin",
+                                "rule": "self.kind == 'GCPWasmPlugin' ? self.group == 'networking.gke.io' : true"
+                              },
+                              {
+                                "message": "Port has to be set if kind is Service",
+                                "rule": "self.kind == 'Service' ? has(self.port) : true"
+                              },
+                              {
+                                "message": "Port has to be empty if kind is GCPWasmPlugin",
+                                "rule": "self.kind == 'GCPWasmPlugin' ? !has(self.port) : true"
+                              }
+                            ],
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        },
+                        "celMatcher": {
+                          "description": "CELMatcher is a Common Expression Language (CEL) expression that is used\nto match requests for which the extension chain is executed.\n\nFor more information, see [CEL matcher language\nreference](https://cloud.google.com/service-extensions/docs/cel-matcher-language-reference).",
+                          "maxLength": 512,
+                          "pattern": "^(( )|(request.headers)|(request.method)|(request.host)|(request.path)|(request.query)|(request.scheme)|(response.code)|(response.grpc_status)|(response.headers)|(source.address)|(source.port)|(connection.requested_server_name)|(connection.tls_version)|(connection.sha256_peer_certificate_digest)|(endsWith)|(startsWith)|(matches)|(contains)|(lowerAscii)|(upperAscii)|(int)|(==)|(!=)|(&&)|(>=)|(<=)|(>)|(<)|(\\|\\|)|(!)|(\\+)|(\\.)|(/)|('[a-zA-Z0-9\\/\\-._~%!$&'()*+,;=:\\\"\\\\]*')|(\"[a-zA-Z0-9\\/\\-._~%!$&'()*+,;=:\\\"\\\\]*\")|(\u201c[a-zA-Z0-9\\/\\-._~%!$&'()*+,;=:\\\"\\\\]*\u201d)|(R\"[a-zA-Z0-9\\/\\-._~%!$&'()*+,;=:\\\\]*\")|[0-9]|(\\()|(\\))|(\\[)|(\\]))+$",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "name": {
+                "description": "Name is the name for this extension chain.\nThe name is logged as part of the HTTP request logs.\nThe name must conform with RFC-1034, is restricted to lower-cased letters,\nnumbers and hyphens, and can have a maximum length of 63 characters.\nAdditionally, the first character must be a letter and the last a letter or a number.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "extensions",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "type": "array"
+        },
+        "targetRefs": {
+          "description": "TargetRefs is a list of API objects this extension applies to.\nValid Groups are:\n- \"gateway.networking.k8s.io\"\n\nValid Kinds are:\n- \"Gateway\"",
+          "items": {
+            "description": "LocalObjectReference identifies an API object within the namespace of the\nreferrer.\nThe API object must be valid in the cluster; the Group and Kind must\nbe registered in the cluster for this reference to be valid.\n\nReferences to objects with invalid Group and Kind are not valid, and must\nbe rejected by the implementation, with appropriate Conditions set\non the containing object.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the referent.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "extensionChains",
+        "targetRefs"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status defines the current state of GCPRoutingExtension.",
+      "properties": {
+        "ancestors": {
+          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",
+          "items": {
+            "description": "PolicyAncestorStatus describes the status of a route with respect to an\nassociated Ancestor.\n\nAncestors refer to objects that are either the Target of a policy or above it\nin terms of object hierarchy. For example, if a policy targets a Service, the\nPolicy's Ancestors are, in order, the Service, the HTTPRoute, the Gateway, and\nthe GatewayClass. Almost always, in this hierarchy, the Gateway will be the most\nuseful object to place Policy status on, so we recommend that implementations\nSHOULD use Gateway as the PolicyAncestorStatus object unless the designers\nhave a _very_ good reason otherwise.\n\nIn the context of policy attachment, the Ancestor is used to distinguish which\nresource results in a distinct application of this policy. For example, if a policy\ntargets a Service, it may have a distinct result per attached Gateway.\n\nPolicies targeting the same resource may have different effects depending on the\nancestors of those resources. For example, different Gateways targeting the same\nService may have different capabilities, especially if they have different underlying\nimplementations.\n\nFor example, in BackendTLSPolicy, the Policy attaches to a Service that is\nused as a backend in a HTTPRoute that is itself attached to a Gateway.\nIn this case, the relevant object for status is the Gateway, and that is the\nancestor object referred to in this status.\n\nNote that a parent is also an ancestor, so for objects where the parent is the\nrelevant object for status, this struct SHOULD still be used.\n\nThis struct is intended to be used in a slice that's effectively a map,\nwith a composite key made up of the AncestorRef and the ControllerName.",
+            "properties": {
+              "ancestorRef": {
+                "description": "AncestorRef corresponds with a ParentRef in the spec that this\nPolicyAncestorStatus struct describes the status of.",
+                "properties": {
+                  "group": {
+                    "default": "gateway.networking.k8s.io",
+                    "description": "Group is the group of the referent.\nWhen unspecified, \"gateway.networking.k8s.io\" is inferred.\nTo set the core API group (such as for a \"Service\" kind referent),\nGroup must be explicitly set to \"\" (empty string).\n\nSupport: Core",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "default": "Gateway",
+                    "description": "Kind is kind of the referent.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nSupport for other resources is Implementation-Specific.",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the referent. When unspecified, this refers\nto the local namespace of the Route.\n\nNote that there are specific rules for ParentRefs which cross namespace\nboundaries. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example:\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable any other kind of cross-namespace reference.\n\n<gateway:experimental:description>\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.\n</gateway:experimental:description>\n\nSupport: Core",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the network port this Route targets. It can be interpreted\ndifferently based on the type of parent resource.\n\nWhen the parent resource is a Gateway, this targets all listeners\nlistening on the specified port that also support this kind of Route(and\nselect this Route). It's not recommended to set `Port` unless the\nnetworking behaviors specified in a Route must apply to a specific port\nas opposed to a listener(s) whose port(s) may be changed. When both Port\nand SectionName are specified, the name and port of the selected listener\nmust match both specified values.\n\n<gateway:experimental:description>\nWhen the parent resource is a Service, this targets a specific port in the\nService spec. When both Port (experimental) and SectionName are specified,\nthe name and port of the selected port must match both specified values.\n</gateway:experimental:description>\n\nImplementations MAY choose to support other parent resources.\nImplementations supporting other types of parent resources MUST clearly\ndocument how/if Port is interpreted.\n\nFor the purpose of status, an attachment is considered successful as\nlong as the parent resource accepts it partially. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment\nfrom the referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route,\nthe Route MUST be considered detached from the Gateway.\n\nSupport: Extended",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sectionName": {
+                    "description": "SectionName is the name of a section within the target resource. In the\nfollowing resources, SectionName is interpreted as the following:\n\n* Gateway: Listener name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n* Service: Port name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n\nImplementations MAY choose to support attaching Routes to other resources.\nIf that is the case, they MUST clearly document how SectionName is\ninterpreted.\n\nWhen unspecified (empty string), this will reference the entire resource.\nFor the purpose of status, an attachment is considered successful if at\nleast one section in the parent resource accepts it. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment from\nthe referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route, the\nRoute MUST be considered detached from the Gateway.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "conditions": {
+                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.",
+                "items": {
+                  "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                      "maxLength": 32768,
+                      "type": "string"
+                    },
+                    "observedGeneration": {
+                      "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "status of the condition, one of True, False, Unknown.",
+                      "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                      "maxLength": 316,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lastTransitionTime",
+                    "message",
+                    "reason",
+                    "status",
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "controllerName": {
+                "description": "ControllerName is a domain/path string that indicates the name of the\ncontroller that wrote this status. This corresponds with the\ncontrollerName field on GatewayClass.\n\nExample: \"example.net/gateway-controller\".\n\nThe format of this field is DOMAIN \"/\" PATH, where DOMAIN and PATH are\nvalid Kubernetes names\n(https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names).\n\nControllers MUST populate this field when writing status. Controllers should ensure that\nentries to status populated with their ControllerName are cleaned up when they are no\nlonger necessary.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&'()*+,;=:]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ancestorRef",
+              "controllerName"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array"
+        }
+      },
+      "required": [
+        "ancestors"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

@@ -7299,15 +7299,18 @@
                 "description": "topologyRequest defines the topology request for the PodSet.",
                 "properties": {
                   "podIndexLabel": {
-                    "description": "podIndexLabel indicates the name of the label indexing the pods.\nFor example, in the context of\n- kubernetes job this is: kubernetes.io/job-completion-index\n- JobSet: kubernetes.io/job-completion-index (inherited from Job)\n- Kubeflow: training.kubeflow.org/replica-index",
+                    "description": "podIndexLabel indicates the name of the label indexing the pods.\nFor example, in the context of\n- kubernetes job this is: kubernetes.io/job-completion-index\n- JobSet: kubernetes.io/job-completion-index (inherited from Job)\n- Kubeflow: training.kubeflow.org/replica-index\n\tThis is limited to 317 characters.",
+                    "maxLength": 317,
                     "type": "string"
                   },
                   "podSetGroupName": {
                     "description": "podSetGroupName indicates the name of the group of PodSets to which this PodSet belongs to.\nPodSets with the same `PodSetGroupName` should be assigned the same ResourceFlavor",
+                    "maxLength": 256,
                     "type": "string"
                   },
                   "podSetSliceRequiredTopology": {
-                    "description": "podSetSliceRequiredTopology indicates the topology level required by the PodSet slice, as\nindicated by the `kueue.x-k8s.io/podset-slice-required-topology` annotation.",
+                    "description": "podSetSliceRequiredTopology indicates the topology level required by the PodSet slice, as\nindicated by the `kueue.x-k8s.io/podset-slice-required-topology` annotation.\n\nThis is limited to 63",
+                    "maxLength": 63,
                     "type": "string"
                   },
                   "podSetSliceSize": {
@@ -7316,11 +7319,13 @@
                     "type": "integer"
                   },
                   "preferred": {
-                    "description": "preferred indicates the topology level preferred by the PodSet, as\nindicated by the `kueue.x-k8s.io/podset-preferred-topology` PodSet\nannotation.",
+                    "description": "preferred indicates the topology level preferred by the PodSet, as\nindicated by the `kueue.x-k8s.io/podset-preferred-topology` PodSet\nannotation.\nThis is limited to 63 characters.",
+                    "maxLength": 63,
                     "type": "string"
                   },
                   "required": {
-                    "description": "required indicates the topology level required by the PodSet, as\nindicated by the `kueue.x-k8s.io/podset-required-topology` PodSet\nannotation.",
+                    "description": "required indicates the topology level required by the PodSet, as\nindicated by the `kueue.x-k8s.io/podset-required-topology` PodSet\nannotation.\nThis is limited to 63 characters.",
+                    "maxLength": 63,
                     "type": "string"
                   },
                   "subGroupCount": {
@@ -7329,7 +7334,8 @@
                     "type": "integer"
                   },
                   "subGroupIndexLabel": {
-                    "description": "subGroupIndexLabel indicates the name of the label indexing the instances of replicated Jobs (groups)\nwithin a PodSet. For example, in the context of JobSet this is jobset.sigs.k8s.io/job-index.",
+                    "description": "subGroupIndexLabel indicates the name of the label indexing the instances of replicated Jobs (groups)\nwithin a PodSet. For example, in the context of JobSet this is jobset.sigs.k8s.io/job-index.\n\tThis is limited to 317 characters.",
+                    "maxLength": 317,
                     "type": "string"
                   },
                   "unconstrained": {
@@ -7342,7 +7348,6 @@
               }
             },
             "required": [
-              "count",
               "template"
             ],
             "type": "object",
@@ -7363,25 +7368,54 @@
           "x-kubernetes-list-type": "map"
         },
         "priority": {
-          "description": "priority determines the order of access to the resources managed by the\nClusterQueue where the workload is queued.\nThe priority value is populated from PriorityClassName.\nThe higher the value, the higher the priority.\nIf priorityClassName is specified, priority must not be null.",
+          "description": "priority determines the order of access to the resources managed by the\nClusterQueue where the workload is queued.\nThe priority value is populated from the referenced PriorityClass (via priorityClassRef).\nThe higher the value, the higher the priority.\nIf priorityClassRef is specified, priority must not be null.",
           "format": "int32",
           "type": "integer"
         },
-        "priorityClassName": {
-          "description": "priorityClassName is the name of the PriorityClass the Workload is associated with.\nIf specified, indicates the workload's priority.\n\"system-node-critical\" and \"system-cluster-critical\" are two special\nkeywords which indicate the highest priorities with the former being\nthe highest priority. Any other name must be defined by creating a\nPriorityClass object with that name. If not specified, the workload\npriority will be default or zero if there is no default.",
-          "maxLength": 253,
-          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-          "type": "string"
-        },
-        "priorityClassSource": {
-          "default": "",
-          "description": "priorityClassSource determines whether the priorityClass field refers to a pod PriorityClass or kueue.x-k8s.io/workloadpriorityclass.\nWorkload's PriorityClass can accept the name of a pod priorityClass or a workloadPriorityClass.\nWhen using pod PriorityClass, a priorityClassSource field has the scheduling.k8s.io/priorityclass value.",
-          "enum": [
-            "kueue.x-k8s.io/workloadpriorityclass",
-            "scheduling.k8s.io/priorityclass",
-            ""
+        "priorityClassRef": {
+          "description": "priorityClassRef references a PriorityClass object that defines the workload's priority.",
+          "properties": {
+            "group": {
+              "description": "group is the API group of the PriorityClass object.\nUse \"kueue.x-k8s.io\" for WorkloadPriorityClass.\nUse \"scheduling.k8s.io\" for Pod PriorityClass.",
+              "enum": [
+                "kueue.x-k8s.io",
+                "scheduling.k8s.io"
+              ],
+              "type": "string"
+            },
+            "kind": {
+              "description": "kind is the kind of the PriorityClass object.",
+              "enum": [
+                "WorkloadPriorityClass",
+                "PriorityClass"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "description": "name is the name of the PriorityClass the Workload is associated with.\nIf specified, indicates the workload's priority.\n\"system-node-critical\" and \"system-cluster-critical\" are two special\nkeywords which indicate the highest priorities with the former being\nthe highest priority. Any other name must be defined by creating a\nPriorityClass object with that name. If not specified, the workload\npriority will be default or zero if there is no default.",
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "group",
+            "kind",
+            "name"
           ],
-          "type": "string"
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "only the PriorityClass kind is allowed for the scheduling.k8s.io group",
+              "rule": "(self.group == 'scheduling.k8s.io') ? self.kind == 'PriorityClass' : true"
+            },
+            {
+              "message": "only the WorkloadPriorityClass kind is allowed for the kueue.x-k8s.io group",
+              "rule": "(self.group == 'kueue.x-k8s.io') ? self.kind == 'WorkloadPriorityClass' : true"
+            }
+          ],
+          "additionalProperties": false
         },
         "queueName": {
           "description": "queueName is the name of the LocalQueue the Workload is associated with.\nqueueName cannot be changed while .status.admission is not null.",
@@ -7390,14 +7424,11 @@
           "type": "string"
         }
       },
-      "required": [
-        "podSets"
-      ],
       "type": "object",
       "x-kubernetes-validations": [
         {
-          "message": "priority should not be nil when priorityClassName is set",
-          "rule": "has(self.priorityClassName) ? has(self.priority) : true"
+          "message": "priority should not be nil when priorityClassRef is set",
+          "rule": "!has(self.priorityClassRef) || has(self.priority)"
         }
       ],
       "additionalProperties": false
@@ -7405,8 +7436,8 @@
     "status": {
       "description": "status is the status of the Workload.",
       "properties": {
-        "accumulatedPastExexcutionTimeSeconds": {
-          "description": "accumulatedPastExexcutionTimeSeconds holds the total time, in seconds, the workload spent\nin Admitted state, in the previous `Admit` - `Evict` cycles.",
+        "accumulatedPastExecutionTimeSeconds": {
+          "description": "accumulatedPastExecutionTimeSeconds holds the total time, in seconds, the workload spent\nin Admitted state, in the previous `Admit` - `Evict` cycles.",
           "format": "int32",
           "type": "integer"
         },
@@ -7431,6 +7462,11 @@
                   },
                   "delayedTopologyRequest": {
                     "description": "delayedTopologyRequest indicates the topology assignment is delayed.\nTopology assignment might be delayed in case there is ProvisioningRequest\nAdmissionCheck used.\nKueue schedules the second pass of scheduling for each workload with at\nleast one PodSet which has delayedTopologyRequest=true and without\ntopologyAssignment.",
+                    "enum": [
+                      "Pending",
+                      "Ready"
+                    ],
+                    "maxLength": 7,
                     "type": "string"
                   },
                   "flavors": {
@@ -7467,22 +7503,109 @@
                     "type": "object"
                   },
                   "topologyAssignment": {
-                    "description": "topologyAssignment indicates the topology assignment divided into\ntopology domains corresponding to the lowest level of the topology.\nThe assignment specifies the number of Pods to be scheduled per topology\ndomain and specifies the node selectors for each topology domain, in the\nfollowing way: the node selector keys are specified by the levels field\n(same for all domains), and the corresponding node selector value is\nspecified by the domains.values subfield. If the TopologySpec.Levels field contains\n\"kubernetes.io/hostname\" label, topologyAssignment will contain data only for\nthis label, and omit higher levels in the topology\n\nExample:\n\ntopologyAssignment:\n  levels:\n  - cloud.provider.com/topology-block\n  - cloud.provider.com/topology-rack\n  domains:\n  - values: [block-1, rack-1]\n    count: 4\n  - values: [block-1, rack-2]\n    count: 2\n\nHere:\n- 4 Pods are to be scheduled on nodes matching the node selector:\n  cloud.provider.com/topology-block: block-1\n  cloud.provider.com/topology-rack: rack-1\n- 2 Pods are to be scheduled on nodes matching the node selector:\n  cloud.provider.com/topology-block: block-1\n  cloud.provider.com/topology-rack: rack-2\n\nExample:\nBelow there is an equivalent of the above example assuming, Topology\nobject defines kubernetes.io/hostname as the lowest level in topology.\nHence we omit higher level of topologies, since the hostname label\nis sufficient to explicitly identify a proper node.\n\ntopologyAssignment:\n  levels:\n  - kubernetes.io/hostname\n  domains:\n  - values: [hostname-1]\n    count: 4\n  - values: [hostname-2]\n    count: 2",
+                    "description": "topologyAssignment indicates the topology assignment divided into\ntopology domains corresponding to the lowest level of the topology.\nThe assignment specifies the number of Pods to be scheduled per topology\ndomain and specifies the node selectors for each topology domain, in the\nfollowing way:\n* `levels` specifies the node selector keys (same for all domains).\n  - If the TopologySpec.Levels field contains \"kubernetes.io/hostname\" label,\n    topologyAssignment will contain data only for this label,\n    and omit higher levels in the topology.\n* `slices` specifies the node selector values and pod counts for all domains\n  (which may be partitioned into separate slices).\n  - The node selector values are arranged first by topology level, only then by domain.\n    (This allows \"optimizing\" similar values; see below).\n* The format of `slices` supports the following variations\n  (aimed to optimize the total bytesize for very large number of domains; see examples below):\n  - When all node selector values (at a given topology level, in a given slice)\n    share a common prefix and/or suffix, these may be stored\n    in dedicated `prefix`/`suffix` fields.\n    If so, the array of `roots` will only store the remaining parts of these strings.\n  - When all node selector values (at a given topology level, in a given slice)\n    are identical, this may be represented by `universal` value.\n  - When all pod counts (in a given slice) are identical,\n    this may be represented by `universal` pod count.\n\nExample 1:\n\nThe following represents an assignment in which:\n* 4 Pods are to be scheduled on nodes matching the node selector:\n  - cloud.provider.com/topology-block: block-1\n  - cloud.provider.com/topology-rack: rack-1\n* 2 Pods are to be scheduled on nodes matching the node selector:\n  - cloud.provider.com/topology-block: block-1\n  - cloud.provider.com/topology-rack: rack-2\n\ntopologyAssignment:\n  levels:\n  - cloud.provider.com/topology-block\n  - cloud.provider.com/topology-rack\n  slices:\n  - domainCount: 2\n    valuesPerLevel:\n    - individual:\n        roots: [block-1, block-1]\n    - individual:\n        roots: [rack-1, rack-2]\n    podCounts:\n      individual: [4, 2]\n\nExample 2:\n\nThe following is equivalent to Example 1 - but using extracted prefix and universalValue.\n\ntopologyAssignment:\n  levels:\n  - cloud.provider.com/topology-block\n  - cloud.provider.com/topology-rack\n  slices:\n  - domainCount: 2\n    valuesPerLevel:\n    - universal: block-1\n    - individual:\n        prefix: rack-\n\t\t   roots: [1, 2]\n    podCounts:\n      individual: [4, 2]\n\nExample 3:\n\nNow suppose that:\n- the Topology object defines kubernetes.io/hostname as the lowest level\n  (and hence, in the topologyAssignment, we omit all other levels\n  since the hostname label suffices to explicitly identify a proper node),\n- we assign 1 Pod per each node,\n- the node naming scheme is `block-{blockId}-rack-{rackId}-node-{nodeId}`.\nThen, using the \"extraction of commons\", the assignment from Examples 1-2 would look as follows:\n\ntopologyAssignment:\n  levels:\n  - kubernetes.io/hostname\n  slices:\n  - domainCount: 6\n    valuesPerLevel:\n    - individual:\n        prefix: block-1-rack-\n\t\t   roots: [1-node-1, 1-node-2, 1-node-3, 1-node-4, 2-node-1, 2-node-2]\n    podCounts:\n      universal: 1\n\nExample 4:\n\nBy using multiple slices, we can afford even longer common prefixes.\nThe assignment from Example 3 can be alternatively represented as follows:\n\ntopologyAssignment:\n  levels:\n  - kubernetes.io/hostname\n  slices:\n  - domainCount: 4\n    valuesPerLevel:\n    - individual:\n        prefix: block-1-rack-1-node-\n\t\t   roots: [1, 2, 3, 4]\n    podCounts:\n      universal: 1\n  - domainCount: 2\n    valuesPerLevel:\n    - individual:\n        prefix: block-1-rack-2-node-\n\t\t   roots: [1, 2]\n    podCounts:\n      universal: 1",
                     "properties": {
-                      "domains": {
-                        "description": "domains is a list of topology assignments split by topology domains at\nthe lowest level of the topology.",
+                      "levels": {
+                        "description": "levels is an ordered list of keys denoting the levels of the assigned\ntopology (i.e. node label keys), from the highest to the lowest level of\nthe topology.",
+                        "items": {
+                          "maxLength": 317,
+                          "type": "string"
+                        },
+                        "maxItems": 16,
+                        "minItems": 1,
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      },
+                      "slices": {
+                        "description": "slices represent topology assignments for subsets of pods of a workload.\nThe full assignment is obtained as a union of all slices.",
                         "items": {
                           "properties": {
-                            "count": {
-                              "description": "count indicates the number of Pods to be scheduled in the topology\ndomain indicated by the values field.",
+                            "domainCount": {
+                              "description": "domainCount is the number of domains covered by this slice.",
                               "format": "int32",
                               "minimum": 1,
                               "type": "integer"
                             },
-                            "values": {
-                              "description": "values is an ordered list of node selector values describing a topology\ndomain. The values correspond to the consecutive topology levels, from\nthe highest to the lowest.",
+                            "podCounts": {
+                              "description": "podCounts specifies the number of pods allocated per each domain.",
+                              "properties": {
+                                "individual": {
+                                  "description": "individual - if set - specifies the number of pods allocated in each domain in this slice.\nIf set, its length must be equal to the \"domainCount\" field of the TopologyAssignmentSlice.\nExactly one of universal, individual must be set.",
+                                  "items": {
+                                    "format": "int32",
+                                    "minimum": 1,
+                                    "type": "integer"
+                                  },
+                                  "maxItems": 100000,
+                                  "minItems": 1,
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "atomic"
+                                },
+                                "universal": {
+                                  "description": "universal - if set - specifies the number of pods allocated in every domain in this slice.\nExactly one of universal, individual must be set.",
+                                  "format": "int32",
+                                  "minimum": 1,
+                                  "type": "integer"
+                                }
+                              },
+                              "type": "object",
+                              "x-kubernetes-validations": [
+                                {
+                                  "message": "exactly one of the fields in [universal individual] must be set",
+                                  "rule": "[has(self.universal),has(self.individual)].filter(x,x==true).size() == 1"
+                                }
+                              ],
+                              "additionalProperties": false
+                            },
+                            "valuesPerLevel": {
+                              "description": "valuesPerLevel has one entry for each of the Levels specified in the TopologyAssignment.\nThe entry corresponding to a particular level specifies the placement of pods at that level.",
                               "items": {
-                                "type": "string"
+                                "properties": {
+                                  "individual": {
+                                    "description": "individual - if set - specifies multiple topology placement values (at a particular topology level)\nthat apply to the pods in the current TopologyAssignmentSlice.\nExactly one of universal, individual must be set.",
+                                    "properties": {
+                                      "prefix": {
+                                        "description": "prefix specifies a common prefix for all values in this slice assignment.\nIt must be either nil pointer or a non-empty string.",
+                                        "maxLength": 63,
+                                        "type": "string"
+                                      },
+                                      "roots": {
+                                        "description": "roots specifies the values in this assignment (excluding prefix and suffix, if non-empty).\nIts length must be equal to the \"domainCount\" field of the TopologyAssignmentSlice.",
+                                        "items": {
+                                          "maxLength": 63,
+                                          "type": "string"
+                                        },
+                                        "maxItems": 100000,
+                                        "minItems": 1,
+                                        "type": "array",
+                                        "x-kubernetes-list-type": "atomic"
+                                      },
+                                      "suffix": {
+                                        "description": "suffix specifies a common suffix for all values in this slice assignment.\nIt must be either nil pointer or a non-empty string.",
+                                        "maxLength": 63,
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "roots"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "universal": {
+                                    "description": "universal - if set - specifies a single topology placement value (at a particular topology level)\nthat applies to all pods in the current TopologyAssignmentSlice.\nExactly one of universal, individual must be set.",
+                                    "maxLength": 63,
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object",
+                                "x-kubernetes-validations": [
+                                  {
+                                    "message": "exactly one of the fields in [universal individual] must be set",
+                                    "rule": "[has(self.universal),has(self.individual)].filter(x,x==true).size() == 1"
+                                  }
+                                ],
+                                "additionalProperties": false
                               },
                               "maxItems": 16,
                               "minItems": 1,
@@ -7491,36 +7614,42 @@
                             }
                           },
                           "required": [
-                            "count",
-                            "values"
+                            "domainCount",
+                            "podCounts",
+                            "valuesPerLevel"
                           ],
                           "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "podCounts.individual must have length equal to domainCount",
+                              "rule": "!has(self.podCounts.individual) || size(self.podCounts.individual) == self.domainCount"
+                            },
+                            {
+                              "message": "valuesPerLevel.individual, if set, must have roots of length equal to domainCount of this TopologyAssignmentSlice",
+                              "rule": "self.valuesPerLevel.all(x, !has(x.individual) || size(x.individual.roots) == self.domainCount)"
+                            }
+                          ],
                           "additionalProperties": false
                         },
-                        "type": "array"
-                      },
-                      "levels": {
-                        "description": "levels is an ordered list of keys denoting the levels of the assigned\ntopology (i.e. node label keys), from the highest to the lowest level of\nthe topology.",
-                        "items": {
-                          "type": "string"
-                        },
-                        "maxItems": 16,
-                        "minItems": 1,
+                        "maxItems": 1000,
                         "type": "array",
                         "x-kubernetes-list-type": "atomic"
                       }
                     },
                     "required": [
-                      "domains",
-                      "levels"
+                      "levels",
+                      "slices"
                     ],
                     "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "valuesPerLevel must have the same length as the number of levels in this TopologyAssignment",
+                        "rule": "self.slices.all(x, size(x.valuesPerLevel) == size(self.levels))"
+                      }
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "name"
-                ],
                 "type": "object",
                 "additionalProperties": false
               },
@@ -7532,10 +7661,6 @@
               "x-kubernetes-list-type": "map"
             }
           },
-          "required": [
-            "clusterQueue",
-            "podSetAssignments"
-          ],
           "type": "object",
           "additionalProperties": false
         },
@@ -7556,6 +7681,7 @@
               "name": {
                 "description": "name identifies the admission check.",
                 "maxLength": 316,
+                "minLength": 1,
                 "type": "string"
               },
               "podSetUpdates": {
@@ -7622,6 +7748,7 @@
                       },
                       "maxItems": 8,
                       "type": "array",
+                      "x-kubernetes-list-type": "atomic",
                       "x-kubernetes-validations": [
                         {
                           "message": "operator must be Exists when 'key' is empty, which means 'match all values and all keys'",
@@ -7697,10 +7824,11 @@
         },
         "clusterName": {
           "description": "clusterName is the name of the cluster where the workload is currently assigned.\n\nWith ElasticJobs, this field may also indicate the cluster where the original (old) workload\nwas assigned, providing placement context for new scaled-up workloads. This supports\naffinity or propagation policies across workload slices.\n\nThis field is reset after the Workload is evicted.",
+          "maxLength": 256,
           "type": "string"
         },
         "conditions": {
-          "description": "conditions hold the latest available observations of the Workload\ncurrent state.\n\nThe type of the condition could be:\n\n- Admitted: the Workload was admitted through a ClusterQueue.\n- Finished: the associated workload finished running (failed or succeeded).\n- PodsReady: at least `.spec.podSets[*].count` Pods are ready or have\nsucceeded.",
+          "description": "conditions hold the latest available observations of the Workload\ncurrent state.\n\nThe type of the condition could be:\n\n- Admitted: the Workload was admitted through a ClusterQueue.\n- Finished: the associated workload finished running (failed or succeeded).\n- PodsReady: at least `.spec.podSets[*].count` Pods are ready or have\nsucceeded.\nconditions are limited to 16 items.",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
@@ -7753,6 +7881,7 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 16,
           "type": "array",
           "x-kubernetes-list-map-keys": [
             "type"
@@ -7762,6 +7891,7 @@
         "nominatedClusterNames": {
           "description": "nominatedClusterNames specifies the list of cluster names that have been nominated for scheduling.\nThis field is mutually exclusive with the `.status.clusterName` field, and is reset when\n`status.clusterName` is set.\nThis field is optional.",
           "items": {
+            "maxLength": 256,
             "type": "string"
           },
           "maxItems": 10,
@@ -7889,6 +8019,7 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "maxItems": 256,
               "type": "array",
               "x-kubernetes-list-map-keys": [
                 "reason",
@@ -7906,6 +8037,7 @@
             "properties": {
               "name": {
                 "description": "name is the name of the unhealthy node.",
+                "maxLength": 63,
                 "type": "string"
               }
             },
@@ -7915,7 +8047,12 @@
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
+          "maxItems": 8,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
         }
       },
       "type": "object",
@@ -7939,12 +8076,20 @@
       "rule": "has(self.status) && has(self.status.conditions) && self.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True') && has(self.status.admission) ? size(self.spec.podSets) == size(self.status.admission.podSetAssignments) : true"
     },
     {
-      "message": "priorityClassSource is immutable while workload quota reserved",
-      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True')) ? (oldSelf.spec.priorityClassSource == self.spec.priorityClassSource) : true"
+      "message": "priorityClassRef is immutable while workload quota reserved",
+      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True')) ? (!has(oldSelf.spec.priorityClassRef) && !has(self.spec.priorityClassRef)) || (has(oldSelf.spec.priorityClassRef) && has(self.spec.priorityClassRef)) : true"
     },
     {
-      "message": "priorityClassName is immutable while workload quota reserved and priorityClassSource is not equal to kueue.x-k8s.io/workloadpriorityclass",
-      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True') && (self.spec.priorityClassSource != 'kueue.x-k8s.io/workloadpriorityclass') && has(oldSelf.spec.priorityClassName) && has(self.spec.priorityClassName)) ? (oldSelf.spec.priorityClassName == self.spec.priorityClassName) : true"
+      "message": "priorityClassRef.group is immutable while workload quota reserved",
+      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True') && has(oldSelf.spec.priorityClassRef) && has(self.spec.priorityClassRef)) ? oldSelf.spec.priorityClassRef.group == self.spec.priorityClassRef.group : true"
+    },
+    {
+      "message": "priorityClassRef.kind is immutable while workload quota reserved",
+      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True') && has(oldSelf.spec.priorityClassRef) && has(self.spec.priorityClassRef)) ? oldSelf.spec.priorityClassRef.kind == self.spec.priorityClassRef.kind : true"
+    },
+    {
+      "message": "priorityClassRef.name is immutable for scheduling.k8s.io/priorityclass while workload quota reserved",
+      "rule": "(has(oldSelf.status) && has(oldSelf.status.conditions) && oldSelf.status.conditions.exists(c, c.type == 'QuotaReserved' && c.status == 'True') && has(oldSelf.spec.priorityClassRef) && has(self.spec.priorityClassRef) && self.spec.priorityClassRef.group == 'scheduling.k8s.io' && self.spec.priorityClassRef.kind == 'PriorityClass') ? oldSelf.spec.priorityClassRef.name == self.spec.priorityClassRef.name : true"
     },
     {
       "message": "queueName is immutable while workload quota reserved",

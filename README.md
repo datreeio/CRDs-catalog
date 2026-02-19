@@ -76,6 +76,22 @@ cd Utilities
 ./crd-extractor.sh
 ```
 
+#### Using a specific Kubernetes context
+To extract CRDs from a specific Kubernetes cluster context, set the `KUBECTL_CONTEXT` environment variable:
+```
+cd Utilities
+KUBECTL_CONTEXT=staging ./crd-extractor.sh
+```
+
+Or export it before running:
+```
+export KUBECTL_CONTEXT=staging
+cd Utilities
+./crd-extractor.sh
+```
+
+If `KUBECTL_CONTEXT` is not set, the utility will use your default kubectl context.
+
 #### Using Devbox
 If you have [Devbox](https://www.jetify.com/devbox) installed:
 ```

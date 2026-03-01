@@ -1,0 +1,1668 @@
+{
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "TrafficPolicySpec defines the desired state of a traffic policy.",
+      "properties": {
+        "apiKeyAuth": {
+          "description": "APIKeyAuth authenticates users based on a configured API Key.",
+          "properties": {
+            "clientIdHeader": {
+              "description": "clientIdHeader specifies the header name to forward the authenticated client identifier.\nIf not specified, the client identifier will not be forwarded in any header.\nExample: \"x-client-id\"",
+              "type": "string"
+            },
+            "disable": {
+              "description": "Disable the API key authentication filter.\nCan be used to disable API key authentication policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "forwardCredential": {
+              "description": "forwardCredential controls whether the API key is included in the request sent to the upstream.\nIf false (default), the API key is removed from the request before sending to upstream.\nIf true, the API key is included in the request sent to upstream.\nThis applies to all configured key sources (header, query parameter, or cookie).",
+              "type": "boolean"
+            },
+            "keySources": {
+              "description": "keySources specifies the list of key sources to extract the API key from.\nKey sources are processed in array order and the first one that successfully\nextracts a key is used. Within each key source, if multiple types (header, query, cookie) are\nspecified, precedence is: header > query parameter > cookie.\n\nIf empty, defaults to a single key source with header \"api-key\".\n\nExample:\n  keySources:\n  - header: \"X-API-KEY\"\n  - query: \"api_key\"\n  - header: \"Authorization\"\n    query: \"token\"\n    cookie: \"auth_token\"\n\nIn this example, the system will:\n1. First try header \"X-API-KEY\"\n2. If not found, try query parameter \"api_key\"\n3. If not found, try header \"Authorization\" (then query \"token\", then cookie \"auth_token\" within that key source)",
+              "items": {
+                "description": "APIKeySource defines where to extract the API key from within a single key source.\nWithin a single key source, if multiple types are specified, precedence is:\nheader > query parameter > cookie. The header is checked first, and only falls back\nto query parameter if the header is not present, then to cookie if both header and query\nare not present.",
+                "properties": {
+                  "cookie": {
+                    "description": "cookie specifies the name of the cookie that contains the API key.",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "header": {
+                    "description": "header specifies the name of the header that contains the API key.",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "query": {
+                    "description": "query specifies the name of the query parameter that contains the API key.",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "at least one of the fields in [header query cookie] must be set",
+                    "rule": "[has(self.header),has(self.query),has(self.cookie)].filter(x,x==true).size() >= 1"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 16,
+              "minItems": 0,
+              "type": "array"
+            },
+            "secretRef": {
+              "description": "secretRef references a Kubernetes secret storing a set of API Keys. If there are many keys, 'secretSelector' can be\nused instead.\n\nEach entry in the Secret represents one API Key. The key is an arbitrary identifier.\nThe value is a string, representing the API Key.\n\nExample:\n\napiVersion: v1\nkind: Secret\nmetadata:\n  name: api-key\nstringData:\n  client1: \"k-123\"\n  client2: \"k-456\"",
+              "properties": {
+                "group": {
+                  "default": "",
+                  "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                  "maxLength": 253,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "Secret",
+                  "description": "Kind is kind of the referent. For example \"Secret\".",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name is the name of the referent.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "secretSelector": {
+              "description": "secretSelector selects multiple secrets containing API Keys. If the same key is defined in multiple secrets, the\nbehavior is undefined.\n\nEach entry in the Secret represents one API Key. The key is an arbitrary identifier.\nThe value is a string, representing the API Key.\n\nExample:\n\napiVersion: v1\nkind: Secret\nmetadata:\n  name: api-key\nstringData:\n  client1: \"k-123\"\n  client2: \"k-456\"",
+              "properties": {
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Label selector to select the target resource.",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "matchLabels"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [secretRef secretSelector disable] must be set",
+              "rule": "[has(self.secretRef),has(self.secretSelector),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "autoHostRewrite": {
+          "description": "AutoHostRewrite rewrites the Host header to the DNS name of the selected upstream.\nNOTE: This field is only honored for HTTPRoute targets.\nNOTE: If `autoHostRewrite` is set on a route that also has a [URLRewrite filter](https://gateway-api.sigs.k8s.io/reference/spec/#httpurlrewritefilter)\nconfigured to override the `hostname`, the `hostname` value will be used and `autoHostRewrite` will be ignored.",
+          "type": "boolean"
+        },
+        "basicAuth": {
+          "description": "BasicAuth specifies the HTTP basic authentication configuration for the policy.\nThis controls authentication using username/password credentials in the Authorization header.",
+          "properties": {
+            "disable": {
+              "description": "Disable basic auth.\nCan be used to disable basic auth policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "secretRef": {
+              "description": "SecretRef references a Kubernetes secret containing htpasswd data.\nThe secret must contain username/password pairs in htpasswd format.",
+              "properties": {
+                "key": {
+                  "default": ".htpasswd",
+                  "description": "Key in the secret that contains the htpasswd data.\nDefaults to \".htpasswd\" if not specified.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the secret containing htpasswd data.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace of the secret. If not specified, defaults to the namespace of the TrafficPolicy.\nNote that a secret in a different namespace requires a ReferenceGrant to be accessible.",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "users": {
+              "description": "Users provides an inline list of username/password pairs in htpasswd format.\nEach entry should be formatted as \"username:hashed_password\".\nThe only supported hash format is SHA-1\n\nExample entries:\n  - \"user1:{SHA}d95o2uzYI7q7tY7bHI4U1xBug7s=\"",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 256,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [users secretRef disable] must be set",
+              "rule": "[has(self.users),has(self.secretRef),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "buffer": {
+          "description": "Buffer can be used to set the maximum request size that will be buffered.\nRequests exceeding this size will return a 413 response.",
+          "properties": {
+            "disable": {
+              "description": "Disable the buffer filter.\nCan be used to disable buffer policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "maxRequestSize": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "MaxRequestSize sets the maximum size in bytes of a message body to buffer.\nRequests exceeding this size will receive HTTP 413.\nExample format: \"1Mi\", \"512Ki\", \"1Gi\"",
+              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+              "x-kubernetes-int-or-string": true,
+              "x-kubernetes-validations": [
+                {
+                  "message": "maxRequestSize must be greater than 0 and less than 4Gi",
+                  "rule": "(type(self) == int && int(self) > 0 && int(self) < 4294967296) || (type(self) == string && quantity(self).isGreaterThan(quantity('0')) && quantity(self).isLessThan(quantity('4Gi')))"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [maxRequestSize disable] must be set",
+              "rule": "[has(self.maxRequestSize),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "compression": {
+          "description": "Compression configures response compression (per-route) and request/response\ndecompression (listener-level insertion triggered by route enable).\nThe response compression configuration is only honored for HTTPRoute targets.",
+          "properties": {
+            "requestDecompression": {
+              "description": "RequestDecompression controls request decompression.\nIf set, gzip requests will be decompressed.",
+              "properties": {
+                "disable": {
+                  "description": "Disables decompression.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "responseCompression": {
+              "description": "ResponseCompression controls response compression to the downstream.\nIf set, responses with the appropriate `Accept-Encoding` header with certain textual content types will be compressed using gzip.\nThe content-types that will be compressed are:\n- `application/javascript`\n- `application/json`\n- `application/xhtml+xml`\n- `image/svg+xml`\n- `text/css`\n- `text/html`\n- `text/plain`\n- `text/xml`",
+              "properties": {
+                "disable": {
+                  "description": "Disables compression.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of the fields in [responseCompression requestDecompression] must be set",
+              "rule": "[has(self.responseCompression),has(self.requestDecompression)].filter(x,x==true).size() >= 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "cors": {
+          "description": "Cors specifies the CORS configuration for the policy.",
+          "properties": {
+            "allowCredentials": {
+              "description": "AllowCredentials indicates whether the actual cross-origin request allows\nto include credentials.\n\nWhen set to true, the gateway will include the `Access-Control-Allow-Credentials`\nresponse header with value true (case-sensitive).\n\nWhen set to false or omitted the gateway will omit the header\n`Access-Control-Allow-Credentials` entirely (this is the standard CORS\nbehavior).\n\nSupport: Extended",
+              "type": "boolean"
+            },
+            "allowHeaders": {
+              "description": "AllowHeaders indicates which HTTP request headers are supported for\naccessing the requested resource.\n\nHeader names are not case sensitive.\n\nMultiple header names in the value of the `Access-Control-Allow-Headers`\nresponse header are separated by a comma (\",\").\n\nWhen the `AllowHeaders` field is configured with one or more headers, the\ngateway must return the `Access-Control-Allow-Headers` response header\nwhich value is present in the `AllowHeaders` field.\n\nIf any header name in the `Access-Control-Request-Headers` request header\nis not included in the list of header names specified by the response\nheader `Access-Control-Allow-Headers`, it will present an error on the\nclient side.\n\nIf any header name in the `Access-Control-Allow-Headers` response header\ndoes not recognize by the client, it will also occur an error on the\nclient side.\n\nA wildcard indicates that the requests with all HTTP headers are allowed.\nThe `Access-Control-Allow-Headers` response header can only use `*`\nwildcard as value when the `AllowCredentials` field is false or omitted.\n\nWhen the `AllowCredentials` field is true and `AllowHeaders` field\nspecified with the `*` wildcard, the gateway must specify one or more\nHTTP headers in the value of the `Access-Control-Allow-Headers` response\nheader. The value of the header `Access-Control-Allow-Headers` is same as\nthe `Access-Control-Request-Headers` header provided by the client. If\nthe header `Access-Control-Request-Headers` is not included in the\nrequest, the gateway will omit the `Access-Control-Allow-Headers`\nresponse header, instead of specifying the `*` wildcard. A Gateway\nimplementation may choose to add implementation-specific default headers.\n\nSupport: Extended",
+              "items": {
+                "description": "HTTPHeaderName is the name of an HTTP header.\n\nValid values include:\n\n* \"Authorization\"\n* \"Set-Cookie\"\n\nInvalid values include:\n\n  - \":method\" - \":\" is an invalid character. This means that HTTP/2 pseudo\n    headers are not currently supported by this type.\n  - \"/invalid\" - \"/ \" is an invalid character",
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
+            "allowMethods": {
+              "description": "AllowMethods indicates which HTTP methods are supported for accessing the\nrequested resource.\n\nValid values are any method defined by RFC9110, along with the special\nvalue `*`, which represents all HTTP methods are allowed.\n\nMethod names are case sensitive, so these values are also case-sensitive.\n(See https://www.rfc-editor.org/rfc/rfc2616#section-5.1.1)\n\nMultiple method names in the value of the `Access-Control-Allow-Methods`\nresponse header are separated by a comma (\",\").\n\nA CORS-safelisted method is a method that is `GET`, `HEAD`, or `POST`.\n(See https://fetch.spec.whatwg.org/#cors-safelisted-method) The\nCORS-safelisted methods are always allowed, regardless of whether they\nare specified in the `AllowMethods` field.\n\nWhen the `AllowMethods` field is configured with one or more methods, the\ngateway must return the `Access-Control-Allow-Methods` response header\nwhich value is present in the `AllowMethods` field.\n\nIf the HTTP method of the `Access-Control-Request-Method` request header\nis not included in the list of methods specified by the response header\n`Access-Control-Allow-Methods`, it will present an error on the client\nside.\n\nThe `Access-Control-Allow-Methods` response header can only use `*`\nwildcard as value when the `AllowCredentials` field is false or omitted.\n\nWhen the `AllowCredentials` field is true and `AllowMethods` field\nspecified with the `*` wildcard, the gateway must specify one HTTP method\nin the value of the Access-Control-Allow-Methods response header. The\nvalue of the header `Access-Control-Allow-Methods` is same as the\n`Access-Control-Request-Method` header provided by the client. If the\nheader `Access-Control-Request-Method` is not included in the request,\nthe gateway will omit the `Access-Control-Allow-Methods` response header,\ninstead of specifying the `*` wildcard. A Gateway implementation may\nchoose to add implementation-specific default methods.\n\nSupport: Extended",
+              "items": {
+                "enum": [
+                  "GET",
+                  "HEAD",
+                  "POST",
+                  "PUT",
+                  "DELETE",
+                  "CONNECT",
+                  "OPTIONS",
+                  "TRACE",
+                  "PATCH",
+                  "*"
+                ],
+                "type": "string"
+              },
+              "maxItems": 9,
+              "type": "array",
+              "x-kubernetes-list-type": "set",
+              "x-kubernetes-validations": [
+                {
+                  "message": "AllowMethods cannot contain '*' alongside other methods",
+                  "rule": "!('*' in self && self.size() > 1)"
+                }
+              ]
+            },
+            "allowOrigins": {
+              "description": "AllowOrigins indicates whether the response can be shared with requested\nresource from the given `Origin`.\n\nThe `Origin` consists of a scheme and a host, with an optional port, and\ntakes the form `<scheme>://<host>(:<port>)`.\n\nValid values for scheme are: `http` and `https`.\n\nValid values for port are any integer between 1 and 65535 (the list of\navailable TCP/UDP ports). Note that, if not included, port `80` is\nassumed for `http` scheme origins, and port `443` is assumed for `https`\norigins. This may affect origin matching.\n\nThe host part of the origin may contain the wildcard character `*`. These\nwildcard characters behave as follows:\n\n* `*` is a greedy match to the _left_, including any number of\n  DNS labels to the left of its position. This also means that\n  `*` will include any number of period `.` characters to the\n  left of its position.\n* A wildcard by itself matches all hosts.\n\nAn origin value that includes _only_ the `*` character indicates requests\nfrom all `Origin`s are allowed.\n\nWhen the `AllowOrigins` field is configured with multiple origins, it\nmeans the server supports clients from multiple origins. If the request\n`Origin` matches the configured allowed origins, the gateway must return\nthe given `Origin` and sets value of the header\n`Access-Control-Allow-Origin` same as the `Origin` header provided by the\nclient.\n\nThe status code of a successful response to a \"preflight\" request is\nalways an OK status (i.e., 204 or 200).\n\nIf the request `Origin` does not match the configured allowed origins,\nthe gateway returns 204/200 response but doesn't set the relevant\ncross-origin response headers. Alternatively, the gateway responds with\n403 status to the \"preflight\" request is denied, coupled with omitting\nthe CORS headers. The cross-origin request fails on the client side.\nTherefore, the client doesn't attempt the actual cross-origin request.\n\nThe `Access-Control-Allow-Origin` response header can only use `*`\nwildcard as value when the `AllowCredentials` field is false or omitted.\n\nWhen the `AllowCredentials` field is true and `AllowOrigins` field\nspecified with the `*` wildcard, the gateway must return a single origin\nin the value of the `Access-Control-Allow-Origin` response header,\ninstead of specifying the `*` wildcard. The value of the header\n`Access-Control-Allow-Origin` is same as the `Origin` header provided by\nthe client.\n\nSupport: Extended",
+              "items": {
+                "description": "The CORSOrigin MUST NOT be a relative URI, and it MUST follow the URI syntax and\nencoding rules specified in RFC3986.  The CORSOrigin MUST include both a\nscheme (e.g., \"http\" or \"spiffe\") and a scheme-specific-part, or it should be a single '*' character.\nURIs that include an authority MUST include a fully qualified domain name or\nIP address as the host.\n<gateway:util:excludeFromCRD> The below regex was generated to simplify the assertion of scheme://host:<port> being port optional </gateway:util:excludeFromCRD>",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "(^\\*$)|(^([a-zA-Z][a-zA-Z0-9+\\-.]+):\\/\\/([^:/?#]+)(:([0-9]{1,5}))?$)",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "type": "array",
+              "x-kubernetes-list-type": "set",
+              "x-kubernetes-validations": [
+                {
+                  "message": "AllowOrigins cannot contain '*' alongside other origins",
+                  "rule": "!('*' in self && self.size() > 1)"
+                }
+              ]
+            },
+            "disable": {
+              "description": "Disable the CORS filter.\nCan be used to disable CORS policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "exposeHeaders": {
+              "description": "ExposeHeaders indicates which HTTP response headers can be exposed\nto client-side scripts in response to a cross-origin request.\n\nA CORS-safelisted response header is an HTTP header in a CORS response\nthat it is considered safe to expose to the client scripts.\nThe CORS-safelisted response headers include the following headers:\n`Cache-Control`\n`Content-Language`\n`Content-Length`\n`Content-Type`\n`Expires`\n`Last-Modified`\n`Pragma`\n(See https://fetch.spec.whatwg.org/#cors-safelisted-response-header-name)\nThe CORS-safelisted response headers are exposed to client by default.\n\nWhen an HTTP header name is specified using the `ExposeHeaders` field,\nthis additional header will be exposed as part of the response to the\nclient.\n\nHeader names are not case sensitive.\n\nMultiple header names in the value of the `Access-Control-Expose-Headers`\nresponse header are separated by a comma (\",\").\n\nA wildcard indicates that the responses with all HTTP headers are exposed\nto clients. The `Access-Control-Expose-Headers` response header can only\nuse `*` wildcard as value when the `AllowCredentials` field is false or omitted.\n\nSupport: Extended",
+              "items": {
+                "description": "HTTPHeaderName is the name of an HTTP header.\n\nValid values include:\n\n* \"Authorization\"\n* \"Set-Cookie\"\n\nInvalid values include:\n\n  - \":method\" - \":\" is an invalid character. This means that HTTP/2 pseudo\n    headers are not currently supported by this type.\n  - \"/invalid\" - \"/ \" is an invalid character",
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
+            "maxAge": {
+              "default": 5,
+              "description": "MaxAge indicates the duration (in seconds) for the client to cache the\nresults of a \"preflight\" request.\n\nThe information provided by the `Access-Control-Allow-Methods` and\n`Access-Control-Allow-Headers` response headers can be cached by the\nclient until the time specified by `Access-Control-Max-Age` elapses.\n\nThe default value of `Access-Control-Max-Age` response header is 5\n(seconds).",
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true,
+          "additionalProperties": false
+        },
+        "csrf": {
+          "description": "Csrf specifies the Cross-Site Request Forgery (CSRF) policy for this traffic policy.",
+          "properties": {
+            "additionalOrigins": {
+              "description": "Specifies additional source origins that will be allowed in addition to the destination origin.",
+              "items": {
+                "description": "Specifies the way to match a string.",
+                "properties": {
+                  "contains": {
+                    "description": "The input string must contain the substring specified here.\nExample: abc matches the value xyz.abc.def",
+                    "type": "string"
+                  },
+                  "exact": {
+                    "description": "The input string must match exactly the string specified here.\nExample: abc matches the value abc",
+                    "type": "string"
+                  },
+                  "ignoreCase": {
+                    "description": "If true, indicates the exact/prefix/suffix/contains matching should be\ncase insensitive. This has no effect on the regex match.\nFor example, the matcher data will match both input string Data and data if this\noption is set to true.",
+                    "type": "boolean"
+                  },
+                  "prefix": {
+                    "description": "The input string must have the prefix specified here.\nNote: empty prefix is not allowed, please use regex instead.\nExample: abc matches the value abc.xyz",
+                    "type": "string"
+                  },
+                  "safeRegex": {
+                    "description": "The input string must match the Google RE2 regular expression specified here.\nSee https://github.com/google/re2/wiki/Syntax for the syntax.",
+                    "type": "string"
+                  },
+                  "suffix": {
+                    "description": "The input string must have the suffix specified here.\nNote: empty prefix is not allowed, please use regex instead.\nExample: abc matches the value xyz.abc",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "exactly one of the fields in [exact prefix suffix contains safeRegex] must be set",
+                    "rule": "[has(self.exact),has(self.prefix),has(self.suffix),has(self.contains),has(self.safeRegex)].filter(x,x==true).size() == 1"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 16,
+              "type": "array"
+            },
+            "percentageEnabled": {
+              "description": "Specifies the percentage of requests for which the CSRF filter is enabled.",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "percentageShadowed": {
+              "description": "Specifies that CSRF policies will be evaluated and tracked, but not enforced.",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at most one of the fields in [percentageEnabled percentageShadowed] may be set",
+              "rule": "[has(self.percentageEnabled),has(self.percentageShadowed)].filter(x,x==true).size() <= 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "extAuth": {
+          "description": "ExtAuth specifies the external authentication configuration for the policy.\nThis controls what external server to send requests to for authentication.",
+          "properties": {
+            "contextExtensions": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Additional context for the auth service.",
+              "type": "object"
+            },
+            "disable": {
+              "description": "Disable all external auth filters.\nCan be used to disable external auth policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "extensionRef": {
+              "description": "ExtensionRef references the GatewayExtension that should be used for auth.",
+              "properties": {
+                "name": {
+                  "description": "The name of the target resource.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace of the target resource.\nIf not set, defaults to the namespace of the parent object.",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "withRequestBody": {
+              "description": "WithRequestBody allows the request body to be buffered and sent to the auth service.\nWarning buffering has implications for streaming and therefore performance.",
+              "properties": {
+                "allowPartialMessage": {
+                  "default": false,
+                  "description": "AllowPartialMessage determines if partial messages should be allowed.\nWhen true, requests will be sent to the auth service even if they exceed maxRequestBytes.\nThe default behavior is false.",
+                  "type": "boolean"
+                },
+                "maxRequestBytes": {
+                  "description": "MaxRequestBytes sets the maximum size of a message body to buffer.\nRequests exceeding this size will receive HTTP 413 and not be sent to the auth service.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "packAsBytes": {
+                  "default": false,
+                  "description": "PackAsBytes determines if the body should be sent as raw bytes.\nWhen true, the body is sent as raw bytes in the raw_body field.\nWhen false, the body is sent as UTF-8 string in the body field.\nThe default behavior is false.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "maxRequestBytes"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [extensionRef disable] must be set",
+              "rule": "[has(self.extensionRef),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "extProc": {
+          "description": "ExtProc specifies the external processing configuration for the policy.",
+          "properties": {
+            "disable": {
+              "description": "Disable all external processing filters.\nCan be used to disable external processing policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "extensionRef": {
+              "description": "ExtensionRef references the GatewayExtension that should be used for external processing.",
+              "properties": {
+                "name": {
+                  "description": "The name of the target resource.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace of the target resource.\nIf not set, defaults to the namespace of the parent object.",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "processingMode": {
+              "description": "ProcessingMode defines how the filter should interact with the request/response streams",
+              "properties": {
+                "requestBodyMode": {
+                  "default": "NONE",
+                  "description": "RequestBodyMode determines how to handle the request body",
+                  "enum": [
+                    "NONE",
+                    "STREAMED",
+                    "BUFFERED",
+                    "BUFFERED_PARTIAL",
+                    "FULL_DUPLEX_STREAMED"
+                  ],
+                  "type": "string"
+                },
+                "requestHeaderMode": {
+                  "default": "SEND",
+                  "description": "RequestHeaderMode determines how to handle the request headers",
+                  "enum": [
+                    "DEFAULT",
+                    "SEND",
+                    "SKIP"
+                  ],
+                  "type": "string"
+                },
+                "requestTrailerMode": {
+                  "default": "SKIP",
+                  "description": "RequestTrailerMode determines how to handle the request trailers",
+                  "enum": [
+                    "DEFAULT",
+                    "SEND",
+                    "SKIP"
+                  ],
+                  "type": "string"
+                },
+                "responseBodyMode": {
+                  "default": "NONE",
+                  "description": "ResponseBodyMode determines how to handle the response body",
+                  "enum": [
+                    "NONE",
+                    "STREAMED",
+                    "BUFFERED",
+                    "BUFFERED_PARTIAL",
+                    "FULL_DUPLEX_STREAMED"
+                  ],
+                  "type": "string"
+                },
+                "responseHeaderMode": {
+                  "default": "SEND",
+                  "description": "ResponseHeaderMode determines how to handle the response headers",
+                  "enum": [
+                    "DEFAULT",
+                    "SEND",
+                    "SKIP"
+                  ],
+                  "type": "string"
+                },
+                "responseTrailerMode": {
+                  "default": "SKIP",
+                  "description": "ResponseTrailerMode determines how to handle the response trailers",
+                  "enum": [
+                    "DEFAULT",
+                    "SEND",
+                    "SKIP"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [extensionRef disable] must be set",
+              "rule": "[has(self.extensionRef),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "headerModifiers": {
+          "description": "HeaderModifiers defines the policy to modify request and response headers.",
+          "properties": {
+            "request": {
+              "description": "Request modifies request headers.",
+              "properties": {
+                "add": {
+                  "description": "Add adds the given header(s) (name, value) to the request\nbefore the action. It appends to any existing values associated\nwith the header name.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  add:\n  - name: \"my-header\"\n    value: \"bar,baz\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: foo,bar,baz",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "remove": {
+                  "description": "Remove the given header(s) from the HTTP request before the action. The\nvalue of Remove is a list of HTTP header names. Note that the header\nnames are case-insensitive (see\nhttps://datatracker.ietf.org/doc/html/rfc2616#section-4.2).\n\nInput:\n  GET /foo HTTP/1.1\n  my-header1: foo\n  my-header2: bar\n  my-header3: baz\n\nConfig:\n  remove: [\"my-header1\", \"my-header3\"]\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header2: bar",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "set": {
+                  "description": "Set overwrites the request with the given header (name, value)\nbefore the action.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  set:\n  - name: \"my-header\"\n    value: \"bar\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: bar",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "response": {
+              "description": "Response modifies response headers.",
+              "properties": {
+                "add": {
+                  "description": "Add adds the given header(s) (name, value) to the request\nbefore the action. It appends to any existing values associated\nwith the header name.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  add:\n  - name: \"my-header\"\n    value: \"bar,baz\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: foo,bar,baz",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "remove": {
+                  "description": "Remove the given header(s) from the HTTP request before the action. The\nvalue of Remove is a list of HTTP header names. Note that the header\nnames are case-insensitive (see\nhttps://datatracker.ietf.org/doc/html/rfc2616#section-4.2).\n\nInput:\n  GET /foo HTTP/1.1\n  my-header1: foo\n  my-header2: bar\n  my-header3: baz\n\nConfig:\n  remove: [\"my-header1\", \"my-header3\"]\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header2: bar",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "set": {
+                  "description": "Set overwrites the request with the given header (name, value)\nbefore the action.\n\nInput:\n  GET /foo HTTP/1.1\n  my-header: foo\n\nConfig:\n  set:\n  - name: \"my-header\"\n    value: \"bar\"\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header: bar",
+                  "items": {
+                    "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the value of HTTP Header to be matched.",
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of the fields in [request response] must be set",
+              "rule": "[has(self.request),has(self.response)].filter(x,x==true).size() >= 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "jwtAuth": {
+          "description": "JWT specifies the JWT authentication configuration for the policy.\nThis defines the JWT providers and their configurations.",
+          "properties": {
+            "disable": {
+              "description": "Disable all JWT filters.\nCan be used to disable JWT policies applied at a higher level in the config hierarchy.",
+              "type": "object"
+            },
+            "extensionRef": {
+              "description": "ExtensionRef references a GatewayExtension that provides the jwt providers",
+              "properties": {
+                "name": {
+                  "description": "The name of the target resource.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace of the target resource.\nIf not set, defaults to the namespace of the parent object.",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of the fields in [extensionRef disable] must be set",
+              "rule": "[has(self.extensionRef),has(self.disable)].filter(x,x==true).size() == 1"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "oauth2": {
+          "description": "OAuth2 specifies the configuration to use for OAuth2/OIDC.\nNote: the OAuth2 filter does not protect against Cross-Site-Request-Forgery attacks on domains with cached\nauthentication (in the form of cookies). It is recommended to pair this with the CSRF policy to prevent\nmalicious social engineering.",
+          "properties": {
+            "extensionRef": {
+              "description": "ExtensionRef specifies the GatewayExtension that should be used for OAuth2.",
+              "properties": {
+                "name": {
+                  "description": "The name of the target resource.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace of the target resource.\nIf not set, defaults to the namespace of the parent object.",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "extensionRef"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "rateLimit": {
+          "description": "RateLimit specifies the rate limiting configuration for the policy.\nThis controls the rate at which requests are allowed to be processed.",
+          "properties": {
+            "global": {
+              "description": "Global defines a global rate limiting policy using an external service.",
+              "properties": {
+                "descriptors": {
+                  "description": "Descriptors define the dimensions for rate limiting.\nThese values are passed to the rate limit service which applies configured limits based on them.\nEach descriptor represents a single rate limit rule with one or more entries.",
+                  "items": {
+                    "description": "RateLimitDescriptor defines a descriptor for rate limiting.\nA descriptor is a group of entries that form a single rate limit rule.",
+                    "properties": {
+                      "entries": {
+                        "description": "Entries are the individual components that make up this descriptor.\nWhen translated to Envoy, these entries combine to form a single descriptor.",
+                        "items": {
+                          "description": "RateLimitDescriptorEntry defines a single entry in a rate limit descriptor.\nOnly one entry type may be specified.",
+                          "properties": {
+                            "generic": {
+                              "description": "Generic contains the configuration for a generic key-value descriptor entry.\nThis field must be specified when Type is Generic.",
+                              "properties": {
+                                "key": {
+                                  "description": "Key is the name of this descriptor entry.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "description": "Value is the static value for this descriptor entry.",
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "value"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "header": {
+                              "description": "Header specifies a request header to extract the descriptor value from.\nThis field must be specified when Type is Header.",
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "type": {
+                              "description": "Type specifies what kind of rate limit descriptor entry this is.",
+                              "enum": [
+                                "Generic",
+                                "Header",
+                                "RemoteAddress",
+                                "Path"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "exactly one entry type must be specified",
+                              "rule": "(has(self.type) && (self.type == 'Generic' && has(self.generic) && !has(self.header)) || (self.type == 'Header' && has(self.header) && !has(self.generic)) || (self.type == 'RemoteAddress' && !has(self.generic) && !has(self.header)) || (self.type == 'Path' && !has(self.generic) && !has(self.header)))"
+                            }
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "extensionRef": {
+                  "description": "ExtensionRef references a GatewayExtension that provides the global rate limit service.",
+                  "properties": {
+                    "name": {
+                      "description": "The name of the target resource.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "The namespace of the target resource.\nIf not set, defaults to the namespace of the parent object.",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "descriptors",
+                "extensionRef"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "local": {
+              "description": "Local defines a local rate limiting policy.",
+              "properties": {
+                "tokenBucket": {
+                  "description": "TokenBucket represents the configuration for a token bucket local rate-limiting mechanism.\nIt defines the parameters for controlling the rate at which requests are allowed.",
+                  "properties": {
+                    "fillInterval": {
+                      "description": "FillInterval defines the time duration between consecutive token fills.\nThis value must be a valid duration string (e.g., \"1s\", \"500ms\").\nIt determines the frequency of token replenishment.",
+                      "type": "string",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "invalid duration value",
+                          "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                        },
+                        {
+                          "message": "must be at least 50ms",
+                          "rule": "duration(self) >= duration('50ms')"
+                        }
+                      ]
+                    },
+                    "maxTokens": {
+                      "description": "MaxTokens specifies the maximum number of tokens that the bucket can hold.\nThis value must be greater than or equal to 1.\nIt determines the burst capacity of the rate limiter.",
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "tokensPerFill": {
+                      "default": 1,
+                      "description": "TokensPerFill specifies the number of tokens added to the bucket during each fill interval.\nIf not specified, it defaults to 1.\nThis controls the steady-state rate of token generation.",
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "fillInterval",
+                    "maxTokens"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "rbac": {
+          "description": "RBAC specifies the role-based access control configuration for the policy.\nThis defines the rules for authorization based on roles and permissions.\nRBAC policies applied at different attachment points in the configuration\nhierarchy are not cumulative, and only the most specific policy is enforced. This means an RBAC policy\nattached to a route will override any RBAC policies applied to the gateway or listener.",
+          "properties": {
+            "action": {
+              "default": "Allow",
+              "description": "Action defines whether the rule allows or denies the request if matched.\nIf unspecified, the default is \"Allow\".",
+              "enum": [
+                "Allow",
+                "Deny"
+              ],
+              "type": "string"
+            },
+            "policy": {
+              "description": "Policy specifies the Authorization rule to evaluate.\nA policy matches when **any** of the conditions evaluates to true.",
+              "properties": {
+                "matchExpressions": {
+                  "description": "MatchExpressions defines a set of conditions that must be satisfied for the rule to match.\nThese expression should be in the form of a Common Expression Language (CEL) expression.",
+                  "items": {
+                    "description": "CELExpression represents a Common Expression Language (CEL) expression.",
+                    "maxLength": 16384,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 256,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "required": [
+                "matchExpressions"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "policy"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "retry": {
+          "description": "Retry defines the policy for retrying requests.\nIt is applicable to HTTPRoutes, Gateway listeners and XListenerSets, and ignored for other targeted kinds.",
+          "properties": {
+            "attempts": {
+              "default": 1,
+              "description": "Attempts specifies the number of retry attempts for a request.\nDefaults to 1 attempt if not set.\nA value of 0 effectively disables retries.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "backoffBaseInterval": {
+              "default": "25ms",
+              "description": "BackoffBaseInterval specifies the base interval used with a fully jittered exponential back-off between retries.\nDefaults to 25ms if not set.\nGiven a backoff base interval B and retry number N, the back-off for the retry is in the range [0, (2^N-1)*B].\nThe backoff interval is capped at a max of 10 times the base interval.\nE.g., given a value of 25ms, the first retry will be delayed randomly by 0-24ms, the 2nd by 0-74ms,\nthe 3rd by 0-174ms, and so on, and capped to a max of 10 times the base interval (250ms).",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "invalid duration value",
+                  "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                },
+                {
+                  "message": "retry.backoffBaseInterval must be at least 1ms.",
+                  "rule": "duration(self) >= duration('1ms')"
+                }
+              ]
+            },
+            "perTryTimeout": {
+              "description": "PerTryTimeout specifies the timeout per retry attempt (incliding the initial attempt).\nIf a global timeout is configured on a route, this timeout must be less than the global\nroute timeout.\nIt is specified as a sequence of decimal numbers, each with optional fraction and a unit suffix, such as \"1s\" or \"500ms\".",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "invalid duration value",
+                  "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                },
+                {
+                  "message": "retry.perTryTimeout must be at least 1ms.",
+                  "rule": "duration(self) >= duration('1ms')"
+                }
+              ]
+            },
+            "retryOn": {
+              "description": "RetryOn specifies the conditions under which a retry should be attempted.",
+              "items": {
+                "description": "RetryOnCondition specifies the condition under which retry takes place.",
+                "enum": [
+                  "5xx",
+                  "gateway-error",
+                  "reset",
+                  "reset-before-request",
+                  "connect-failure",
+                  "envoy-ratelimited",
+                  "retriable-4xx",
+                  "refused-stream",
+                  "retriable-status-codes",
+                  "http3-post-connect-failure",
+                  "cancelled",
+                  "deadline-exceeded",
+                  "internal",
+                  "resource-exhausted",
+                  "unavailable"
+                ],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "statusCodes": {
+              "description": "StatusCodes specifies the HTTP status codes in the range 400-599 that should be retried in addition\nto the conditions specified in RetryOn.",
+              "items": {
+                "description": "HTTPRouteRetryStatusCode defines an HTTP response status code for\nwhich a backend request should be retried.\n\nImplementations MUST support the following status codes as retryable:\n\n* 500\n* 502\n* 503\n* 504\n\nImplementations MAY support specifying additional discrete values in the\n500-599 range.\n\nImplementations MAY support specifying discrete values in the 400-499 range,\nwhich are often inadvisable to retry.\n\n<gateway:experimental>",
+                "maximum": 599,
+                "minimum": 400,
+                "type": "integer"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "retryOn or statusCodes must be set.",
+              "rule": "has(self.retryOn) || has(self.statusCodes)"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "targetRefs": {
+          "description": "TargetRefs specifies the target resources by reference to attach the policy to.",
+          "items": {
+            "description": "Select the object to attach the policy by Group, Kind, Name and SectionName.\nThe object must be in the same namespace as the policy.\nYou can target only one object at a time.",
+            "properties": {
+              "group": {
+                "description": "The API group of the target resource.\nFor Kubernetes Gateway API resources, the group is `gateway.networking.k8s.io`.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "The API kind of the target resource,\nsuch as Gateway or HTTPRoute.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              "sectionName": {
+                "description": "The section name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "targetRefs may only reference Gateway, HTTPRoute, or ListenerSet resources",
+              "rule": "self.all(r, (r.kind == 'Gateway' || r.kind == 'HTTPRoute' || r.kind.endsWith('ListenerSet')))"
+            }
+          ]
+        },
+        "targetSelectors": {
+          "description": "TargetSelectors specifies the target selectors to select resources to attach the policy to.",
+          "items": {
+            "description": "LocalPolicyTargetSelectorWithSectionName the object to attach the policy by Group, Kind, MatchLabels, and optionally SectionName.\nThe object must be in the same namespace as the policy and match the\nspecified labels.\nDo not use targetSelectors when reconciliation times are critical, especially if you\nhave a large number of policies that target the same resource.\nInstead, use targetRefs to attach the policy.",
+            "properties": {
+              "group": {
+                "description": "The API group of the target resource.\nFor Kubernetes Gateway API resources, the group is `gateway.networking.k8s.io`.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "The API kind of the target resource,\nsuch as Gateway or HTTPRoute.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "matchLabels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Label selector to select the target resource.",
+                "type": "object"
+              },
+              "sectionName": {
+                "description": "The section name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "matchLabels"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "targetSelectors may only reference Gateway, HTTPRoute, or ListenerSet resources",
+              "rule": "self.all(r, (r.kind == 'Gateway' || r.kind == 'HTTPRoute' || r.kind.endsWith('ListenerSet')))"
+            }
+          ]
+        },
+        "timeouts": {
+          "description": "Timeouts defines the timeouts for requests\nIt is applicable to HTTPRoutes and ignored for other targeted kinds.",
+          "properties": {
+            "request": {
+              "description": "Request specifies a timeout for an individual request from the gateway to a backend.\nThis spans between the point at which the entire downstream request (i.e. end-of-stream) has been\nprocessed and when the backend response has been completely processed.\nA value of 0 effectively disables the timeout.\nIt is specified as a sequence of decimal numbers, each with optional fraction and a unit suffix, such as \"1s\" or \"500ms\".",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "invalid duration value",
+                  "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                }
+              ]
+            },
+            "streamIdle": {
+              "description": "StreamIdle specifies a timeout for a requests' idle streams.\nA value of 0 effectively disables the timeout.",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "invalid duration value",
+                  "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "transformation": {
+          "description": "Transformation is used to mutate and transform requests and responses\nbefore forwarding them to the destination.",
+          "properties": {
+            "request": {
+              "description": "Request is used to modify the request path.",
+              "properties": {
+                "add": {
+                  "description": "Add is a list of headers to add to the request and what that value should be set to.\nIf there is already a header with these values then append the value as an extra entry.\nAdd is not supported on arm64 build, see https://github.com/kgateway-dev/kgateway/blob/v2.2.x/docs/guides/transformation.md for details",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the header to interact with.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the Inja template to apply to generate the output value for the header.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "body": {
+                  "description": "Body controls both how to parse the body and if needed how to set.\nIf empty, body will not be buffered.",
+                  "properties": {
+                    "parseAs": {
+                      "default": "AsString",
+                      "description": "ParseAs defines what auto formatting should be applied to the body.\nThis can make interacting with keys within a json body much easier if AsJson is selected.",
+                      "enum": [
+                        "AsString",
+                        "AsJson"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Value is the template to apply to generate the output value for the body.\nOnly Inja templates are supported.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "remove": {
+                  "description": "Remove is a list of header names to remove from the request/response.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "set": {
+                  "description": "Set is a list of headers and the value they should be set to.",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the header to interact with.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the Inja template to apply to generate the output value for the header.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "response": {
+              "description": "Response is used to modify the response path.",
+              "properties": {
+                "add": {
+                  "description": "Add is a list of headers to add to the request and what that value should be set to.\nIf there is already a header with these values then append the value as an extra entry.\nAdd is not supported on arm64 build, see https://github.com/kgateway-dev/kgateway/blob/v2.2.x/docs/guides/transformation.md for details",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the header to interact with.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the Inja template to apply to generate the output value for the header.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "body": {
+                  "description": "Body controls both how to parse the body and if needed how to set.\nIf empty, body will not be buffered.",
+                  "properties": {
+                    "parseAs": {
+                      "default": "AsString",
+                      "description": "ParseAs defines what auto formatting should be applied to the body.\nThis can make interacting with keys within a json body much easier if AsJson is selected.",
+                      "enum": [
+                        "AsString",
+                        "AsJson"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Value is the template to apply to generate the output value for the body.\nOnly Inja templates are supported.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "remove": {
+                  "description": "Remove is a list of header names to remove from the request/response.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set"
+                },
+                "set": {
+                  "description": "Set is a list of headers and the value they should be set to.",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the header to interact with.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value is the Inja template to apply to generate the output value for the header.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "urlRewrite": {
+          "description": "UrlRewrite specifies URL rewrite rules for matching requests.\nNOTE: This field is only honored for HTTPRoute targets.",
+          "properties": {
+            "pathRegex": {
+              "description": "Path specifies the path rewrite configuration.",
+              "properties": {
+                "pattern": {
+                  "description": "Pattern is the regex pattern that matches the URL path.\nThe pattern must be a valid RE2 regular expression.\nIf the HTTPRoute uses a RegularExpression path match, this field can use capture groups\nfrom that match.",
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "substitution": {
+                  "description": "Substitution is the replacement string for the matched pattern.\nIt can include backreferences to captured groups from the pattern (e.g., \\1, \\2)\nor named groups (e.g., \\g<name>).",
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pattern",
+                "substitution"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of the fields in [pathRegex] must be set",
+              "rule": "[has(self.pathRegex)].filter(x,x==true).size() >= 1"
+            }
+          ],
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "autoHostRewrite can only be used when targeting HTTPRoute resources",
+          "rule": "!has(self.autoHostRewrite) || ((has(self.targetRefs) && self.targetRefs.all(r, r.kind == 'HTTPRoute')) || (has(self.targetSelectors) && self.targetSelectors.all(r, r.kind == 'HTTPRoute')))"
+        },
+        {
+          "message": "retry.perTryTimeout must be less than timeouts.request",
+          "rule": "has(self.retry) && has(self.timeouts) ? (has(self.retry.perTryTimeout) && has(self.timeouts.request) ? duration(self.retry.perTryTimeout) < duration(self.timeouts.request) : true) : true"
+        },
+        {
+          "message": "targetRefs[].sectionName must be set when targeting Gateway resources with retry policy",
+          "rule": "has(self.retry) && has(self.targetRefs) ? self.targetRefs.all(r, (r.kind == 'Gateway' ? has(r.sectionName) : true )) : true"
+        },
+        {
+          "message": "targetSelectors[].sectionName must be set when targeting Gateway resources with retry policy",
+          "rule": "has(self.retry) && has(self.targetSelectors) ? self.targetSelectors.all(r, (r.kind == 'Gateway' ? has(r.sectionName) : true )) : true"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "PolicyStatus defines the common attributes that all Policies should include within\ntheir status.",
+      "properties": {
+        "ancestors": {
+          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",
+          "items": {
+            "description": "PolicyAncestorStatus describes the status of a route with respect to an\nassociated Ancestor.\n\nAncestors refer to objects that are either the Target of a policy or above it\nin terms of object hierarchy. For example, if a policy targets a Service, the\nPolicy's Ancestors are, in order, the Service, the HTTPRoute, the Gateway, and\nthe GatewayClass. Almost always, in this hierarchy, the Gateway will be the most\nuseful object to place Policy status on, so we recommend that implementations\nSHOULD use Gateway as the PolicyAncestorStatus object unless the designers\nhave a _very_ good reason otherwise.\n\nIn the context of policy attachment, the Ancestor is used to distinguish which\nresource results in a distinct application of this policy. For example, if a policy\ntargets a Service, it may have a distinct result per attached Gateway.\n\nPolicies targeting the same resource may have different effects depending on the\nancestors of those resources. For example, different Gateways targeting the same\nService may have different capabilities, especially if they have different underlying\nimplementations.\n\nFor example, in BackendTLSPolicy, the Policy attaches to a Service that is\nused as a backend in a HTTPRoute that is itself attached to a Gateway.\nIn this case, the relevant object for status is the Gateway, and that is the\nancestor object referred to in this status.\n\nNote that a parent is also an ancestor, so for objects where the parent is the\nrelevant object for status, this struct SHOULD still be used.\n\nThis struct is intended to be used in a slice that's effectively a map,\nwith a composite key made up of the AncestorRef and the ControllerName.",
+            "properties": {
+              "ancestorRef": {
+                "description": "AncestorRef corresponds with a ParentRef in the spec that this\nPolicyAncestorStatus struct describes the status of.",
+                "properties": {
+                  "group": {
+                    "default": "gateway.networking.k8s.io",
+                    "description": "Group is the group of the referent.\nWhen unspecified, \"gateway.networking.k8s.io\" is inferred.\nTo set the core API group (such as for a \"Service\" kind referent),\nGroup must be explicitly set to \"\" (empty string).\n\nSupport: Core",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "default": "Gateway",
+                    "description": "Kind is kind of the referent.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nSupport for other resources is Implementation-Specific.",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the referent. When unspecified, this refers\nto the local namespace of the Route.\n\nNote that there are specific rules for ParentRefs which cross namespace\nboundaries. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example:\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable any other kind of cross-namespace reference.\n\n<gateway:experimental:description>\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.\n</gateway:experimental:description>\n\nSupport: Core",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the network port this Route targets. It can be interpreted\ndifferently based on the type of parent resource.\n\nWhen the parent resource is a Gateway, this targets all listeners\nlistening on the specified port that also support this kind of Route(and\nselect this Route). It's not recommended to set `Port` unless the\nnetworking behaviors specified in a Route must apply to a specific port\nas opposed to a listener(s) whose port(s) may be changed. When both Port\nand SectionName are specified, the name and port of the selected listener\nmust match both specified values.\n\n<gateway:experimental:description>\nWhen the parent resource is a Service, this targets a specific port in the\nService spec. When both Port (experimental) and SectionName are specified,\nthe name and port of the selected port must match both specified values.\n</gateway:experimental:description>\n\nImplementations MAY choose to support other parent resources.\nImplementations supporting other types of parent resources MUST clearly\ndocument how/if Port is interpreted.\n\nFor the purpose of status, an attachment is considered successful as\nlong as the parent resource accepts it partially. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment\nfrom the referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route,\nthe Route MUST be considered detached from the Gateway.\n\nSupport: Extended",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sectionName": {
+                    "description": "SectionName is the name of a section within the target resource. In the\nfollowing resources, SectionName is interpreted as the following:\n\n* Gateway: Listener name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n* Service: Port name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n\nImplementations MAY choose to support attaching Routes to other resources.\nIf that is the case, they MUST clearly document how SectionName is\ninterpreted.\n\nWhen unspecified (empty string), this will reference the entire resource.\nFor the purpose of status, an attachment is considered successful if at\nleast one section in the parent resource accepts it. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment from\nthe referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route, the\nRoute MUST be considered detached from the Gateway.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "conditions": {
+                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.\n\n<gateway:util:excludeFromCRD>\n\nNotes for implementors:\n\nConditions are a listType `map`, which means that they function like a\nmap with a key of the `type` field _in the k8s apiserver_.\n\nThis means that implementations must obey some rules when updating this\nsection.\n\n* Implementations MUST perform a read-modify-write cycle on this field\n  before modifying it. That is, when modifying this field, implementations\n  must be confident they have fetched the most recent version of this field,\n  and ensure that changes they make are on that recent version.\n* Implementations MUST NOT remove or reorder Conditions that they are not\n  directly responsible for. For example, if an implementation sees a Condition\n  with type `special.io/SomeField`, it MUST NOT remove, change or update that\n  Condition.\n* Implementations MUST always _merge_ changes into Conditions of the same Type,\n  rather than creating more than one Condition of the same Type.\n* Implementations MUST always update the `observedGeneration` field of the\n  Condition to the `metadata.generation` of the Gateway at the time of update creation.\n* If the `observedGeneration` of a Condition is _greater than_ the value the\n  implementation knows about, then it MUST NOT perform the update on that Condition,\n  but must wait for a future reconciliation and status update. (The assumption is that\n  the implementation's copy of the object is stale and an update will be re-triggered\n  if relevant.)\n\n</gateway:util:excludeFromCRD>",
+                "items": {
+                  "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                      "maxLength": 32768,
+                      "type": "string"
+                    },
+                    "observedGeneration": {
+                      "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "status of the condition, one of True, False, Unknown.",
+                      "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                      "maxLength": 316,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lastTransitionTime",
+                    "message",
+                    "reason",
+                    "status",
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "controllerName": {
+                "description": "ControllerName is a domain/path string that indicates the name of the\ncontroller that wrote this status. This corresponds with the\ncontrollerName field on GatewayClass.\n\nExample: \"example.net/gateway-controller\".\n\nThe format of this field is DOMAIN \"/\" PATH, where DOMAIN and PATH are\nvalid Kubernetes names\n(https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names).\n\nControllers MUST populate this field when writing status. Controllers should ensure that\nentries to status populated with their ControllerName are cleaned up when they are no\nlonger necessary.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&'()*+,;=:]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ancestorRef",
+              "conditions",
+              "controllerName"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "ancestors"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

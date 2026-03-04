@@ -3,9 +3,15 @@
 
 set -euo pipefail
 
+# Support kubectl context via KUBECTL_CONTEXT environment variable
+KUBECTL_ARGS=(kubectl)
+if [ -n "${KUBECTL_CONTEXT:-}" ]; then
+    KUBECTL_ARGS=(kubectl --context="${KUBECTL_CONTEXT}")
+fi
+
 fetch_crd() {
     filename=${1%% *}
-    kubectl get crds "$filename" -o yaml >"$TMP/$filename.yaml" 2>&1
+    "${KUBECTL_ARGS[@]}" get crds "$filename" -o yaml >"$TMP/$filename.yaml" 2>&1
 }
 
 # Check if python3 is installed
@@ -64,8 +70,13 @@ SCHEMAS_DIR=${OUTPUT_DIR:-$HOME/.datree/crdSchemas}
 mkdir -p "$SCHEMAS_DIR"
 
 # Get a list of all CRDs
-printf "Fetching list of CRDs...\n"
-IFS=$'\n' read -r -d '' -a CRD_LIST < <(kubectl get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2 && printf '\0')
+printf "Fetching list of CRDs..."
+if [ -n "${KUBECTL_CONTEXT:-}" ]; then
+    printf " (using context: %s)\n" "${KUBECTL_CONTEXT}"
+else
+    printf "\n"
+fi
+IFS=$'\n' read -r -d '' -a CRD_LIST < <("${KUBECTL_ARGS[@]}" get crds 2>&1 | sed -n '/NAME/,$p' | tail -n +2 && printf '\0')
 
 # If no CRDs exist in the cluster, exit
 if [ ${#CRD_LIST[@]} == 0 ]; then

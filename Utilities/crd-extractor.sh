@@ -11,7 +11,9 @@ fi
 
 fetch_crd() {
     filename=${1%% *}
-    "${KUBECTL_ARGS[@]}" get crds "$filename" -o yaml >"$TMP/$filename.yaml" 2>&1
+    if ! "${KUBECTL_ARGS[@]}" get crds "$filename" -o yaml >"$TMP/$filename.yaml" 2>/dev/null; then
+        printf "Warning: Failed to extract CRD: %s\n" "$filename" >&2
+    fi
 }
 
 # Check if python3 is installed

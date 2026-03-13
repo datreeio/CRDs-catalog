@@ -2,11 +2,11 @@
   "description": "ConfigConnector is the Schema for the configconnectors API",
   "properties": {
     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
       "type": "string"
     },
     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
       "type": "string"
     },
     "metadata": {
@@ -71,19 +71,66 @@
       ],
       "description": "ConfigConnectorSpec defines the desired state of ConfigConnector",
       "properties": {
-        "credentialSecretName": {
-          "description": "The Kubernetes secret that contains the Google Service Account Key's credentials to be used by ConfigConnector to authenticate with Google Cloud APIs. This field is used only when in cluster mode. It's recommended to use `googleServiceAccount` when running ConfigConnector in Google Kubernetes Engine (GKE) clusters with Workload Identity enabled. This field cannot be specified together with `googleServiceAccount`.",
+        "actuationMode": {
+          "description": "The actuation mode of Config Connector controls how resources are actuated onto the cloud provider.\nThis can be either 'Reconciling' or 'Paused'.\nIn 'Paused', k8s resources are still reconciled with the api server but not actuated onto the cloud provider.\nIf Config Connector is running in 'namespaced' mode, then the value in ConfigConnectorContext (CCC) takes precedence.\nIf CCC doesn't define a value but ConfigConnector (CC) does, we defer to that value. Otherwise,\nthe default is 'Reconciling' where resources get actuated.",
+          "enum": [
+            "Reconciling",
+            "Paused"
+          ],
           "type": "string"
         },
+        "credentialSecretName": {
+          "description": "The Kubernetes secret that contains the Google Service Account Key's credentials to be used by ConfigConnector to authenticate with Google Cloud APIs. This field is used only when in cluster mode.\nIt's recommended to use `googleServiceAccount` when running ConfigConnector in Google Kubernetes Engine (GKE) clusters with Workload Identity enabled.\nThis field cannot be specified together with `googleServiceAccount`.",
+          "type": "string"
+        },
+        "experiments": {
+          "description": "ConfigConnector specific experiments",
+          "properties": {
+            "multiClusterLease": {
+              "description": "MultiClusterLease defines configuration specific to multi-cluster leader election.",
+              "properties": {
+                "clusterCandidateIdentity": {
+                  "description": "The identity of the cluster candidate for the KCC components, hared by all KCC replicas\nand workloads across all clusters that are part of the same election.\n This name must be unique across all the clusters that you are configuring the multi cluster set up for.",
+                  "type": "string"
+                },
+                "leaseName": {
+                  "description": "The name of the MultiClusterLease object that KCC will create.",
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace where the MultiClusterLease object will be created.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "clusterCandidateIdentity",
+                "leaseName",
+                "namespace"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "googleServiceAccount": {
-          "description": "The Google Service Account to be used by Config Connector to authenticate with Google Cloud APIs. This field is used only when running in cluster mode with Workload Identity enabled. See Google Kubernetes Engine (GKE) workload-identity (https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) for details. This field cannot be specified together with `credentialSecretName`. For namespaced mode, use `googleServiceAccount` in ConfigConnectorContext CRD to specify the Google Service Account to be used to authenticate with Google Cloud APIs per namespace.",
+          "description": "The Google Service Account to be used by Config Connector to authenticate with Google Cloud APIs. This field is used only when running in cluster mode with Workload Identity enabled.\nSee Google Kubernetes Engine (GKE) workload-identity (https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) for details. This field cannot be specified together with `credentialSecretName`.\nFor namespaced mode, use `googleServiceAccount` in ConfigConnectorContext CRD to specify the Google Service Account to be used to authenticate with Google Cloud APIs per namespace.",
           "type": "string"
         },
         "mode": {
-          "description": "The mode that Config Connector will run in. This can be either 'cluster' or 'namespaced'. The default is 'namespaced'. Cluster mode uses a single Google Service Account to create and manage resources, even if you are using Config Connector to manage multiple Projects. You must specify either `credentialSecretName` or `googleServiceAccount` when in cluster mode, but not both. Namespaced mode allows you to use different Google service accounts for different Projects. When in namespaced mode, you must create a ConfigConnectorContext object per namespace that you want to enable Config Connector in, and each must set `googleServiceAccount` to specify the Google Service Account to be used to authenticate with Google Cloud APIs for the namespace.",
+          "description": "The mode that Config Connector will run in. This can be either 'cluster' or 'namespaced'. The default is 'namespaced'.\nCluster mode uses a single Google Service Account to create and manage resources, even if you are using Config Connector to manage multiple Projects.\nYou must specify either `credentialSecretName` or `googleServiceAccount` when in cluster mode, but not both.\nNamespaced mode allows you to use different Google service accounts for different Projects.\nWhen in namespaced mode, you must create a ConfigConnectorContext object per namespace that you want to enable Config Connector in, and each must set `googleServiceAccount` to specify the Google Service Account to be used to authenticate with Google Cloud APIs for the namespace.",
           "enum": [
             "cluster",
             "namespaced"
+          ],
+          "type": "string"
+        },
+        "stateIntoSpec": {
+          "description": "StateIntoSpec is the user override of the default value for the\n'cnrm.cloud.google.com/state-into-spec' annotation if the annotation is\nunset for a resource.\nIf the field is set in both the ConfigConnector object and the\nConfigConnectorContext object is in the namespaced mode, then the value\nin the ConfigConnectorContext object will be used.\n'Absent' means that unspecified fields in the resource spec stay\nunspecified after successful reconciliation.\n'Merge' means that unspecified fields in the resource spec are populated\nafter a successful reconciliation if those unspecified fields are\ncomputed/defaulted by the API. It is only applicable to resources\nsupporting the 'Merge' option.",
+          "enum": [
+            "Absent",
+            "Merge"
           ],
           "type": "string"
         }
@@ -103,12 +150,18 @@
         "healthy": {
           "type": "boolean"
         },
+        "observedGeneration": {
+          "default": 0,
+          "format": "int64",
+          "type": "integer"
+        },
         "phase": {
           "type": "string"
         }
       },
       "required": [
-        "healthy"
+        "healthy",
+        "observedGeneration"
       ],
       "type": "object",
       "additionalProperties": false

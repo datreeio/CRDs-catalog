@@ -36,13 +36,24 @@
           "type": "boolean"
         },
         "hostname": {
-          "description": "Hostname is the tailnet hostname that should be assigned to the\nConnector node. If unset, hostname defaults to <connector\nname>-connector. Hostname can contain lower case letters, numbers and\ndashes, it must not start or end with a dash and must be between 2\nand 63 characters long.",
+          "description": "Hostname is the tailnet hostname that should be assigned to the\nConnector node. If unset, hostname defaults to <connector\nname>-connector. Hostname can contain lower case letters, numbers and\ndashes, it must not start or end with a dash and must be between 2\nand 63 characters long. This field should only be used when creating a connector\nwith an unspecified number of replicas, or a single replica.",
           "pattern": "^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$",
+          "type": "string"
+        },
+        "hostnamePrefix": {
+          "description": "HostnamePrefix specifies the hostname prefix for each\nreplica. Each device will have the integer number\nfrom its StatefulSet pod appended to this prefix to form the full hostname.\nHostnamePrefix can contain lower case letters, numbers and dashes, it\nmust not start with a dash and must be between 1 and 62 characters long.",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,61}$",
           "type": "string"
         },
         "proxyClass": {
           "description": "ProxyClass is the name of the ProxyClass custom resource that\ncontains configuration options that should be applied to the\nresources created for this Connector. If unset, the operator will\ncreate resources with the default configuration.",
           "type": "string"
+        },
+        "replicas": {
+          "description": "Replicas specifies how many devices to create. Set this to enable\nhigh availability for app connectors, subnet routers, or exit nodes.\nhttps://tailscale.com/kb/1115/high-availability. Defaults to 1.",
+          "format": "int32",
+          "minimum": 0,
+          "type": "integer"
         },
         "subnetRouter": {
           "description": "SubnetRouter defines subnet routes that the Connector device should\nexpose to tailnet as a Tailscale subnet router.\nhttps://tailscale.com/kb/1019/subnets/\nIf this field is unset, the device does not get configured as a Tailscale subnet router.\nThis field is mutually exclusive with the appConnector field.",
@@ -81,6 +92,14 @@
         {
           "message": "The appConnector field is mutually exclusive with exitNode and subnetRouter fields.",
           "rule": "!((has(self.subnetRouter) || (has(self.exitNode)  && self.exitNode == true)) && has(self.appConnector))"
+        },
+        {
+          "message": "The hostname field cannot be specified when replicas is greater than 1.",
+          "rule": "!(has(self.hostname) && has(self.replicas) && self.replicas > 1)"
+        },
+        {
+          "message": "The hostname and hostnamePrefix fields are mutually exclusive.",
+          "rule": "!(has(self.hostname) && has(self.hostnamePrefix))"
         }
       ],
       "additionalProperties": false
@@ -148,8 +167,29 @@
           ],
           "x-kubernetes-list-type": "map"
         },
+        "devices": {
+          "description": "Devices contains information on each device managed by the Connector resource.",
+          "items": {
+            "properties": {
+              "hostname": {
+                "description": "Hostname is the fully qualified domain name of the Connector replica.\nIf MagicDNS is enabled in your tailnet, it is the MagicDNS name of the\nnode.",
+                "type": "string"
+              },
+              "tailnetIPs": {
+                "description": "TailnetIPs is the set of tailnet IP addresses (both IPv4 and IPv6)\nassigned to the Connector replica.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "hostname": {
-          "description": "Hostname is the fully qualified domain name of the Connector node.\nIf MagicDNS is enabled in your tailnet, it is the MagicDNS name of the\nnode.",
+          "description": "Hostname is the fully qualified domain name of the Connector node.\nIf MagicDNS is enabled in your tailnet, it is the MagicDNS name of the\nnode. When using multiple replicas, this field will be populated with the\nfirst replica's hostname. Use the Hostnames field for the full list\nof hostnames.",
           "type": "string"
         },
         "isAppConnector": {

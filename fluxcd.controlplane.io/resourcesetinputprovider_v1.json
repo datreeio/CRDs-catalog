@@ -16,7 +16,7 @@
       "description": "ResourceSetInputProviderSpec defines the desired state of ResourceSetInputProvider",
       "properties": {
         "certSecretRef": {
-          "description": "CertSecretRef specifies the Kubernetes Secret containing either or both of\n\n- a PEM-encoded CA certificate (`ca.crt`)\n- a PEM-encoded client certificate (`tls.crt`) and private key (`tls.key`)\n\nWhen connecting to a Git provider that uses self-signed certificates, the CA certificate\nmust be set in the Secret under the 'ca.crt' key to establish the trust relationship.",
+          "description": "CertSecretRef specifies the Kubernetes Secret containing either or both of\n\n- a PEM-encoded CA certificate (`ca.crt`)\n- a PEM-encoded client certificate (`tls.crt`) and private key (`tls.key`)\n\nWhen connecting to a Git or OCI provider that uses self-signed certificates, the CA certificate\nmust be set in the Secret under the 'ca.crt' key to establish the trust relationship.\nWhen connecting to an OCI provider that supports client certificates (mTLS), the client certificate\nand private key must be set in the Secret under the 'tls.crt' and 'tls.key' keys, respectively.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -43,8 +43,16 @@
               "description": "ExcludeBranch specifies the regular expression to filter the branches\nthat the input provider should exclude.",
               "type": "string"
             },
+            "excludeTag": {
+              "description": "ExcludeTag specifies the regular expression to filter the tags\nthat the input provider should exclude.",
+              "type": "string"
+            },
             "includeBranch": {
               "description": "IncludeBranch specifies the regular expression to filter the branches\nthat the input provider should include.",
+              "type": "string"
+            },
+            "includeTag": {
+              "description": "IncludeTag specifies the regular expression to filter the tags\nthat the input provider should include.",
               "type": "string"
             },
             "labels": {
@@ -55,15 +63,49 @@
               "type": "array"
             },
             "limit": {
+              "default": 100,
               "description": "Limit specifies the maximum number of input sets to return.\nWhen not set, the default limit is 100.",
               "type": "integer"
+            },
+            "semver": {
+              "description": "Semver specifies a semantic version range to filter and sort the tags.\nIf this field is not specified, the tags will be sorted in reverse\nalphabetical order.\nSupported only for tags at the moment.",
+              "type": "string"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
+        "schedule": {
+          "description": "Schedule defines the schedules for the input provider to run.",
+          "items": {
+            "description": "Schedule defines a schedule for something to run.",
+            "properties": {
+              "cron": {
+                "description": "Cron specifies the cron expression for the schedule.",
+                "type": "string"
+              },
+              "timeZone": {
+                "default": "UTC",
+                "description": "TimeZone specifies the time zone for the cron schedule. Defaults to UTC.",
+                "type": "string"
+              },
+              "window": {
+                "default": "0s",
+                "description": "Window defines the time window during which the execution is allowed.\nDefaults to 0s, meaning no window is applied.",
+                "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "cron"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "secretRef": {
-          "description": "SecretRef specifies the Kubernetes Secret containing the basic-auth credentials\nto access the input provider. The secret must contain the keys\n'username' and 'password'.\nWhen connecting to a Git provider, the password should be a personal access token\nthat grants read-only access to the repository.",
+          "description": "SecretRef specifies the Kubernetes Secret containing the basic-auth credentials\nto access the input provider.\nWhen connecting to a Git provider, the secret must contain the keys\n'username' and 'password', and the password should be a personal access token\nthat grants read-only access to the repository.\nWhen connecting to an OCI provider, the secret must contain a Kubernetes\nImage Pull Secret, as if created by `kubectl create secret docker-registry`.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -76,27 +118,88 @@
           "type": "object",
           "additionalProperties": false
         },
+        "serviceAccountName": {
+          "description": "ServiceAccountName specifies the name of the Kubernetes ServiceAccount\nused for authentication with AWS, Azure or GCP services through\nworkload identity federation features. If not specified, the\nauthentication for these cloud providers will use the ServiceAccount\nof the operator (or any other environment authentication configuration).",
+          "type": "string"
+        },
+        "skip": {
+          "description": "Skip defines whether we need to skip input provider response updates.",
+          "properties": {
+            "labels": {
+              "description": "Labels specifies list of labels to skip input provider response when any of the label conditions matched.\nWhen prefixed with !, input provider response will be skipped if it does not have this label.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "type": {
           "description": "Type specifies the type of the input provider.",
           "enum": [
+            "Static",
             "GitHubBranch",
+            "GitHubTag",
             "GitHubPullRequest",
             "GitLabBranch",
-            "GitLabMergeRequest"
+            "GitLabTag",
+            "GitLabMergeRequest",
+            "AzureDevOpsBranch",
+            "AzureDevOpsTag",
+            "AzureDevOpsPullRequest",
+            "OCIArtifactTag",
+            "ACRArtifactTag",
+            "ECRArtifactTag",
+            "GARArtifactTag"
           ],
           "type": "string"
         },
         "url": {
-          "description": "URL specifies the HTTP/S address of the input provider API.\nWhen connecting to a Git provider, the URL should point to the repository address.",
-          "pattern": "^(http|https)://.*$",
+          "description": "URL specifies the HTTP/S or OCI address of the input provider API.\nWhen connecting to a Git provider, the URL should point to the repository address.\nWhen connecting to an OCI provider, the URL should point to the OCI repository address.",
+          "pattern": "^((http|https|oci)://.*){0,1}$",
           "type": "string"
         }
       },
       "required": [
-        "type",
-        "url"
+        "type"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "spec.url must be empty when spec.type is 'Static'",
+          "rule": "self.type != 'Static' || !has(self.url)"
+        },
+        {
+          "message": "spec.url must not be empty when spec.type is not 'Static'",
+          "rule": "self.type == 'Static' || has(self.url)"
+        },
+        {
+          "message": "spec.url must start with 'http://' or 'https://' when spec.type is a Git provider",
+          "rule": "!self.type.startsWith('Git') || self.url.startsWith('http')"
+        },
+        {
+          "message": "spec.url must start with 'http://' or 'https://' when spec.type is a Git provider",
+          "rule": "!self.type.startsWith('AzureDevOps') || self.url.startsWith('http')"
+        },
+        {
+          "message": "spec.url must start with 'oci://' when spec.type is an OCI provider",
+          "rule": "!self.type.endsWith('ArtifactTag') || self.url.startsWith('oci')"
+        },
+        {
+          "message": "cannot specify spec.serviceAccountName when spec.type is not one of AzureDevOps* or *ArtifactTag",
+          "rule": "!has(self.serviceAccountName) || self.type.startsWith('AzureDevOps') || self.type.endsWith('ArtifactTag')"
+        },
+        {
+          "message": "cannot specify spec.certSecretRef when spec.type is one of Static, AzureDevOps*, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
+          "rule": "!has(self.certSecretRef) || !(self.url == 'Static' || self.type.startsWith('AzureDevOps') || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
+        },
+        {
+          "message": "cannot specify spec.secretRef when spec.type is one of Static, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
+          "rule": "!has(self.secretRef) || !(self.url == 'Static' || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
@@ -173,9 +276,44 @@
           "description": "LastExportedRevision is the digest of the\ninputs that were last reconcile.",
           "type": "string"
         },
+        "lastHandledForceAt": {
+          "description": "LastHandledForceAt holds the value of the most recent\nforce request value, so a change of the annotation value\ncan be detected.",
+          "type": "string"
+        },
         "lastHandledReconcileAt": {
           "description": "LastHandledReconcileAt holds the value of the most recent\nreconcile request value, so a change of the annotation value\ncan be detected.",
           "type": "string"
+        },
+        "nextSchedule": {
+          "description": "NextSchedule is the next schedule when the input provider will run.",
+          "properties": {
+            "cron": {
+              "description": "Cron specifies the cron expression for the schedule.",
+              "type": "string"
+            },
+            "timeZone": {
+              "default": "UTC",
+              "description": "TimeZone specifies the time zone for the cron schedule. Defaults to UTC.",
+              "type": "string"
+            },
+            "when": {
+              "description": "When is the next time the schedule will run.",
+              "format": "date-time",
+              "type": "string"
+            },
+            "window": {
+              "default": "0s",
+              "description": "Window defines the time window during which the execution is allowed.\nDefaults to 0s, meaning no window is applied.",
+              "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "cron",
+            "when"
+          ],
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "type": "object",

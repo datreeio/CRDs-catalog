@@ -198,7 +198,7 @@
                     "type": "string"
                   },
                   "volumeAttributesClassName": {
-                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+                    "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
                     "type": "string"
                   },
                   "volumeMode": {
@@ -311,11 +311,11 @@
                     "x-kubernetes-list-type": "map"
                   },
                   "currentVolumeAttributesClassName": {
-                    "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                    "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                     "type": "string"
                   },
                   "modifyVolumeStatus": {
-                    "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                    "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
                     "properties": {
                       "status": {
                         "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",
@@ -451,7 +451,7 @@
           "description": "ConfigReloaderResources config-reloader container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
@@ -580,7 +580,7 @@
           "type": "boolean"
         },
         "disableNamespaceMatcher": {
-          "description": "DisableNamespaceMatcher disables top route namespace label matcher for VMAlertmanagerConfig\nIt may be useful if alert doesn't have namespace label for some reason",
+          "description": "DisableNamespaceMatcher disables adding top route label matcher \"namespace = <VMAlertmanagerConfig.namespace>\" for VMAlertmanagerConfig\nIt may be useful if alert doesn't have namespace label for some reason",
           "type": "boolean"
         },
         "disableRouteContinueEnforce": {
@@ -641,6 +641,10 @@
           "description": "DNSPolicy sets DNS policy for the pod",
           "type": "string"
         },
+        "enforcedNamespaceLabel": {
+          "description": "EnforcedNamespaceLabel defines the namespace label key for top route matcher for VMAlertmanagerConfig\nDefault is \"namespace\"",
+          "type": "string"
+        },
         "enforcedTopRouteMatchers": {
           "description": "EnforcedTopRouteMatchers defines label matchers to be added for the top route\nof VMAlertmanagerConfig\nIt allows to make some set of labels required for alerts.\nhttps://prometheus.io/docs/alerting/latest/configuration/#matcher",
           "items": {
@@ -665,7 +669,7 @@
             "description": "EnvVar represents an environment variable present in a Container.",
             "properties": {
               "name": {
-                "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                "description": "Name of the environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "value": {
@@ -685,7 +689,7 @@
         "extraEnvsFrom": {
           "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
           "items": {
-            "description": "EnvFromSource represents the source of a set of ConfigMaps",
+            "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
             "properties": {
               "configMapRef": {
                 "description": "The ConfigMap to select from",
@@ -705,7 +709,7 @@
                 "additionalProperties": false
               },
               "prefix": {
-                "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                "description": "Optional text to prepend to the name of each environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "secretRef": {
@@ -1146,6 +1150,21 @@
           "description": "Paused If set to true all actions on the underlying managed objects are not\ngoing to be performed, except for delete actions.",
           "type": "boolean"
         },
+        "persistentVolumeClaimRetentionPolicy": {
+          "description": "PersistentVolumeClaimRetentionPolicy allows configuration of PVC retention policy",
+          "properties": {
+            "whenDeleted": {
+              "description": "WhenDeleted specifies what happens to PVCs created from StatefulSet\nVolumeClaimTemplates when the StatefulSet is deleted. The default policy\nof `Retain` causes PVCs to not be affected by StatefulSet deletion. The\n`Delete` policy causes those PVCs to be deleted.",
+              "type": "string"
+            },
+            "whenScaled": {
+              "description": "WhenScaled specifies what happens to PVCs created from StatefulSet\nVolumeClaimTemplates when the StatefulSet is scaled down. The default\npolicy of `Retain` causes PVCs to not be affected by a scaledown. The\n`Delete` policy causes the associated PVCs for any excess pods above\nthe replica count to be deleted.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "podDisruptionBudget": {
           "description": "PodDisruptionBudget created by operator",
           "properties": {
@@ -1179,6 +1198,14 @@
               },
               "description": "replaces default labels selector generated by operator\nit's useful when you need to create custom budget",
               "type": "object"
+            },
+            "unhealthyPodEvictionPolicy": {
+              "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods\n\nValid policies are IfHealthyBudget and AlwaysAllow.\nIf no policy is specified, the default behavior will be used,\nwhich corresponds to the IfHealthyBudget policy.\nAvailable from operator v0.64.0",
+              "enum": [
+                "IfHealthyBudget",
+                "AlwaysAllow"
+              ],
+              "type": "string"
             }
           },
           "type": "object",
@@ -1253,7 +1280,7 @@
           "description": "Resources container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
@@ -1449,7 +1476,7 @@
               "additionalProperties": false
             },
             "volumeClaimTemplate": {
-              "description": "A PVC spec to be used by the VMAlertManager StatefulSets.",
+              "description": "A PVC spec to be used by the StatefulSets/Deployments.",
               "properties": {
                 "apiVersion": {
                   "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -1637,7 +1664,7 @@
                       "type": "string"
                     },
                     "volumeAttributesClassName": {
-                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+                      "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
                       "type": "string"
                     },
                     "volumeMode": {
@@ -1750,11 +1777,11 @@
                       "x-kubernetes-list-type": "map"
                     },
                     "currentVolumeAttributesClassName": {
-                      "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                      "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                       "type": "string"
                     },
                     "modifyVolumeStatus": {
-                      "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.\nThis is a beta field and requires enabling VolumeAttributesClass feature (off by default).",
+                      "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
                       "properties": {
                         "status": {
                           "description": "status is the status of the ControllerModifyVolume operation. It can be in any of following states:\n - Pending\n   Pending indicates that the PersistentVolumeClaim cannot be modified due to unmet requirements, such as\n   the specified VolumeAttributesClass not existing.\n - InProgress\n   InProgress indicates that the volume is being modified.\n - Infeasible\n  Infeasible indicates that the request has been rejected as invalid by the CSI driver. To\n\t  resolve the error, a valid VolumeAttributesClass needs to be specified.\nNote: New statuses can be added in the future. Consumers should check for unknown statuses and fail appropriately.",

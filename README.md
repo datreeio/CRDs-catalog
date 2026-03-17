@@ -53,7 +53,7 @@ This repository also contains a handy utility that extracts all CRDs from a clus
 
 ### What does this utility do?
 1. Checks that the prerequisites are installed.
-2. Extracts your CRDs from your cluster using kubectl.
+2. Extracts your CRDs from your cluster using kubectl (optionally from a specific [Kubernetes context](#using-a-specific-kubernetes-context) via `KUBECTL_CONTEXT`).
 3. Using the script from [openapi2jsonschema.py from kubeconform](https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py) to convert your CRDs from openAPI to JSON schema.
 
 ### Supported Platforms
@@ -65,11 +65,45 @@ The following programs are required to be installed on the machine running this 
 * [python3](https://www.python.org/downloads/)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
 
+Alternatively, you can use [Nix](https://nixos.org/) or [Devbox](https://www.jetify.com/devbox) to automatically set up all dependencies.
+
 ### Usage
-To use the CRD Extractor:  
+To use the CRD Extractor:
 1. Download the [latest release](https://github.com/datreeio/CRDs-catalog/releases/latest/download/crd-extractor.zip) from this repository.
 2. Extract, and run the utility:
 ```
+cd Utilities
+./crd-extractor.sh
+```
+
+#### Using a specific Kubernetes context
+To extract CRDs from a specific Kubernetes cluster context, set the `KUBECTL_CONTEXT` environment variable:
+```
+cd Utilities
+KUBECTL_CONTEXT=staging ./crd-extractor.sh
+```
+
+Or export it before running:
+```
+export KUBECTL_CONTEXT=staging
+cd Utilities
+./crd-extractor.sh
+```
+
+If `KUBECTL_CONTEXT` is not set, the utility will use your default kubectl context.
+
+#### Using Devbox
+If you have [Devbox](https://www.jetify.com/devbox) installed:
+```
+cd Utilities
+devbox run crd-extractor
+```
+
+#### Using Nix
+If you have [Nix](https://nixos.org/) with flakes enabled:
+```
+cd Utilities
+nix develop
 ./crd-extractor.sh
 ```
 

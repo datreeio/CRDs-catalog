@@ -110,7 +110,7 @@
             "description": "EnvVar represents an environment variable present in a Container.",
             "properties": {
               "name": {
-                "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                "description": "Name of the environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "value": {
@@ -130,7 +130,7 @@
         "extraEnvsFrom": {
           "description": "ExtraEnvsFrom defines source of env variables for the application container\ncould either be secret or configmap",
           "items": {
-            "description": "EnvFromSource represents the source of a set of ConfigMaps",
+            "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
             "properties": {
               "configMapRef": {
                 "description": "The ConfigMap to select from",
@@ -150,7 +150,7 @@
                 "additionalProperties": false
               },
               "prefix": {
-                "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+                "description": "Optional text to prepend to the name of each environment variable.\nMay consist of any printable ASCII characters except '='.",
                 "type": "string"
               },
               "secretRef": {
@@ -419,7 +419,7 @@
           "description": "Resources container resource request and limits, https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/\nif not defined default resources from operator config will be used",
           "properties": {
             "claims": {
-              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis is an alpha field and requires enabling the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
               "items": {
                 "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
                 "properties": {
@@ -728,7 +728,7 @@
               "type": "string"
             },
             "volumeAttributesClassName": {
-              "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string value means that no VolumeAttributesClass\nwill be applied to the claim but it's not allowed to reset this field to empty string once it is set.\nIf unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass\nwill be set by the persistentvolume controller if it exists.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/\n(Beta) Using this field requires the VolumeAttributesClass feature gate to be enabled (off by default).",
+              "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
               "type": "string"
             },
             "volumeMode": {
@@ -767,6 +767,156 @@
             "name": {
               "description": "Name must be unique within a namespace. Is required when creating resources, although\nsome resources may allow a client to request the generation of an appropriate name\nautomatically. Name is primarily intended for creation idempotence and configuration\ndefinition.\nCannot be updated.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names",
               "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "syslogSpec": {
+          "description": "SyslogSpec defines syslog listener configuration",
+          "properties": {
+            "tcpListeners": {
+              "description": "TCPListeners defines syslog server TCP listener configuration",
+              "items": {
+                "description": "SyslogTCPListener defines configuration for TCP syslog server listen",
+                "properties": {
+                  "compressMethod": {
+                    "description": "CompressMethod for syslog messages\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#compression",
+                    "pattern": "^(none|zstd|gzip|deflate)$",
+                    "type": "string"
+                  },
+                  "decolorizeFields": {
+                    "description": "DecolorizeFields to remove ANSI color codes across logs\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#decolorizing-fields",
+                    "type": "string"
+                  },
+                  "ignoreFields": {
+                    "description": "IgnoreFields to ignore at logs\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#dropping-fields",
+                    "type": "string"
+                  },
+                  "listenPort": {
+                    "description": "ListenPort defines listen port",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "streamFields": {
+                    "description": "StreamFields to use as log stream labels\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#stream-fields",
+                    "type": "string"
+                  },
+                  "tenantID": {
+                    "description": "TenantID for logs ingested in form of accountID:projectID\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#multiple-configs",
+                    "type": "string"
+                  },
+                  "tlsConfig": {
+                    "description": "TLSServerConfig defines VictoriaMetrics TLS configuration for the application's server",
+                    "properties": {
+                      "certFile": {
+                        "description": "CertFile defines path to the pre-mounted file with certificate\nmutually exclusive with CertSecret",
+                        "type": "string"
+                      },
+                      "certSecret": {
+                        "description": "CertSecretRef defines reference for secret with certificate content under given key\nmutually exclusive with CertFile",
+                        "properties": {
+                          "key": {
+                            "description": "The key of the secret to select from.  Must be a valid secret key.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "keyFile": {
+                        "description": "KeyFile defines path to the pre-mounted file with certificate key\nmutually exclusive with KeySecretRef",
+                        "type": "string"
+                      },
+                      "keySecret": {
+                        "description": "Key defines reference for secret with certificate key content under given key\nmutually exclusive with KeyFile",
+                        "properties": {
+                          "key": {
+                            "description": "The key of the secret to select from.  Must be a valid secret key.",
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "description": "Specify whether the Secret or its key must be defined",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "listenPort"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "udpListeners": {
+              "description": "UDPListeners defines syslog server UDP listener configuration",
+              "items": {
+                "description": "SyslogUDPListener defines configuration for UDP syslog server listen",
+                "properties": {
+                  "compressMethod": {
+                    "description": "CompressMethod for syslog messages\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#compression",
+                    "pattern": "^(none|zstd|gzip|deflate)$",
+                    "type": "string"
+                  },
+                  "decolorizeFields": {
+                    "description": "DecolorizeFields to remove ANSI color codes across logs\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#decolorizing-fields",
+                    "type": "string"
+                  },
+                  "ignoreFields": {
+                    "description": "IgnoreFields to ignore at logs\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#dropping-fields",
+                    "type": "string"
+                  },
+                  "listenPort": {
+                    "description": "ListenPort defines listen port",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "streamFields": {
+                    "description": "StreamFields to use as log stream labels\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#stream-fields",
+                    "type": "string"
+                  },
+                  "tenantID": {
+                    "description": "TenantID for logs ingested in form of accountID:projectID\nsee https://docs.victoriametrics.com/victorialogs/data-ingestion/syslog/#multiple-configs",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "listenPort"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
             }
           },
           "type": "object",

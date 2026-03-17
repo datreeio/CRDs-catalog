@@ -12,7 +12,7 @@
       "type": "object"
     },
     "spec": {
-      "description": "The specification of the Kafka Bridge.",
+      "description": "The specification of the HTTP Bridge.",
       "properties": {
         "adminClient": {
           "description": "Kafka AdminClient related configuration.",
@@ -68,7 +68,7 @@
                   "type": "string"
                 },
                 "key": {
-                  "description": "The name of the private key in the Secret.",
+                  "description": "The name of the private key in the secret. The private key must be in unencrypted PKCS #8 format. For more information, see RFC 5208: https://datatracker.ietf.org/doc/html/rfc5208.",
                   "type": "string"
                 },
                 "secretName": {
@@ -134,6 +134,11 @@
               "type": "object",
               "additionalProperties": false
             },
+            "config": {
+              "description": "Configuration for the custom authentication mechanism. Only properties with the `sasl.` and `ssl.keystore.` prefixes are allowed. Specify other options in the regular configuration section of the custom resource.",
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            },
             "connectTimeoutSeconds": {
               "description": "The connect timeout in seconds when connecting to authorization server. If not set, the effective connect timeout is 60 seconds.",
               "type": "integer"
@@ -145,6 +150,10 @@
             "enableMetrics": {
               "description": "Enable or disable OAuth metrics. Default value is `false`.",
               "type": "boolean"
+            },
+            "grantType": {
+              "description": "A custom OAuth grant type to use when authenticating against the authorization server with `clientId` and one of `clientSecret` or `clientAssertion`. The value defaults to `client_credentials` in these cases. This is optional configuration, only used with custom authorization server implementations.",
+              "type": "string"
             },
             "httpRetries": {
               "description": "The maximum number of retries to attempt if an initial HTTP request fails. If not set, the default is to not attempt any retries.",
@@ -203,6 +212,10 @@
               ],
               "type": "object",
               "additionalProperties": false
+            },
+            "sasl": {
+              "description": "Enable or disable SASL on this authentication mechanism.",
+              "type": "boolean"
             },
             "saslExtensions": {
               "additionalProperties": {
@@ -263,13 +276,14 @@
               "type": "string"
             },
             "type": {
-              "description": "Authentication type. Currently the supported types are `tls`, `scram-sha-256`, `scram-sha-512`, `plain`, and 'oauth'. `scram-sha-256` and `scram-sha-512` types use SASL SCRAM-SHA-256 and SASL SCRAM-SHA-512 Authentication, respectively. `plain` type uses SASL PLAIN Authentication. `oauth` type uses SASL OAUTHBEARER Authentication. The `tls` type uses TLS Client Authentication. The `tls` type is supported only over TLS connections.",
+              "description": "Specifies the authentication type. Supported types are `tls`, `scram-sha-256`, `scram-sha-512`, `plain`, 'oauth', and `custom`. `tls` uses TLS client authentication and is supported only over TLS connections. `scram-sha-256` and `scram-sha-512` use SASL SCRAM-SHA-256 and SASL SCRAM-SHA-512 authentication, respectively. `plain` uses SASL PLAIN authentication. `oauth` uses SASL OAUTHBEARER authentication. `custom` allows you to configure a custom authentication mechanism. As of Strimzi 0.49.0, `oauth` type is deprecated and will be removed in the `v1` API version. Please use `custom` type instead.",
               "enum": [
                 "tls",
                 "scram-sha-256",
                 "scram-sha-512",
                 "plain",
-                "oauth"
+                "oauth",
+                "custom"
               ],
               "type": "string"
             },
@@ -313,7 +327,7 @@
           "additionalProperties": false
         },
         "enableMetrics": {
-          "description": "Enable the metrics for the Kafka Bridge. Default is false.",
+          "description": "Enable the metrics for the HTTP Bridge. Default is false.",
           "type": "boolean"
         },
         "http": {
@@ -354,11 +368,11 @@
           "additionalProperties": false
         },
         "image": {
-          "description": "The container image used for Kafka Bridge pods. If no image name is explicitly specified, the image name corresponds to the image specified in the Cluster Operator configuration. If an image name is not defined in the Cluster Operator configuration, a default value is used.",
+          "description": "The container image used for HTTP Bridge pods. If no image name is explicitly specified, the image name corresponds to the image specified in the Cluster Operator configuration. If an image name is not defined in the Cluster Operator configuration, a default value is used.",
           "type": "string"
         },
         "jvmOptions": {
-          "description": "**Currently not supported** JVM Options for pods.",
+          "description": "JVM Options for pods.",
           "properties": {
             "-XX": {
               "additionalProperties": {
@@ -436,7 +450,7 @@
           "additionalProperties": false
         },
         "logging": {
-          "description": "Logging configuration for Kafka Bridge.",
+          "description": "Logging configuration for HTTP Bridge.",
           "properties": {
             "loggers": {
               "additionalProperties": {
@@ -481,6 +495,67 @@
             "type"
           ],
           "type": "object",
+          "additionalProperties": false
+        },
+        "metricsConfig": {
+          "description": "Metrics configuration.",
+          "properties": {
+            "type": {
+              "description": "Metrics type. The supported types are `jmxPrometheusExporter` and `strimziMetricsReporter`. Type `jmxPrometheusExporter` uses the Prometheus JMX Exporter to expose Kafka JMX metrics in Prometheus format through an HTTP endpoint. Type `strimziMetricsReporter` uses the Strimzi Metrics Reporter to directly expose Kafka metrics in Prometheus format through an HTTP endpoint.",
+              "enum": [
+                "jmxPrometheusExporter",
+                "strimziMetricsReporter"
+              ],
+              "type": "string"
+            },
+            "valueFrom": {
+              "description": "ConfigMap entry where the Prometheus JMX Exporter configuration is stored.",
+              "properties": {
+                "configMapKeyRef": {
+                  "description": "Reference to the key in the ConfigMap containing the configuration.",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "values": {
+              "description": "Configuration values for the Strimzi Metrics Reporter.",
+              "properties": {
+                "allowList": {
+                  "description": "A list of regex patterns to filter the metrics to collect. Should contain at least one element.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "valueFrom property is required",
+              "rule": "self.type != 'jmxPrometheusExporter' || has(self.valueFrom)"
+            }
+          ],
           "additionalProperties": false
         },
         "producer": {
@@ -547,7 +622,7 @@
           "additionalProperties": false
         },
         "replicas": {
-          "description": "The number of pods in the `Deployment`.  Defaults to `1`.",
+          "description": "The number of pods in the `Deployment`. Required in the `v1` version of the Strimzi API. Defaults to `1` in the `v1beta2` version of the Strimzi API.",
           "minimum": 0,
           "type": "integer"
         },
@@ -558,6 +633,9 @@
               "items": {
                 "properties": {
                   "name": {
+                    "type": "string"
+                  },
+                  "request": {
                     "type": "string"
                   }
                 },
@@ -601,10 +679,10 @@
           "additionalProperties": false
         },
         "template": {
-          "description": "Template for Kafka Bridge resources. The template allows users to specify how a `Deployment` and `Pod` is generated.",
+          "description": "Template for HTTP Bridge resources. The template allows users to specify how a `Deployment` and `Pod` is generated.",
           "properties": {
             "apiService": {
-              "description": "Template for Kafka Bridge API `Service`.",
+              "description": "Template for HTTP Bridge API `Service`.",
               "properties": {
                 "ipFamilies": {
                   "description": "Specifies the IP Families used by the service. Available options are `IPv4` and `IPv6`. If unspecified, Kubernetes will choose the default value based on the `ipFamilyPolicy` setting.",
@@ -652,7 +730,7 @@
               "additionalProperties": false
             },
             "bridgeContainer": {
-              "description": "Template for the Kafka Bridge container.",
+              "description": "Template for the HTTP Bridge container.",
               "properties": {
                 "env": {
                   "description": "Environment variables which should be applied to the container.",
@@ -889,7 +967,7 @@
               "additionalProperties": false
             },
             "clusterRoleBinding": {
-              "description": "Template for the Kafka Bridge ClusterRoleBinding.",
+              "description": "Template for the HTTP Bridge ClusterRoleBinding.",
               "properties": {
                 "metadata": {
                   "description": "Metadata applied to the resource.",
@@ -917,7 +995,7 @@
               "additionalProperties": false
             },
             "deployment": {
-              "description": "Template for Kafka Bridge `Deployment`.",
+              "description": "Template for HTTP Bridge `Deployment`.",
               "properties": {
                 "deploymentStrategy": {
                   "description": "Pod replacement strategy for deployment configuration changes. Valid values are `RollingUpdate` and `Recreate`. Defaults to `RollingUpdate`.",
@@ -953,7 +1031,7 @@
               "additionalProperties": false
             },
             "initContainer": {
-              "description": "Template for the Kafka Bridge init container.",
+              "description": "Template for the HTTP Bridge init container.",
               "properties": {
                 "env": {
                   "description": "Environment variables which should be applied to the container.",
@@ -1190,7 +1268,7 @@
               "additionalProperties": false
             },
             "pod": {
-              "description": "Template for Kafka Bridge `Pods`.",
+              "description": "Template for HTTP Bridge `Pods`.",
               "properties": {
                 "affinity": {
                   "description": "The pod's affinity rules.",
@@ -1736,6 +1814,50 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "dnsConfig": {
+                  "description": "The pod's DNSConfig. If specified, it will be merged to the generated DNS configuration based on the DNSPolicy.",
+                  "properties": {
+                    "nameservers": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "options": {
+                      "items": {
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array"
+                    },
+                    "searches": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "dnsPolicy": {
+                  "description": "The pod's DNSPolicy. Defaults to `ClusterFirst`. Valid values are `ClusterFirstWithHostNet`, `ClusterFirst`, `Default` or `None`.",
+                  "enum": [
+                    "ClusterFirst",
+                    "ClusterFirstWithHostNet",
+                    "Default",
+                    "None"
+                  ],
+                  "type": "string"
+                },
                 "enableServiceLinks": {
                   "description": "Indicates whether information about services should be injected into Pod's environment variables.",
                   "type": "boolean"
@@ -1831,6 +1953,9 @@
                     "runAsUser": {
                       "type": "integer"
                     },
+                    "seLinuxChangePolicy": {
+                      "type": "string"
+                    },
                     "seLinuxOptions": {
                       "properties": {
                         "level": {
@@ -1866,6 +1991,9 @@
                         "type": "integer"
                       },
                       "type": "array"
+                    },
+                    "supplementalGroupsPolicy": {
+                      "type": "string"
                     },
                     "sysctls": {
                       "items": {
@@ -2015,6 +2143,7 @@
                           "configMap": {},
                           "csi": {},
                           "emptyDir": {},
+                          "image": {},
                           "persistentVolumeClaim": {},
                           "secret": {}
                         }
@@ -2022,7 +2151,7 @@
                     ],
                     "properties": {
                       "configMap": {
-                        "description": "ConfigMap to use to populate the volume.",
+                        "description": "`ConfigMap` to use to populate the volume.",
                         "properties": {
                           "defaultMode": {
                             "type": "integer"
@@ -2056,7 +2185,7 @@
                         "additionalProperties": false
                       },
                       "csi": {
-                        "description": "CSIVolumeSource object to use to populate the volume.",
+                        "description": "`CSIVolumeSource` object to use to populate the volume.",
                         "properties": {
                           "driver": {
                             "type": "string"
@@ -2087,22 +2216,32 @@
                         "additionalProperties": false
                       },
                       "emptyDir": {
-                        "description": "EmptyDir to use to populate the volume.",
+                        "description": "`EmptyDir` to use to populate the volume.",
                         "properties": {
                           "medium": {
+                            "description": "Medium represents the type of storage medium should back this volume. Valid values are unset or `Memory`. When not set, it will use the node's default medium.",
+                            "enum": [
+                              "Memory"
+                            ],
                             "type": "string"
                           },
                           "sizeLimit": {
-                            "properties": {
-                              "amount": {
-                                "type": "string"
-                              },
-                              "format": {
-                                "type": "string"
-                              }
-                            },
-                            "type": "object",
-                            "additionalProperties": false
+                            "description": "The total amount of local storage required for this EmptyDir volume (for example 1Gi).",
+                            "pattern": "^([0-9.]+)([eEinumkKMGTP]*[-+]?[0-9]*)$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "image": {
+                        "description": "`ImageVolumeSource` object to use to populate the volume.",
+                        "properties": {
+                          "pullPolicy": {
+                            "type": "string"
+                          },
+                          "reference": {
+                            "type": "string"
                           }
                         },
                         "type": "object",
@@ -2113,7 +2252,7 @@
                         "type": "string"
                       },
                       "persistentVolumeClaim": {
-                        "description": "PersistentVolumeClaim object to use to populate the volume.",
+                        "description": "`PersistentVolumeClaim` object to use to populate the volume.",
                         "properties": {
                           "claimName": {
                             "type": "string"
@@ -2126,7 +2265,7 @@
                         "additionalProperties": false
                       },
                       "secret": {
-                        "description": "Secret to use populate the volume.",
+                        "description": "`Secret` to use to populate the volume.",
                         "properties": {
                           "defaultMode": {
                             "type": "integer"
@@ -2170,7 +2309,7 @@
               "additionalProperties": false
             },
             "podDisruptionBudget": {
-              "description": "Template for Kafka Bridge `PodDisruptionBudget`.",
+              "description": "Template for HTTP Bridge `PodDisruptionBudget`.",
               "properties": {
                 "maxUnavailable": {
                   "description": "Maximum number of unavailable pods to allow automatic Pod eviction. A Pod eviction is allowed when the `maxUnavailable` number of pods or fewer are unavailable after the eviction. Setting this value to 0 prevents all voluntary evictions, so the pods must be evicted manually. Defaults to 1.",
@@ -2203,7 +2342,7 @@
               "additionalProperties": false
             },
             "serviceAccount": {
-              "description": "Template for the Kafka Bridge service account.",
+              "description": "Template for the HTTP Bridge service account.",
               "properties": {
                 "metadata": {
                   "description": "Metadata applied to the resource.",
@@ -2235,7 +2374,7 @@
           "additionalProperties": false
         },
         "tls": {
-          "description": "TLS configuration for connecting Kafka Bridge to the cluster.",
+          "description": "TLS configuration for connecting HTTP Bridge to the cluster.",
           "properties": {
             "trustedCertificates": {
               "description": "Trusted certificates for TLS connection.",
@@ -2285,7 +2424,7 @@
           "additionalProperties": false
         },
         "tracing": {
-          "description": "The configuration of tracing in Kafka Bridge.",
+          "description": "The configuration of tracing in HTTP Bridge.",
           "properties": {
             "type": {
               "description": "Type of the tracing used. Currently the only supported type is `opentelemetry` for OpenTelemetry tracing. As of Strimzi 0.37.0, `jaeger` type is not supported anymore and this option is ignored.",
@@ -2310,7 +2449,7 @@
       "additionalProperties": false
     },
     "status": {
-      "description": "The status of the Kafka Bridge.",
+      "description": "The status of the HTTP Bridge.",
       "properties": {
         "conditions": {
           "description": "List of status conditions.",
@@ -2355,7 +2494,7 @@
           "type": "integer"
         },
         "url": {
-          "description": "The URL at which external client applications can access the Kafka Bridge.",
+          "description": "The URL at which external client applications can access the HTTP Bridge.",
           "type": "string"
         }
       },

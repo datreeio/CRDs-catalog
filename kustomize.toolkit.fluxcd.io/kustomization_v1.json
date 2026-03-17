@@ -37,7 +37,7 @@
           "additionalProperties": false
         },
         "components": {
-          "description": "Components specifies relative paths to specifications of other Components.",
+          "description": "Components specifies relative paths to kustomize Components.",
           "items": {
             "type": "string"
           },
@@ -89,16 +89,20 @@
           "type": "string"
         },
         "dependsOn": {
-          "description": "DependsOn may contain a meta.NamespacedObjectReference slice\nwith references to Kustomization resources that must be ready before this\nKustomization can be reconciled.",
+          "description": "DependsOn may contain a DependencyReference slice\nwith references to Kustomization resources that must be ready before this\nKustomization can be reconciled.",
           "items": {
-            "description": "NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any\nnamespace.",
+            "description": "DependencyReference defines a Kustomization dependency on another Kustomization resource.",
             "properties": {
               "name": {
                 "description": "Name of the referent.",
                 "type": "string"
               },
               "namespace": {
-                "description": "Namespace of the referent, when not specified it acts as LocalObjectReference.",
+                "description": "Namespace of the referent, defaults to the namespace of the Kustomization\nresource object that contains the reference.",
+                "type": "string"
+              },
+              "readyExpr": {
+                "description": "ReadyExpr is a CEL expression that can be used to assess the readiness\nof a dependency. When specified, the built-in readiness check\nis replaced by the logic defined in the CEL expression.\nTo make the CEL expression additive to the built-in readiness check,\nthe feature gate `AdditiveCELDependencyCheck` must be set to `true`.",
                 "type": "string"
               }
             },
@@ -182,6 +186,10 @@
           },
           "type": "array"
         },
+        "ignoreMissingComponents": {
+          "description": "IgnoreMissingComponents instructs the controller to ignore Components paths\nnot found in source by removing them from the generated kustomization.yaml\nbefore running kustomize build.",
+          "type": "boolean"
+        },
         "images": {
           "description": "Images is a list of (image name, new name, new tag or digest)\nfor changing image names, tags or digests. This can also be achieved with a\npatch, but this operator is simpler to specify.",
           "items": {
@@ -220,8 +228,22 @@
         "kubeConfig": {
           "description": "The KubeConfig for reconciling the Kustomization on a remote cluster.\nWhen used in combination with KustomizationSpec.ServiceAccountName,\nforces the controller to act on behalf of that Service Account at the\ntarget cluster.\nIf the --default-service-account flag is set, its value will be used as\na controller level fallback for when KustomizationSpec.ServiceAccountName\nis empty.",
           "properties": {
+            "configMapRef": {
+              "description": "ConfigMapRef holds an optional name of a ConfigMap that contains\nthe following keys:\n\n- `provider`: the provider to use. One of `aws`, `azure`, `gcp`, or\n   `generic`. Required.\n- `cluster`: the fully qualified resource name of the Kubernetes\n   cluster in the cloud provider API. Not used by the `generic`\n   provider. Required when one of `address` or `ca.crt` is not set.\n- `address`: the address of the Kubernetes API server. Required\n   for `generic`. For the other providers, if not specified, the\n   first address in the cluster resource will be used, and if\n   specified, it must match one of the addresses in the cluster\n   resource.\n   If audiences is not set, will be used as the audience for the\n   `generic` provider.\n- `ca.crt`: the optional PEM-encoded CA certificate for the\n   Kubernetes API server. If not set, the controller will use the\n   CA certificate from the cluster resource.\n- `audiences`: the optional audiences as a list of\n   line-break-separated strings for the Kubernetes ServiceAccount\n   token. Defaults to the `address` for the `generic` provider, or\n   to specific values for the other providers depending on the\n   provider.\n-  `serviceAccountName`: the optional name of the Kubernetes\n   ServiceAccount in the same namespace that should be used\n   for authentication. If not specified, the controller\n   ServiceAccount will be used.\n\nMutually exclusive with SecretRef.",
+              "properties": {
+                "name": {
+                  "description": "Name of the referent.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "secretRef": {
-              "description": "SecretRef holds the name of a secret that contains a key with\nthe kubeconfig file as the value. If no key is set, the key will default\nto 'value'.\nIt is recommended that the kubeconfig is self-contained, and the secret\nis regularly updated if credentials such as a cloud-access-token expire.\nCloud specific `cmd-path` auth helpers will not function without adding\nbinaries and credentials to the Pod that is responsible for reconciling\nKubernetes resources.",
+              "description": "SecretRef holds an optional name of a secret that contains a key with\nthe kubeconfig file as the value. If no key is set, the key will default\nto 'value'. Mutually exclusive with ConfigMapRef.\nIt is recommended that the kubeconfig is self-contained, and the secret\nis regularly updated if credentials such as a cloud-access-token expire.\nCloud specific `cmd-path` auth helpers will not function without adding\nbinaries and credentials to the Pod that is responsible for reconciling\nKubernetes resources. Supported only for the generic provider.",
               "properties": {
                 "key": {
                   "description": "Key in the Secret, when not specified an implementation-specific default key is used.",
@@ -239,10 +261,17 @@
               "additionalProperties": false
             }
           },
-          "required": [
-            "secretRef"
-          ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of spec.kubeConfig.configMapRef or spec.kubeConfig.secretRef must be specified",
+              "rule": "has(self.configMapRef) || has(self.secretRef)"
+            },
+            {
+              "message": "exactly one of spec.kubeConfig.configMapRef or spec.kubeConfig.secretRef must be specified",
+              "rule": "!has(self.configMapRef) || !has(self.secretRef)"
+            }
+          ],
           "additionalProperties": false
         },
         "namePrefix": {
@@ -387,7 +416,8 @@
               "enum": [
                 "OCIRepository",
                 "GitRepository",
-                "Bucket"
+                "Bucket",
+                "ExternalArtifact"
               ],
               "type": "string"
             },
@@ -490,6 +520,59 @@
               "reason",
               "status",
               "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "history": {
+          "description": "History contains a set of snapshots of the last reconciliation attempts\ntracking the revision, the state and the duration of each attempt.",
+          "items": {
+            "description": "Snapshot represents a point-in-time record of a group of resources reconciliation,\nincluding timing information, status, and a unique digest identifier.",
+            "properties": {
+              "digest": {
+                "description": "Digest is the checksum in the format `<algo>:<hex>` of the resources in this snapshot.",
+                "type": "string"
+              },
+              "firstReconciled": {
+                "description": "FirstReconciled is the time when this revision was first reconciled to the cluster.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastReconciled": {
+                "description": "LastReconciled is the time when this revision was last reconciled to the cluster.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lastReconciledDuration": {
+                "description": "LastReconciledDuration is time it took to reconcile the resources in this revision.",
+                "type": "string"
+              },
+              "lastReconciledStatus": {
+                "description": "LastReconciledStatus is the status of the last reconciliation.",
+                "type": "string"
+              },
+              "metadata": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Metadata contains additional information about the snapshot.",
+                "type": "object"
+              },
+              "totalReconciliations": {
+                "description": "TotalReconciliations is the total number of reconciliations that have occurred for this snapshot.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "digest",
+              "firstReconciled",
+              "lastReconciled",
+              "lastReconciledDuration",
+              "lastReconciledStatus",
+              "totalReconciliations"
             ],
             "type": "object",
             "additionalProperties": false

@@ -60,12 +60,20 @@
             {
               "message": "Value is immutable",
               "rule": "self == oldSelf"
+            },
+            {
+              "message": "Plural name must be lowercase",
+              "rule": "self.plural == self.plural.lowerAscii()"
+            },
+            {
+              "message": "Singular name must be lowercase",
+              "rule": "!has(self.singular) || self.singular == self.singular.lowerAscii()"
             }
           ],
           "additionalProperties": false
         },
         "connectionSecretKeys": {
-          "description": "ConnectionSecretKeys is the list of keys that will be exposed to the end\nuser of the defined kind.\nIf the list is empty, all keys will be published.",
+          "description": "ConnectionSecretKeys is the list of connection secret keys the\ndefined XR can publish. If the list is empty, all keys will be\npublished. If the list isn't empty, any connection secret keys that\ndon't appear in the list will be filtered out. Only LegacyCluster XRs\nsupport connection secrets.",
           "items": {
             "type": "string"
           },
@@ -145,6 +153,12 @@
             "strategy"
           ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "Webhook configuration is required when conversion strategy is Webhook",
+              "rule": "self.strategy == 'Webhook' && has(self.webhook)"
+            }
+          ],
           "additionalProperties": false
         },
         "defaultCompositeDeletePolicy": {
@@ -275,9 +289,33 @@
             {
               "message": "Value is immutable",
               "rule": "self == oldSelf"
+            },
+            {
+              "message": "Plural name must be lowercase",
+              "rule": "self.plural == self.plural.lowerAscii()"
+            },
+            {
+              "message": "Singular name must be lowercase",
+              "rule": "!has(self.singular) || self.singular == self.singular.lowerAscii()"
             }
           ],
           "additionalProperties": false
+        },
+        "scope": {
+          "default": "LegacyCluster",
+          "description": "Scope of the defined composite resource. Namespaced composite resources\nare scoped to a single namespace. Cluster scoped composite resource exist\noutside the scope of any namespace. Neither can be claimed. Legacy\ncluster scoped composite resources are cluster scoped resources that can\nbe claimed.",
+          "enum": [
+            "LegacyCluster",
+            "Namespaced",
+            "Cluster"
+          ],
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "Value is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
         },
         "versions": {
           "description": "Versions is the list of all API versions of the defined composite\nresource. Version names are used to compute the order in which served\nversions are listed in API discovery. If the version string is\n\"kube-like\", it will sort above non \"kube-like\" version strings, which\nare ordered lexicographically. \"Kube-like\" versions start with a \"v\",\nthen are followed by a number (the major version), then optionally the\nstring \"alpha\" or \"beta\" and another number (the minor version). These\nare sorted first by GA > beta > alpha (where GA is a version with no\nsuffix such as beta or alpha), and then by comparing major version, then\nminor version. An example sorted list of versions: v10, v2, v1, v11beta2,\nv10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.",
@@ -376,6 +414,16 @@
         "versions"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "Only LegacyCluster composite resources can offer claims",
+          "rule": "self.scope == 'LegacyCluster' || !has(self.claimNames)"
+        },
+        {
+          "message": "Only LegacyCluster composite resources support connection secrets",
+          "rule": "self.scope == 'LegacyCluster' || !has(self.connectionSecretKeys)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

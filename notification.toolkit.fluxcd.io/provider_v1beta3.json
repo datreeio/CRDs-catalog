@@ -21,7 +21,7 @@
           "type": "string"
         },
         "certSecretRef": {
-          "description": "CertSecretRef specifies the Secret containing\na PEM-encoded CA certificate (in the `ca.crt` key).\n\nNote: Support for the `caFile` key has\nbeen deprecated.",
+          "description": "CertSecretRef specifies the Secret containing TLS certificates\nfor secure communication.\n\nSupported configurations:\n- CA-only: Server authentication (provide ca.crt only)\n- mTLS: Mutual authentication (provide ca.crt + tls.crt + tls.key)\n- Client-only: Client authentication with system CA (provide tls.crt + tls.key only)\n\nLegacy keys \"caFile\", \"certFile\", \"keyFile\" are supported but deprecated. Use \"ca.crt\", \"tls.crt\", \"tls.key\" instead.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -49,10 +49,24 @@
           "type": "string"
         },
         "proxy": {
-          "description": "Proxy the HTTP/S address of the proxy server.",
+          "description": "Proxy the HTTP/S address of the proxy server.\nDeprecated: Use ProxySecretRef instead. Will be removed in v1.",
           "maxLength": 2048,
           "pattern": "^(http|https)://.*$",
           "type": "string"
+        },
+        "proxySecretRef": {
+          "description": "ProxySecretRef specifies the Secret containing the proxy configuration\nfor this Provider. The Secret should contain an 'address' key with the\nHTTP/S address of the proxy server. Optional 'username' and 'password'\nkeys can be provided for proxy authentication.",
+          "properties": {
+            "name": {
+              "description": "Name of the referent.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "secretRef": {
           "description": "SecretRef specifies the Secret containing the authentication\ncredentials for this Provider.",
@@ -69,7 +83,7 @@
           "additionalProperties": false
         },
         "serviceAccountName": {
-          "description": "ServiceAccountName is the name of the service account used to\nauthenticate with services from cloud providers. An error is thrown if a\nstatic credential is also defined inside the Secret referenced by the\nSecretRef.",
+          "description": "ServiceAccountName is the name of the Kubernetes ServiceAccount used to\nauthenticate with cloud provider services through workload identity.\nThis enables multi-tenant authentication without storing static credentials.\n\nSupported provider types: azureeventhub, azuredevops, googlepubsub\n\nWhen specified, the controller will:\n1. Create an OIDC token for the specified ServiceAccount\n2. Exchange it for cloud provider credentials via STS\n3. Use the obtained credentials for API authentication\n\nWhen unspecified, controller-level authentication is used (single-tenant).\n\nAn error is thrown if static credentials are also defined in SecretRef.\nThis field requires the ObjectLevelWorkloadIdentity feature gate to be enabled.",
           "type": "string"
         },
         "suspend": {
@@ -110,7 +124,9 @@
             "githubdispatch",
             "pagerduty",
             "datadog",
-            "nats"
+            "nats",
+            "zulip",
+            "otel"
           ],
           "type": "string"
         },

@@ -23,16 +23,64 @@
               "items": {
                 "description": "DatadogPodAutoscalerContainerConstraints defines constraints that should always be respected for a container.\nIf no constraints are set, it enables resource scaling for all containers without any constraints.",
                 "properties": {
+                  "controlledResources": {
+                    "description": "Specifies the resources for which recommendations will be computed.\nIf not specified, it defaults to CPU and Memory.\nIf an empty list is provided, no resource will be controlled (equivalent to Enabled=false).",
+                    "items": {
+                      "description": "ResourceName is the name identifying various resources in a ResourceList.",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "controlledValues": {
+                    "description": "Specifies whether recommendations are made to Requests and Limits (RequestsAndLimits) or Requests only (RequestsOnly).\nThe default is \"RequestsAndLimits\".",
+                    "enum": [
+                      "RequestsAndLimits",
+                      "RequestsOnly"
+                    ],
+                    "type": "string"
+                  },
                   "enabled": {
                     "description": "Enabled, if false, allows one to disable resource autoscaling for the container. Defaults to true.",
                     "type": "boolean"
+                  },
+                  "maxAllowed": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "description": "MaxAllowed is the upper limit for the requests of the container.",
+                    "type": "object"
+                  },
+                  "minAllowed": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "description": "MinAllowed is the lower limit for the requests of the container.",
+                    "type": "object"
                   },
                   "name": {
                     "description": "Name is the name of the container. Can be \"*\" to apply to all containers.",
                     "type": "string"
                   },
                   "requests": {
-                    "description": "Requests defines the constraints for the requests of the container.",
+                    "description": "Requests defines the constraints for the requests of the container.\nWARNING: Deprecated",
                     "properties": {
                       "maxAllowed": {
                         "additionalProperties": {
@@ -82,6 +130,7 @@
             "maxReplicas": {
               "description": "MaxReplicas is the upper limit for the number of POD replicas. Needs to be >= minReplicas.",
               "format": "int32",
+              "minimum": 1,
               "type": "integer"
             },
             "minReplicas": {
@@ -91,9 +140,6 @@
               "type": "integer"
             }
           },
-          "required": [
-            "maxReplicas"
-          ],
           "type": "object",
           "additionalProperties": false
         },
@@ -128,9 +174,9 @@
                     "description": "DatadogPodAutoscalerScalingRule defines rules for horizontal scaling that should be true for a certain amount of time.",
                     "properties": {
                       "periodSeconds": {
-                        "description": "PeriodSeconds specifies the window of time for which the policy should hold true.\nPeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).",
+                        "description": "PeriodSeconds specifies the window of time for which the policy should hold true.\nPeriodSeconds must be greater than zero and less than or equal to 3600 (1 hour).",
                         "format": "int32",
-                        "maximum": 1800,
+                        "maximum": 3600,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -163,7 +209,7 @@
                 "stabilizationWindowSeconds": {
                   "description": "StabilizationWindowSeconds is the number of seconds the controller should lookback at previous recommendations\nbefore deciding to apply a new one. Defaults to 0.",
                   "format": "int32",
-                  "maximum": 1800,
+                  "maximum": 3600,
                   "minimum": 0,
                   "type": "integer"
                 },
@@ -204,9 +250,9 @@
                     "description": "DatadogPodAutoscalerScalingRule defines rules for horizontal scaling that should be true for a certain amount of time.",
                     "properties": {
                       "periodSeconds": {
-                        "description": "PeriodSeconds specifies the window of time for which the policy should hold true.\nPeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).",
+                        "description": "PeriodSeconds specifies the window of time for which the policy should hold true.\nPeriodSeconds must be greater than zero and less than or equal to 3600 (1 hour).",
                         "format": "int32",
-                        "maximum": 1800,
+                        "maximum": 3600,
                         "minimum": 1,
                         "type": "integer"
                       },
@@ -239,7 +285,7 @@
                 "stabilizationWindowSeconds": {
                   "description": "StabilizationWindowSeconds is the number of seconds the controller should lookback at previous recommendations\nbefore deciding to apply a new one. Defaults to 0.",
                   "format": "int32",
-                  "maximum": 1800,
+                  "maximum": 3600,
                   "minimum": 0,
                   "type": "integer"
                 },
@@ -303,15 +349,33 @@
                   "name": {
                     "description": "Name is the name of the resource.",
                     "enum": [
-                      "cpu"
+                      "cpu",
+                      "memory"
                     ],
                     "type": "string"
                   },
                   "value": {
                     "description": "Value is the value of the objective",
                     "properties": {
+                      "absoluteValue": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "description": "AbsoluteValue defines a target as an absolute value divided by the number of running pods.\nUse a plain number (e.g., \"11\" or \"11.5\").\nRepresented as a resource.Quantity to avoid floating point in CRDs.",
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
                       "type": {
-                        "description": "Type specifies how the value is expressed (possible values: Utilization).",
+                        "description": "Type specifies how the value is expressed (possible values: Utilization, AbsoluteValue).",
+                        "enum": [
+                          "Utilization",
+                          "AbsoluteValue"
+                        ],
                         "type": "string"
                       },
                       "utilization": {
@@ -337,21 +401,213 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "customQuery": {
+                "description": "CustomQuery allows to set a controller-level objective.",
+                "properties": {
+                  "request": {
+                    "description": "Request is the timeseries query to use for the objective.",
+                    "properties": {
+                      "formula": {
+                        "description": "Formula to compute (optional).",
+                        "type": "string"
+                      },
+                      "queries": {
+                        "description": "Queries is a list of timeseries queries to use for the objective.\nAt least one query must be specified",
+                        "items": {
+                          "description": "TimeseriesQuery is a discriminated union. Only Metrics and APMMetrics are supported for autoscaling.",
+                          "properties": {
+                            "apmMetrics": {
+                              "description": "ApmMetrics is allows to query APM metrics.",
+                              "properties": {
+                                "groupBy": {
+                                  "description": "GroupBy is the list of tags to group by.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "operationName": {
+                                  "description": "OperationName is the name of the operation to query.",
+                                  "type": "string"
+                                },
+                                "queryFilter": {
+                                  "description": "QueryFilter is the filter to apply to the query.",
+                                  "type": "string"
+                                },
+                                "resourceHash": {
+                                  "description": "ResourceHash is a fingerprint of the resource name that can be used to identify the resource instead of the resource name.",
+                                  "type": "string"
+                                },
+                                "resourceName": {
+                                  "description": "ResourceName is the name of the resource to query.",
+                                  "type": "string"
+                                },
+                                "service": {
+                                  "description": "Service is the name of the service to query.",
+                                  "type": "string"
+                                },
+                                "spanKind": {
+                                  "description": "SpanKind is the kind of span to query.",
+                                  "type": "string"
+                                },
+                                "stat": {
+                                  "description": "Stat defines the statistic to compute for the APM metrics query.",
+                                  "enum": [
+                                    "error_rate",
+                                    "errors",
+                                    "errors_per_second",
+                                    "hits",
+                                    "hits_per_second",
+                                    "apdex",
+                                    "latency_avg",
+                                    "latency_max",
+                                    "latency_p50",
+                                    "latency_p75",
+                                    "latency_p90",
+                                    "latency_p95",
+                                    "latency_p99",
+                                    "latency_p999",
+                                    "latency_distribution",
+                                    "total_time"
+                                  ],
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "stat"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "metrics": {
+                              "description": "Metrics is a standard Datadog metrics query.",
+                              "properties": {
+                                "query": {
+                                  "description": "Classic Datadog metrics query, e.g. \"avg:system.cpu.user{*} by {env}\".",
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "query"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
+                            "name": {
+                              "description": "Optional variable name (\"a\", \"b\", etc.) to reference in formulas.",
+                              "type": "string"
+                            },
+                            "source": {
+                              "description": "Source defines the source of the timeseries query.",
+                              "enum": [
+                                "Metrics",
+                                "ApmMetrics"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "minItems": 1,
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      }
+                    },
+                    "required": [
+                      "queries"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "value": {
+                    "description": "Value is the value of the objective",
+                    "properties": {
+                      "absoluteValue": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "description": "AbsoluteValue defines a target as an absolute value divided by the number of running pods.\nUse a plain number (e.g., \"11\" or \"11.5\").\nRepresented as a resource.Quantity to avoid floating point in CRDs.",
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "type": {
+                        "description": "Type specifies how the value is expressed (possible values: Utilization, AbsoluteValue).",
+                        "enum": [
+                          "Utilization",
+                          "AbsoluteValue"
+                        ],
+                        "type": "string"
+                      },
+                      "utilization": {
+                        "description": "Utilization defines a percentage of the target compared to requested workload",
+                        "format": "int32",
+                        "maximum": 100,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "window": {
+                    "description": "Window is the time duration over which the query is computed. It should contain at least one full sample.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "request",
+                  "value",
+                  "window"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
               "podResource": {
                 "description": "PodResource allows to set a pod-level resource objective.",
                 "properties": {
                   "name": {
                     "description": "Name is the name of the resource.",
                     "enum": [
-                      "cpu"
+                      "cpu",
+                      "memory"
                     ],
                     "type": "string"
                   },
                   "value": {
                     "description": "Value is the value of the objective.",
                     "properties": {
+                      "absoluteValue": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "description": "AbsoluteValue defines a target as an absolute value divided by the number of running pods.\nUse a plain number (e.g., \"11\" or \"11.5\").\nRepresented as a resource.Quantity to avoid floating point in CRDs.",
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
                       "type": {
-                        "description": "Type specifies how the value is expressed (possible values: Utilization).",
+                        "description": "Type specifies how the value is expressed (possible values: Utilization, AbsoluteValue).",
+                        "enum": [
+                          "Utilization",
+                          "AbsoluteValue"
+                        ],
                         "type": "string"
                       },
                       "utilization": {
@@ -380,7 +636,8 @@
                 "description": "Type sets the type of the objective.",
                 "enum": [
                   "PodResource",
-                  "ContainerResource"
+                  "ContainerResource",
+                  "CustomQuery"
                 ],
                 "type": "string"
               }
@@ -493,11 +750,39 @@
               },
               "type": "array"
             },
+            "lastRecommendations": {
+              "description": "LastRecommendations stores the most recent recommendations",
+              "items": {
+                "description": "DatadogPodAutoscalerHorizontalRecommendation defines a horizontal scaling recommendation",
+                "properties": {
+                  "desiredReplicas": {
+                    "description": "Replicas is the recommended number of replicas for the workload",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "generatedAt": {
+                    "description": "GeneratedAt is the timestamp at which the recommendation was generated",
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "source": {
+                    "description": "Source is the source of the value used to scale the target workload",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "desiredReplicas"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
             "target": {
               "description": "Target is the current target of the horizontal scaling",
               "properties": {
                 "desiredReplicas": {
-                  "description": "Replicas is the desired number of replicas for the workload",
+                  "description": "Replicas is the recommended number of replicas for the workload",
                   "format": "int32",
                   "type": "integer"
                 },
@@ -512,8 +797,7 @@
                 }
               },
               "required": [
-                "desiredReplicas",
-                "source"
+                "desiredReplicas"
               ],
               "type": "object",
               "additionalProperties": false

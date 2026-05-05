@@ -20,7 +20,7 @@
           "type": "string"
         },
         "clusterName": {
-          "description": "The name of the cluster to create the association in.",
+          "description": "The name of the cluster to create the EKS Pod Identity association in.",
           "type": "string"
         },
         "clusterRef": {
@@ -43,12 +43,20 @@
           "type": "object",
           "additionalProperties": false
         },
+        "disableSessionTags": {
+          "description": "Disable the automatic sessions tags that are appended by EKS Pod Identity.\n\nEKS Pod Identity adds a pre-defined set of session tags when it assumes the\nrole. You can use these tags to author a single role that can work across\nresources by allowing access to Amazon Web Services resources based on matching\ntags. By default, EKS Pod Identity attaches six tags, including tags for\ncluster name, namespace, and service account name. For the list of tags added\nby EKS Pod Identity, see List of session tags added by EKS Pod Identity (https://docs.aws.amazon.com/eks/latest/userguide/pod-id-abac.html#pod-id-abac-tags)\nin the Amazon EKS User Guide.\n\nAmazon Web Services compresses inline session policies, managed policy ARNs,\nand session tags into a packed binary format that has a separate limit. If\nyou receive a PackedPolicyTooLarge error indicating the packed binary format\nhas exceeded the size limit, you can attempt to reduce the size by disabling\nthe session tags added by EKS Pod Identity.",
+          "type": "boolean"
+        },
         "namespace": {
-          "description": "The name of the Kubernetes namespace inside the cluster to create the association\nin. The service account and the pods that use the service account must be\nin this namespace.",
+          "description": "The name of the Kubernetes namespace inside the cluster to create the EKS\nPod Identity association in. The service account and the Pods that use the\nservice account must be in this namespace.",
+          "type": "string"
+        },
+        "policy": {
+          "description": "An optional IAM policy in JSON format (as an escaped string) that applies\nadditional restrictions to this pod identity association beyond the IAM policies\nattached to the IAM role. This policy is applied as the intersection of the\nrole's policies and this policy, allowing you to reduce the permissions that\napplications in the pods can use. Use this policy to enforce least privilege\naccess while still leveraging a shared IAM role across multiple applications.\n\nImportant considerations\n\n   * Session tags: When using this policy, disableSessionTags must be set\n   to true.\n\n   * Target role permissions: If you specify both a TargetRoleArn and a policy,\n   the policy restrictions apply only to the target role's permissions, not\n   to the initial role used for assuming the target role.",
           "type": "string"
         },
         "roleARN": {
-          "description": "The Amazon Resource Name (ARN) of the IAM role to associate with the service\naccount. The EKS Pod Identity agent manages credentials to assume this role\nfor applications in the containers in the pods that use this service account.",
+          "description": "The Amazon Resource Name (ARN) of the IAM role to associate with the service\naccount. The EKS Pod Identity agent manages credentials to assume this role\nfor applications in the containers in the Pods that use this service account.",
           "type": "string"
         },
         "roleRef": {
@@ -79,8 +87,12 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Metadata that assists with categorization and organization. Each tag consists\nof a key and an optional value. You define both. Tags don't propagate to\nany other cluster or Amazon Web Services resources.\n\nThe following basic restrictions apply to tags:\n\n  - Maximum number of tags per resource \u2013 50\n\n  - For each resource, each tag key must be unique, and each tag key can\n    have only one value.\n\n  - Maximum key length \u2013 128 Unicode characters in UTF-8\n\n  - Maximum value length \u2013 256 Unicode characters in UTF-8\n\n  - If your tagging schema is used across multiple services and resources,\n    remember that other services may have restrictions on allowed characters.\n    Generally allowed characters are: letters, numbers, and spaces representable\n    in UTF-8, and the following characters: + - = . _ : / @.\n\n  - Tag keys and values are case-sensitive.\n\n  - Do not use aws:, AWS:, or any upper or lowercase combination of such\n    as a prefix for either keys or values as it is reserved for Amazon Web\n    Services use. You cannot edit or delete tag keys or values with this prefix.\n    Tags with this prefix do not count against your tags per resource limit.",
+          "description": "Metadata that assists with categorization and organization. Each tag consists\nof a key and an optional value. You define both. Tags don't propagate to\nany other cluster or Amazon Web Services resources.\n\nThe following basic restrictions apply to tags:\n\n   * Maximum number of tags per resource \u2013 50\n\n   * For each resource, each tag key must be unique, and each tag key can\n   have only one value.\n\n   * Maximum key length \u2013 128 Unicode characters in UTF-8\n\n   * Maximum value length \u2013 256 Unicode characters in UTF-8\n\n   * If your tagging schema is used across multiple services and resources,\n   remember that other services may have restrictions on allowed characters.\n   Generally allowed characters are: letters, numbers, and spaces representable\n   in UTF-8, and the following characters: + - = . _ : / @.\n\n   * Tag keys and values are case-sensitive.\n\n   * Do not use aws:, AWS:, or any upper or lowercase combination of such\n   as a prefix for either keys or values as it is reserved for Amazon Web\n   Services use. You cannot edit or delete tag keys or values with this prefix.\n   Tags with this prefix do not count against your tags per resource limit.",
           "type": "object"
+        },
+        "targetRoleARN": {
+          "description": "The Amazon Resource Name (ARN) of the target IAM role to associate with the\nservice account. This role is assumed by using the EKS Pod Identity association\nrole, then the credentials for this role are injected into the Pod.\n\nWhen you run applications on Amazon EKS, your application might need to access\nAmazon Web Services resources from a different role that exists in the same\nor different Amazon Web Services account. For example, your application running\nin \u201cAccount A\u201d might need to access resources, such as Amazon S3 buckets\nin \u201cAccount B\u201d or within \u201cAccount A\u201d itself. You can create a association\nto access Amazon Web Services resources in \u201cAccount B\u201d by creating two\nIAM roles: a role in \u201cAccount A\u201d and a role in \u201cAccount B\u201d (which\ncan be the same or different account), each with the necessary trust and\npermission policies. After you provide these roles in the IAM role and Target\nIAM role fields, EKS will perform role chaining to ensure your application\ngets the required permissions. This means Role A will assume Role B, allowing\nyour Pods to securely access resources like S3 buckets in the target account.",
+          "type": "string"
         }
       },
       "required": [
@@ -165,13 +177,17 @@
           "format": "date-time",
           "type": "string"
         },
+        "externalID": {
+          "description": "The unique identifier for this EKS Pod Identity association for a target\nIAM role. You put this value in the trust policy of the target role, in a\nCondition to match the sts.ExternalId. This ensures that the target role\ncan only be assumed by this association. This prevents the confused deputy\nproblem. For more information about the confused deputy problem, see The\nconfused deputy problem (https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html)\nin the IAM User Guide.\n\nIf you want to use the same target role with multiple associations or other\nroles, use independent statements in the trust policy to allow sts:AssumeRole\naccess from each role.",
+          "type": "string"
+        },
         "modifiedAt": {
-          "description": "The most recent timestamp that the association was modified at",
+          "description": "The most recent timestamp that the association was modified at.",
           "format": "date-time",
           "type": "string"
         },
         "ownerARN": {
-          "description": "If defined, the Pod Identity Association is owned by an Amazon EKS Addon.",
+          "description": "If defined, the EKS Pod Identity association is owned by an Amazon EKS add-on.",
           "type": "string"
         }
       },
@@ -179,5 +195,6 @@
       "additionalProperties": false
     }
   },
-  "type": "object"
+  "type": "object",
+  "additionalProperties": false
 }

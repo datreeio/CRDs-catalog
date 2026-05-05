@@ -1,0 +1,290 @@
+{
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "BackendSpec defines the desired state of Backend.",
+      "properties": {
+        "aws": {
+          "description": "Aws is the AWS backend configuration.\nThe Aws backend type is only supported with envoy-based gateways, it is not supported in agentgateway.",
+          "properties": {
+            "accountId": {
+              "description": "AccountId is the AWS account ID to use for the backend.",
+              "maxLength": 12,
+              "minLength": 1,
+              "pattern": "^[0-9]{12}$",
+              "type": "string"
+            },
+            "auth": {
+              "description": "Auth specifies an explicit AWS authentication method for the backend.\nWhen omitted, the following credential providers are tried in order, stopping when one\nof them returns an access key ID and a secret access key (the session token is optional):\n1. Environment variables: when the environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN are set.\n2. AssumeRoleWithWebIdentity API call: when the environment variables AWS_WEB_IDENTITY_TOKEN_FILE and AWS_ROLE_ARN are set.\n3. EKS Pod Identity: when the environment variable AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE is set.\n\nSee the Envoy docs for more info:\nhttps://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_request_signing_filter#credentials",
+              "properties": {
+                "secretRef": {
+                  "description": "SecretRef references a Kubernetes Secret containing the AWS credentials.\nThe Secret must have keys \"accessKey\", \"secretKey\", and optionally \"sessionToken\".",
+                  "properties": {
+                    "name": {
+                      "default": "",
+                      "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-map-type": "atomic",
+                  "additionalProperties": false
+                },
+                "type": {
+                  "description": "Type specifies the authentication method to use for the backend.",
+                  "enum": [
+                    "Secret"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "secretRef must be nil if the type is not 'Secret'",
+                  "rule": "!(has(self.secretRef) && self.type != 'Secret')"
+                },
+                {
+                  "message": "secretRef must be specified when type is 'Secret'",
+                  "rule": "!(!has(self.secretRef) && self.type == 'Secret')"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "lambda": {
+              "description": "Lambda configures the AWS lambda service.",
+              "properties": {
+                "endpointURL": {
+                  "description": "EndpointURL is the URL or domain for the Lambda service. This is primarily\nuseful for testing and development purposes. When omitted, the default\nlambda hostname will be used.",
+                  "maxLength": 2048,
+                  "pattern": "^https?://[-a-zA-Z0-9@:%.+~#?&/=]+$",
+                  "type": "string"
+                },
+                "functionName": {
+                  "description": "FunctionName is the name of the Lambda function to invoke.",
+                  "pattern": "^[A-Za-z0-9-_]{1,140}$",
+                  "type": "string"
+                },
+                "invocationMode": {
+                  "default": "Sync",
+                  "description": "InvocationMode defines how to invoke the Lambda function.\nDefaults to Sync.",
+                  "enum": [
+                    "Sync",
+                    "Async"
+                  ],
+                  "type": "string"
+                },
+                "payloadTransformMode": {
+                  "default": "Envoy",
+                  "description": "PayloadTransformation specifies payload transformation mode before it is sent to the Lambda function.\nDefaults to Envoy.",
+                  "enum": [
+                    "None",
+                    "Envoy"
+                  ],
+                  "type": "string"
+                },
+                "qualifier": {
+                  "default": "$LATEST",
+                  "description": "Qualifier is the alias or version for the Lambda function.\nValid values include a numeric version (e.g. \"1\"), an alias name\n(alphanumeric plus \"-\" or \"_\"), or the special literal \"$LATEST\".",
+                  "pattern": "^(\\$LATEST|[0-9]+|[A-Za-z0-9-_]{1,128})$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "functionName"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "region": {
+              "default": "us-east-1",
+              "description": "Region is the AWS region to use for the backend.\nDefaults to us-east-1 if not specified.",
+              "maxLength": 63,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId",
+            "lambda"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "dynamicForwardProxy": {
+          "description": "DynamicForwardProxy is the dynamic forward proxy backend configuration.",
+          "properties": {
+            "enableTls": {
+              "description": "EnableTls enables TLS. When true, the backend will be configured to use TLS. System CA will be used for validation.\nThe hostname will be used for SNI and auto SAN validation.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "static": {
+          "description": "Static is the static backend configuration.",
+          "properties": {
+            "appProtocol": {
+              "description": "AppProtocol is the application protocol to use when communicating with the backend.",
+              "enum": [
+                "http2",
+                "grpc",
+                "grpc-web",
+                "kubernetes.io/h2c",
+                "kubernetes.io/ws"
+              ],
+              "type": "string"
+            },
+            "hosts": {
+              "description": "Hosts is a list of hosts to use for the backend.",
+              "items": {
+                "description": "Host defines a static backend host.",
+                "properties": {
+                  "host": {
+                    "description": "Host is the host name to use for the backend.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the port to use for the backend.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "host",
+                  "port"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "hosts"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "type": {
+          "description": "Type indicates the type of the backend to be used.\nDeprecated: The Type field is deprecated and will be removed in a future release.\nThe backend type is inferred from the configuration.",
+          "enum": [
+            "AWS",
+            "Static",
+            "DynamicForwardProxy"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "aws backend must be specified when type is 'AWS'",
+          "rule": "self.type == 'AWS' ? has(self.aws) : true"
+        },
+        {
+          "message": "static backend must be specified when type is 'Static'",
+          "rule": "self.type == 'Static' ? has(self.static) : true"
+        },
+        {
+          "message": "dynamicForwardProxy backend must be specified when type is 'DynamicForwardProxy'",
+          "rule": "self.type == 'DynamicForwardProxy' ? has(self.dynamicForwardProxy) : true"
+        },
+        {
+          "message": "exactly one of the fields in [aws static dynamicForwardProxy] must be set",
+          "rule": "[has(self.aws),has(self.static),has(self.dynamicForwardProxy)].filter(x,x==true).size() == 1"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "BackendStatus defines the observed state of Backend.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions is the list of conditions for the backend.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 8,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

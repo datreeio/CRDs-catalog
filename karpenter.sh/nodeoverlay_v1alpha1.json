@@ -41,29 +41,21 @@
           "type": "string"
         },
         "priceAdjustment": {
-          "description": "PriceAdjustment specifies the price change for matching instance types. Accepts either:\n- A fixed price modifier (e.g., -0.5, 1.2)\n- A percentage modifier (e.g., +10% for increase, -15% for decrees)",
+          "description": "PriceAdjustment specifies the price change for matching instance types. Accepts either:\n- A fixed price modifier (e.g., -0.5, 1.2)\n- A percentage modifier (e.g., +10% for increase, -15% for decrease)",
           "pattern": "^(([+-]{1}(\\d*\\.?\\d+))|(\\+{1}\\d*\\.?\\d+%)|(^(-\\d{1,2}(\\.\\d+)?%)$)|(-100%))$",
           "type": "string"
         },
         "requirements": {
           "description": "Requirements constrain when this NodeOverlay is applied during scheduling simulations.\nThese requirements can match:\n- Well-known labels (e.g., node.kubernetes.io/instance-type, karpenter.sh/nodepool)\n- Custom labels from NodePool's spec.template.labels",
           "items": {
-            "description": "A node selector requirement is a selector that contains values, a key, and an operator\nthat relates the key and values.",
+            "description": "A node selector requirement is a selector that contains values, a key, an operator that relates the key and values\nto have at least that many values.",
             "properties": {
               "key": {
                 "description": "The label key that the selector applies to.",
-                "type": "string",
                 "maxLength": 316,
                 "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*(\\/))?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$",
+                "type": "string",
                 "x-kubernetes-validations": [
-                  {
-                    "message": "label domain \"kubernetes.io\" is restricted",
-                    "rule": "self in [\"beta.kubernetes.io/instance-type\", \"failure-domain.beta.kubernetes.io/region\", \"beta.kubernetes.io/os\", \"beta.kubernetes.io/arch\", \"failure-domain.beta.kubernetes.io/zone\", \"topology.kubernetes.io/zone\", \"topology.kubernetes.io/region\", \"node.kubernetes.io/instance-type\", \"kubernetes.io/arch\", \"kubernetes.io/os\", \"node.kubernetes.io/windows-build\"] || self.find(\"^([^/]+)\").endsWith(\"node.kubernetes.io\") || self.find(\"^([^/]+)\").endsWith(\"node-restriction.kubernetes.io\") || !self.find(\"^([^/]+)\").endsWith(\"kubernetes.io\")"
-                  },
-                  {
-                    "message": "label domain \"k8s.io\" is restricted",
-                    "rule": "self.find(\"^([^/]+)\").endsWith(\"kops.k8s.io\") || !self.find(\"^([^/]+)\").endsWith(\"k8s.io\")"
-                  },
                   {
                     "message": "label domain \"karpenter.sh\" is restricted",
                     "rule": "self in [\"karpenter.sh/capacity-type\", \"karpenter.sh/nodepool\"] || !self.find(\"^([^/]+)\").endsWith(\"karpenter.sh\")"
@@ -79,26 +71,28 @@
                 ]
               },
               "operator": {
-                "description": "Represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.",
-                "type": "string",
+                "description": "Represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists, DoesNotExist. Gt, Lt, Gte, and Lte.",
                 "enum": [
+                  "Gte",
+                  "Lte",
                   "In",
                   "NotIn",
                   "Exists",
                   "DoesNotExist",
                   "Gt",
                   "Lt"
-                ]
+                ],
+                "type": "string"
               },
               "values": {
-                "description": "An array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. If the operator is Gt or Lt, the values\narray must have a single element, which will be interpreted as an integer.\nThis array is replaced during a strategic merge patch.",
+                "description": "An array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. If the operator is Gt, Lt, Gte, or Lte, the values\narray must have a single element, which will be interpreted as an integer.",
                 "items": {
                   "type": "string"
                 },
-                "type": "array",
-                "x-kubernetes-list-type": "atomic",
                 "maxLength": 63,
-                "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"
+                "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
               }
             },
             "required": [
@@ -120,8 +114,8 @@
               "rule": "self.all(x, x.operator == 'In' ? x.values.size() != 0 : true)"
             },
             {
-              "message": "requirements operator 'Gt' or 'Lt' must have a single positive integer value",
-              "rule": "self.all(x, (x.operator == 'Gt' || x.operator == 'Lt') ? (x.values.size() == 1 && int(x.values[0]) >= 0) : true)"
+              "message": "requirements operator 'Gt', 'Lt', 'Gte' or 'Lte' must have a single positive integer value",
+              "rule": "self.all(x, (x.operator == 'Gt' || x.operator == 'Lt' || x.operator == 'Gte' || x.operator == 'Lte') ? (x.values.size() == 1 && int(x.values[0]) >= 0) : true)"
             }
           ]
         },

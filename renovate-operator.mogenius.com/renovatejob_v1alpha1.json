@@ -803,12 +803,29 @@
           "type": "object",
           "additionalProperties": false
         },
-        "discoverTopics": {
-          "description": "Topics to discover projects from",
-          "type": "string"
+        "allowedGroups": {
+          "description": "Groups allowed to view this RenovateJob when authentication is enabled.\nIf empty or not set, the job is hidden from all users.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
-        "discoveryFilter": {
-          "description": "Filter to select which projects to process",
+        "discoverTopics": {
+          "description": "Topics to discover projects from, will be concatenated using , separator",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "discoveryFilters": {
+          "description": "Filter to select which projects to process, will be concatenated using , separator",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dnsPolicy": {
+          "description": "DNS Policy for the renovate pods",
           "type": "string"
         },
         "extraEnv": {
@@ -964,6 +981,55 @@
             "required": [
               "name"
             ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "extraEnvFrom": {
+          "description": "Additional environment variable sources to set in the renovate container",
+          "items": {
+            "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
+            "properties": {
+              "configMapRef": {
+                "description": "The ConfigMap to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the ConfigMap must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "prefix": {
+                "description": "Optional text to prepend to the name of each environment variable.\nMay consist of any printable ASCII characters except '='.",
+                "type": "string"
+              },
+              "secretRef": {
+                "description": "The Secret to select from",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  },
+                  "optional": {
+                    "description": "Specify whether the Secret must be defined",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              }
+            },
             "type": "object",
             "additionalProperties": false
           },
@@ -1463,7 +1529,7 @@
                             "additionalProperties": false
                           },
                           "resources": {
-                            "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                            "description": "resources represents the minimum resources the volume should have.\nUsers are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
                             "properties": {
                               "limits": {
                                 "additionalProperties": {
@@ -2174,6 +2240,13 @@
                             "signerName": {
                               "description": "Kubelet's generated CSRs will be addressed to this signer.",
                               "type": "string"
+                            },
+                            "userAnnotations": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "userAnnotations allow pod authors to pass additional information to\nthe signer implementation.  Kubernetes does not restrict or validate this\nmetadata in any way.\n\nThese values are copied verbatim into the `spec.unverifiedUserAnnotations` field of\nthe PodCertificateRequest objects that Kubelet creates.\n\nEntries are subject to the same validation as object metadata annotations,\nwith the addition that all keys must be domain-prefixed. No restrictions\nare placed on values, except an overall size limitation on the entire field.\n\nSigners should document the keys and values they support. Signers should\ndeny requests that contain keys they do not recognize.",
+                              "type": "object"
                             }
                           },
                           "required": [
@@ -2592,6 +2665,22 @@
           "format": "int32",
           "type": "integer"
         },
+        "provider": {
+          "description": "Renovate Provider Information to fill \"RENOVATE_ENDPOINT\" and \"RENOVATE_PLATFORM\" environment variables in the renovate container",
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "resources": {
           "description": "Resource requirements for the renovate container",
           "properties": {
@@ -2660,6 +2749,229 @@
         "schedule": {
           "description": "Cron schedule in standard cron format",
           "type": "string"
+        },
+        "scratchVolume": {
+          "description": "Configuration for the scratch volume",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "description": "If enabled a scratch volume will be created and RENOVATE_BASE_DIR will be set accordingly",
+              "type": "boolean"
+            },
+            "ephemeral": {
+              "description": "Ephemeral uses a Kubernetes generic ephemeral volume for scratch (volume.ephemeral).\nWhen set, Medium and SizeLimit are ignored.",
+              "properties": {
+                "volumeClaimTemplate": {
+                  "description": "Will be used to create a stand-alone PVC to provision the volume.\nThe pod in which this EphemeralVolumeSource is embedded will be the\nowner of the PVC, i.e. the PVC will be deleted together with the\npod.  The name of the PVC will be `<pod name>-<volume name>` where\n`<volume name>` is the name from the `PodSpec.Volumes` array\nentry. Pod validation will reject the pod if the concatenated name\nis not valid for a PVC (for example, too long).\n\nAn existing PVC with that name that is not owned by the pod\nwill *not* be used for the pod to avoid using an unrelated\nvolume by mistake. Starting the pod is then blocked until\nthe unrelated PVC is removed. If such a pre-created PVC is\nmeant to be used by the pod, the PVC has to updated with an\nowner reference to the pod once the pod exists. Normally\nthis should not be necessary, but it may be useful when\nmanually reconstructing a broken cluster.\n\nThis field is read-only and no changes will be made by Kubernetes\nto the PVC after it has been created.\n\nRequired, must not be nil.",
+                  "properties": {
+                    "metadata": {
+                      "description": "May contain labels and annotations that will be copied into the PVC\nwhen creating it. No other fields are allowed and will be rejected during\nvalidation.",
+                      "type": "object"
+                    },
+                    "spec": {
+                      "description": "The specification for the PersistentVolumeClaim. The entire content is\ncopied unchanged into the PVC that gets created from this\ntemplate. The same fields as in a PersistentVolumeClaim\nare also valid here.",
+                      "properties": {
+                        "accessModes": {
+                          "description": "accessModes contains the desired access modes the volume should have.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        },
+                        "dataSource": {
+                          "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                          "properties": {
+                            "apiGroup": {
+                              "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "description": "Kind is the type of resource being referenced",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "Name is the name of resource being referenced",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "dataSourceRef": {
+                          "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                          "properties": {
+                            "apiGroup": {
+                              "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "description": "Kind is the type of resource being referenced",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "Name is the name of resource being referenced",
+                              "type": "string"
+                            },
+                            "namespace": {
+                              "description": "Namespace is the namespace of resource being referenced\nNote that when a namespace is specified, a gateway.networking.k8s.io/ReferenceGrant object is required in the referent namespace to allow that namespace's owner to accept the reference. See the ReferenceGrant documentation for details.\n(Alpha) This field requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "resources": {
+                          "description": "resources represents the minimum resources the volume should have.\nUsers are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                          "properties": {
+                            "limits": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
+                              },
+                              "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                              "type": "object"
+                            },
+                            "requests": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
+                              },
+                              "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "selector": {
+                          "description": "selector is a label query over volumes to consider for binding.",
+                          "properties": {
+                            "matchExpressions": {
+                              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                              "items": {
+                                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                "properties": {
+                                  "key": {
+                                    "description": "key is the label key that the selector applies to.",
+                                    "type": "string"
+                                  },
+                                  "operator": {
+                                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "atomic"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "operator"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "storageClassName": {
+                          "description": "storageClassName is the name of the StorageClass required by the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+                          "type": "string"
+                        },
+                        "volumeAttributesClassName": {
+                          "description": "volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.\nIf specified, the CSI driver will create or update the volume with the attributes defined\nin the corresponding VolumeAttributesClass. This has a different purpose than storageClassName,\nit can be changed after the claim is created. An empty string or nil value indicates that no\nVolumeAttributesClass will be applied to the claim. If the claim enters an Infeasible error state,\nthis field can be reset to its previous value (including nil) to cancel the modification.\nIf the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be\nset to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource\nexists.\nMore info: https://kubernetes.io/docs/concepts/storage/volume-attributes-classes/",
+                          "type": "string"
+                        },
+                        "volumeMode": {
+                          "description": "volumeMode defines what type of volume is required by the claim.\nValue of Filesystem is implied when not included in claim spec.",
+                          "type": "string"
+                        },
+                        "volumeName": {
+                          "description": "volumeName is the binding reference to the PersistentVolume backing this claim.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "spec"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "medium": {
+              "description": "Medium for the emptyDir volume. Ignored when Ephemeral is set.\nEmpty uses the node's default medium; Memory uses a tmpfs (corev1.StorageMediumMemory).",
+              "type": "string"
+            },
+            "path": {
+              "default": "/tmp",
+              "description": "Path within the container where the scratch volume will be mounted, RENOVATE_BASE_DIR will be set to this path.",
+              "type": "string"
+            },
+            "sizeLimit": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "SizeLimit caps how large the emptyDir may grow (Kubernetes emptyDir.sizeLimit). Ignored when Ephemeral is set.",
+              "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+              "x-kubernetes-int-or-string": true
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "secretRef": {
           "description": "Reference to the secret containing the renovate config",
@@ -2982,6 +3294,10 @@
           "type": "object",
           "additionalProperties": false
         },
+        "skipForks": {
+          "description": "If true, forked repositories discovered during autodiscovery will be excluded by querying the platform API",
+          "type": "boolean"
+        },
         "tolerations": {
           "description": "Tolerations for scheduling the resulting pod",
           "items": {
@@ -2996,7 +3312,7 @@
                 "type": "string"
               },
               "operator": {
-                "description": "Operator represents a key's relationship to the value.\nValid operators are Exists and Equal. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a pod can\ntolerate all taints of a particular category.",
+                "description": "Operator represents a key's relationship to the value.\nValid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a pod can\ntolerate all taints of a particular category.\nLt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
                 "type": "string"
               },
               "tolerationSeconds": {
@@ -3142,6 +3458,65 @@
             },
             "enabled": {
               "type": "boolean"
+            },
+            "forgejo": {
+              "description": "Forgejo-specific webhook configuration",
+              "properties": {
+                "sync": {
+                  "description": "configuration for syncing webhooks to Forgejo repos by topic",
+                  "properties": {
+                    "authTokenSecretRef": {
+                      "description": "reference to a secret and key",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "events": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "tokenSecretRef": {
+                      "description": "reference to a secret and key",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "topic": {
+                      "type": "string"
+                    },
+                    "webhookURL": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "webhookURL"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "required": [
@@ -3152,7 +3527,9 @@
         }
       },
       "required": [
+        "image",
         "parallelism",
+        "provider",
         "schedule"
       ],
       "type": "object",
@@ -3161,15 +3538,130 @@
     "status": {
       "description": "RenovateJobStatus defines the observed state of RenovateJob",
       "properties": {
+        "executionOptions": {
+          "properties": {
+            "debug": {
+              "description": "If true, the renovate job will be executed with LOG_LEVEL=debug",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "projects": {
           "items": {
             "description": "Status of a single project within a RenovateJob",
             "properties": {
+              "duration": {
+                "type": "string"
+              },
               "lastRun": {
                 "format": "date-time",
                 "type": "string"
               },
+              "logIssues": {
+                "description": "LogIssues contains aggregate counts and individual issue messages from a Renovate run.",
+                "properties": {
+                  "errorCount": {
+                    "type": "integer"
+                  },
+                  "issues": {
+                    "items": {
+                      "description": "LogIssue represents a single warning or error from Renovate logs.",
+                      "properties": {
+                        "level": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "message"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "warnCount": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "errorCount",
+                  "warnCount"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
               "name": {
+                "type": "string"
+              },
+              "prActivity": {
+                "description": "PRActivity contains aggregate counts and individual details of PR activity from a run.",
+                "properties": {
+                  "automerged": {
+                    "type": "integer"
+                  },
+                  "created": {
+                    "type": "integer"
+                  },
+                  "prs": {
+                    "items": {
+                      "description": "PRDetail represents a single PR found in Renovate logs.",
+                      "properties": {
+                        "action": {
+                          "description": "PRAction represents what happened to a PR in a Renovate run.",
+                          "type": "string"
+                        },
+                        "branch": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "integer"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "branch"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "unchanged": {
+                    "type": "integer"
+                  },
+                  "updated": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "automerged",
+                  "created",
+                  "unchanged",
+                  "updated"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "priority": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "renovateResultStatus": {
                 "type": "string"
               },
               "status": {

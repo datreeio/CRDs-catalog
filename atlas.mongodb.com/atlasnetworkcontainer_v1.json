@@ -1,0 +1,179 @@
+{
+  "description": "AtlasNetworkContainer is the Schema for the AtlasNetworkContainer API",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "AtlasNetworkContainerSpec defines the target state of an AtlasNetworkContainer.",
+      "properties": {
+        "cidrBlock": {
+          "description": "Atlas CIDR. It needs to be set if ContainerID is not set.",
+          "type": "string"
+        },
+        "connectionSecret": {
+          "description": "Name of the secret containing Atlas API private and public keys.",
+          "properties": {
+            "name": {
+              "description": "Name of the resource being referred to\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "externalProjectRef": {
+          "description": "externalProjectRef holds the parent Atlas project ID.\nMutually exclusive with the \"projectRef\" field.",
+          "properties": {
+            "id": {
+              "description": "ID is the Atlas project ID.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "id": {
+          "description": "ID is the container identifier for an already existent network container to be managed by the operator.\nThis field can be used in conjunction with cidrBlock to update the cidrBlock of an existing container.\nThis field is immutable.",
+          "type": "string"
+        },
+        "projectRef": {
+          "description": "projectRef is a reference to the parent AtlasProject resource.\nMutually exclusive with the \"externalProjectRef\" field.",
+          "properties": {
+            "name": {
+              "description": "Name of the Kubernetes Resource",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "Namespace of the Kubernetes Resource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "provider": {
+          "description": "Provider is the name of the cloud provider hosting the network container.",
+          "enum": [
+            "AWS",
+            "GCP",
+            "AZURE"
+          ],
+          "type": "string"
+        },
+        "region": {
+          "description": "ContainerRegion is the provider region name of Atlas network peer container in Atlas region format\nThis is required by AWS and Azure, but not used by GCP.\nThis field is immutable, Atlas does not admit network container changes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "must define only one project reference through externalProjectRef or projectRef",
+          "rule": "(has(self.externalProjectRef) && !has(self.projectRef)) || (!has(self.externalProjectRef) && has(self.projectRef))"
+        },
+        {
+          "message": "must define a local connection secret when referencing an external project",
+          "rule": "(has(self.externalProjectRef) && has(self.connectionSecret)) || !has(self.externalProjectRef)"
+        },
+        {
+          "message": "must not set region for GCP containers",
+          "rule": "(self.provider == 'GCP' && !has(self.region)) || (self.provider != 'GCP')"
+        },
+        {
+          "message": "must set region for AWS and Azure containers",
+          "rule": "((self.provider == 'AWS' || self.provider == 'AZURE') && has(self.region)) || (self.provider == 'GCP')"
+        },
+        {
+          "message": "id is immutable",
+          "rule": "(self.id == oldSelf.id) || (!has(self.id) && !has(oldSelf.id))"
+        },
+        {
+          "message": "region is immutable",
+          "rule": "(self.region == oldSelf.region) || (!has(self.region) && !has(oldSelf.region))"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "AtlasNetworkContainerStatus is a status for the AtlasNetworkContainer Custom resource.\nNot the one included in the AtlasProject",
+      "properties": {
+        "conditions": {
+          "description": "Conditions is the list of statuses showing the current state of the Atlas Custom Resource",
+          "items": {
+            "description": "Condition describes the state of an Atlas Custom Resource at a certain point.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "Last time the condition transitioned from one status to another.\nRepresented in ISO 8601 format.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "A message providing details about the transition.",
+                "type": "string"
+              },
+              "reason": {
+                "description": "The reason for the condition's last transition.",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status of the condition; one of True, False, Unknown.",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type of Atlas Custom Resource condition.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "ID record the identifier of the container in Atlas",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration indicates the generation of the resource specification of which the Atlas Operator is aware.\nThe Atlas Operator updates this field to the value of 'metadata.generation' as soon as it starts reconciliation of the resource.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "provisioned": {
+          "description": "Provisioned is true when clusters have been deployed to the container before\nthe last reconciliation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "conditions"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

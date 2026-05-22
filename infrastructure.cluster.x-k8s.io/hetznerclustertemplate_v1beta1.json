@@ -19,20 +19,20 @@
           "description": "HetznerClusterTemplateResource contains spec for HetznerClusterSpec.",
           "properties": {
             "metadata": {
-              "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects\nusers must create. This is a copy of customizable fields from metav1.ObjectMeta.\n\n\nObjectMeta is embedded in `Machine.Spec`, `MachineDeployment.Template` and `MachineSet.Template`,\nwhich are not top-level Kubernetes objects. Given that metav1.ObjectMeta has lots of special cases\nand read-only fields which end up in the generated CRD validation, having it as a subset simplifies\nthe API and some issues that can impact user experience.\n\n\nDuring the [upgrade to controller-tools@v2](https://github.com/kubernetes-sigs/cluster-api/pull/1054)\nfor v1alpha2, we noticed a failure would occur running Cluster API test suite against the new CRDs,\nspecifically `spec.metadata.creationTimestamp in body must be of type string: \"null\"`.\nThe investigation showed that `controller-tools@v2` behaves differently than its previous version\nwhen handling types from [metav1](k8s.io/apimachinery/pkg/apis/meta/v1) package.\n\n\nIn more details, we found that embedded (non-top level) types that embedded `metav1.ObjectMeta`\nhad validation properties, including for `creationTimestamp` (metav1.Time).\nThe `metav1.Time` type specifies a custom json marshaller that, when IsZero() is true, returns `null`\nwhich breaks validation because the field isn't marked as nullable.\n\n\nIn future versions, controller-tools@v2 might allow overriding the type and validation for embedded\ntypes. When that happens, this hack should be revisited.",
+              "description": "ObjectMeta is metadata that all persisted resources must have, which includes all objects\nusers must create. This is a copy of customizable fields from metav1.ObjectMeta.\n\nObjectMeta is embedded in `Machine.Spec`, `MachineDeployment.Template` and `MachineSet.Template`,\nwhich are not top-level Kubernetes objects. Given that metav1.ObjectMeta has lots of special cases\nand read-only fields which end up in the generated CRD validation, having it as a subset simplifies\nthe API and some issues that can impact user experience.\n\nDuring the [upgrade to controller-tools@v2](https://github.com/kubernetes-sigs/cluster-api/pull/1054)\nfor v1alpha2, we noticed a failure would occur running Cluster API test suite against the new CRDs,\nspecifically `spec.metadata.creationTimestamp in body must be of type string: \"null\"`.\nThe investigation showed that `controller-tools@v2` behaves differently than its previous version\nwhen handling types from [metav1](k8s.io/apimachinery/pkg/apis/meta/v1) package.\n\nIn more details, we found that embedded (non-top level) types that embedded `metav1.ObjectMeta`\nhad validation properties, including for `creationTimestamp` (metav1.Time).\nThe `metav1.Time` type specifies a custom json marshaller that, when IsZero() is true, returns `null`\nwhich breaks validation because the field isn't marked as nullable.\n\nIn future versions, controller-tools@v2 might allow overriding the type and validation for embedded\ntypes. When that happens, this hack should be revisited.",
               "properties": {
                 "annotations": {
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "Annotations is an unstructured key value map stored with a resource that may be\nset by external tools to store and retrieve arbitrary metadata. They are not\nqueryable and should be preserved when modifying objects.\nMore info: http://kubernetes.io/docs/user-guide/annotations",
+                  "description": "annotations is an unstructured key value map stored with a resource that may be\nset by external tools to store and retrieve arbitrary metadata. They are not\nqueryable and should be preserved when modifying objects.\nMore info: http://kubernetes.io/docs/user-guide/annotations",
                   "type": "object"
                 },
                 "labels": {
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "description": "Map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
+                  "description": "labels is a map of string keys and values that can be used to organize and categorize\n(scope and select) objects. May match selectors of replication controllers\nand services.\nMore info: http://kubernetes.io/docs/user-guide/labels",
                   "type": "object"
                 }
               },
@@ -46,19 +46,16 @@
                   "description": "ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.",
                   "properties": {
                     "host": {
-                      "description": "The hostname on which the API server is serving.",
+                      "description": "host is the hostname on which the API server is serving.",
+                      "maxLength": 512,
                       "type": "string"
                     },
                     "port": {
-                      "description": "The port on which the API server is serving.",
+                      "description": "port is the port on which the API server is serving.",
                       "format": "int32",
                       "type": "integer"
                     }
                   },
-                  "required": [
-                    "host",
-                    "port"
-                  ],
                   "type": "object",
                   "additionalProperties": false
                 },
@@ -240,32 +237,34 @@
                       "description": "Key defines the keys that are used in the secret.\nNeed to specify either HCloudToken or both HetznerRobotUser and HetznerRobotPassword.",
                       "properties": {
                         "hcloudToken": {
-                          "default": "hcloud-token",
-                          "description": "HCloudToken defines the name of the key where the token for the Hetzner Cloud API is stored.",
+                          "description": "HCloudToken defines the name of the key where the token for the Hetzner Cloud API is stored.\nThe controller reads the token from the management-cluster secret using this key and writes\nit to workload-cluster secrets using the same key. Upstream hcloud-ccm expects the key\n\"token\", while the legacy Syself ccm fork uses \"hcloud\". The configured workload-cluster\nsecret remains untouched. CAPH only adds the compatibility key \"token\" inside the\nworkload-cluster secret named \"hcloud\", and only if this field is not already \"token\". If\nthe configured secret name is already \"hcloud\", the same token value is stored under both\nkeys in that single secret. We recommend to use \"token\".",
                           "type": "string"
                         },
                         "hetznerRobotPassword": {
                           "default": "hetzner-robot-password",
-                          "description": "HetznerRobotPassword defines the name of the key where the password for the Hetzner Robot API is stored.",
+                          "description": "HetznerRobotPassword defines the name of the key where the password for the Hetzner Robot API\nis stored.  It gets used for reading the credential in the mgt-cluster, and it gets used for\ncreating a secret in the wl-cluster. We recommend to use \"robot-password\", because this is\nthe default of upstream hcloud-ccm.",
                           "type": "string"
                         },
                         "hetznerRobotUser": {
                           "default": "hetzner-robot-user",
-                          "description": "HetznerRobotUser defines the name of the key where the username for the Hetzner Robot API is stored.",
+                          "description": "HetznerRobotUser defines the name of the key where the username for the Hetzner Robot API is\nstored. It gets used for reading the credential in the mgt-cluster, and it gets used for\ncreating a secret in the wl-cluster. We recommend to use \"robot-user\", because this is the\ndefault of upstream hcloud-ccm.",
                           "type": "string"
                         },
                         "sshKey": {
                           "default": "hcloud-ssh-key-name",
-                          "description": "SSHKey defines the name of the ssh key.",
+                          "description": "SSHKey defines the name of the ssh key. It is only used in the mgt-cluster. It is not synced\nto the wl-cluster.",
                           "type": "string"
                         }
                       },
+                      "required": [
+                        "hcloudToken"
+                      ],
                       "type": "object",
                       "additionalProperties": false
                     },
                     "name": {
                       "default": "hetzner",
-                      "description": "Name defines the name of the secret.",
+                      "description": "Name defines the name of the secret. The controller reads the credential from the\nmanagement-cluster secret with this name and creates a workload-cluster secret with the same\nname. The upstream hcloud-ccm helm chart expects the secret name \"hcloud\", while the Syself\nccm fork defaults to \"hetzner\".\n\nTo facilitate migrations to the upstream hcloud-ccm, it is ensured that the secret it expects\nis created in the proper way. This means that CAPH ensures that in the secret called \"hcloud\"\nthere is the hcloud token stored under the key \"token\". This might lead to the same value\nbeing stored in two different keys of the same secret, depending on the configuration used\nhere.\n\nWe recommend to use the value \"hcloud\". Set `spec.skipCreatingHetznerSecretInWorkloadCluster`\nif you don't want workload-cluster secrets to be created.",
                       "type": "string"
                     }
                   },

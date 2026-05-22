@@ -1,0 +1,203 @@
+{
+  "description": "EventSource is the Schema for the EventSource API",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "EventSourceSpec defines the desired state of EventSource",
+      "properties": {
+        "aggregatedSelection": {
+          "description": "This field is optional and can be used to specify a Lua function\nthat will be used to further select a subset of the resources that\nhave already been selected using the ResourceSelector field.\nThe function will receive the array of resources selected by ResourceSelectors.\nIf this field is not specified, all resources selected by the ResourceSelector\nfield will be considered.\nThis field allows to perform more complex filtering or selection operations\non the resources, looking at all resources together.\nThis can be useful for more sophisticated tasks, such as identifying resources\nthat are related to each other or that have similar properties.\nThe Lua function must return a struct with:\n- \"resources\" field: slice of matching resorces;\n- \"message\" field: (optional) message.",
+          "type": "string"
+        },
+        "collectResources": {
+          "default": false,
+          "description": "CollectResources indicates whether matching resources need\nto be collected and added to EventReport.",
+          "type": "boolean"
+        },
+        "messagingMatchCriteria": {
+          "description": "MessagingMatchCriteria defines a list of MessagingMatchCriteria. Each criteria specifies\nhow to match CloudEvents received on specific NATS/JetStream subjects.",
+          "items": {
+            "description": "MessagingMatchCriteria defines criteria for matching CloudEvents received via NATS.\nSveltos listens to NATS/JetStream subjects, and the messages delivered on those\nsubjects are expected to be CloudEvents.",
+            "properties": {
+              "cloudEventSource": {
+                "description": "CloudEventSource filters CloudEvents based on their \"source\" attribute.\nIf specified, only CloudEvents with a matching source will be considered.\nRegular expressions are supported.",
+                "type": "string"
+              },
+              "cloudEventSubject": {
+                "description": "CloudEventSubject filters CloudEvents based on their \"subject\" attribute.\nIf specified, only CloudEvents with a matching subject will be considered.\nRegular expressions are supported.",
+                "type": "string"
+              },
+              "cloudEventType": {
+                "description": "CloudEventType filters CloudEvents based on their \"type\" attribute.\nIf specified, only CloudEvents with a matching type will be considered.\nRegular expressions are supported.",
+                "type": "string"
+              },
+              "subject": {
+                "description": "Subject is an optional NATS/JetStream subject filter. If specified, this criteria will\nonly consider CloudEvents received on this specific subject. Leaving it empty\nmeans the criteria will match CloudEvents from any of the subjects Sveltos\nis subscribed to. Regular expressions are supported.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "resourceSelectors": {
+          "description": "ResourceSelectors identifies what Kubernetes resources to select",
+          "items": {
+            "description": "ResourceSelector defines what resources are a match",
+            "properties": {
+              "evaluate": {
+                "description": "Evaluate contains a function \"evaluate\" in lua language.\nThe function will be passed one of the object selected based on\nabove criteria.\nMust return struct with field \"matching\" representing whether\nobject is a match and an optional \"message\" field.",
+                "type": "string"
+              },
+              "evaluateCEL": {
+                "description": "EvaluateCEL contains a list of named CEL (Common Expression Language) rules.\nEach rule will be evaluated in order against each object selected based on\nthe criteria defined above. Each rule's expression must return a boolean value\nindicating whether the object is a match.\n\nEvaluation stops at the first rule that returns true; subsequent\nrules will not be evaluated.",
+                "items": {
+                  "description": "CELRule defines a named CEL rule used in EvaluateCEL.",
+                  "properties": {
+                    "name": {
+                      "description": "Name is a human-readable identifier for the rule.",
+                      "type": "string"
+                    },
+                    "rule": {
+                      "description": "Rule is the CEL (Common Expression Language) expression to evaluate.\nIt must return a bool",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "rule"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "group": {
+                "description": "Group of the resource deployed in the Cluster.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind of the resource deployed in the Cluster.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "labelFilters": {
+                "description": "LabelFilters allows to filter resources based on current labels.",
+                "items": {
+                  "properties": {
+                    "key": {
+                      "description": "Key is the label key",
+                      "type": "string"
+                    },
+                    "operation": {
+                      "description": "Operation is the comparison operation",
+                      "enum": [
+                        "Equal",
+                        "Different",
+                        "Has",
+                        "DoesNotHave"
+                      ],
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Value is the label value",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "operation"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "name": {
+                "description": "Name of the resource deployed in the  Cluster.",
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace of the resource deployed in the  Cluster.\nEmpty for resources scoped at cluster level.\nFor namespaced resources, an empty string \"\" indicates all namespaces.",
+                "type": "string"
+              },
+              "selector": {
+                "description": "Selector is a standard Kubernetes label selector. Resources are selected\nif their labels match the selector. This field uses the standard\nKubernetes label matching syntax (e.g., {\"environment\": \"production\"}).\nIf both LabelFilters and Selector are specified, the requirements from\nboth are logically ANDed.",
+                "properties": {
+                  "matchExpressions": {
+                    "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                    "items": {
+                      "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                      "properties": {
+                        "key": {
+                          "description": "key is the label key that the selector applies to.",
+                          "type": "string"
+                        },
+                        "operator": {
+                          "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                          "type": "string"
+                        },
+                        "values": {
+                          "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "operator"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "matchLabels": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                    "type": "object"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "version": {
+                "description": "Version of the resource deployed in the Cluster.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "version"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

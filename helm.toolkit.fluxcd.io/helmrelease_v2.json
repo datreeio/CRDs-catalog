@@ -317,6 +317,42 @@
           "type": "object",
           "additionalProperties": false
         },
+        "healthCheckExprs": {
+          "description": "HealthCheckExprs is a list of healthcheck expressions for evaluating the\nhealth of custom resources using Common Expression Language (CEL).\nThe expressions are evaluated only when the specific Helm action\ntaking place has wait enabled, i.e. DisableWait is false, and the\n'poller' WaitStrategy is used.",
+          "items": {
+            "description": "CustomHealthCheck defines the health check for custom resources.",
+            "properties": {
+              "apiVersion": {
+                "description": "APIVersion of the custom resource under evaluation.",
+                "type": "string"
+              },
+              "current": {
+                "description": "Current is the CEL expression that determines if the status\nof the custom resource has reached the desired state.",
+                "type": "string"
+              },
+              "failed": {
+                "description": "Failed is the CEL expression that determines if the status\nof the custom resource has failed to reach the desired state.",
+                "type": "string"
+              },
+              "inProgress": {
+                "description": "InProgress is the CEL expression that determines if the status\nof the custom resource has not yet reached the desired state.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind of the custom resource under evaluation.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "apiVersion",
+              "current",
+              "kind"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "install": {
           "description": "Install holds the configuration for Helm install actions for this HelmRelease.",
           "properties": {
@@ -380,12 +416,16 @@
               "description": "Replace tells the Helm install action to re-use the 'ReleaseName', but only\nif that name is a deleted release which remains in the history.",
               "type": "boolean"
             },
+            "serverSideApply": {
+              "description": "ServerSideApply enables server-side apply for resources during install.\nDefaults to true (or false when UseHelm3Defaults feature gate is enabled).",
+              "type": "boolean"
+            },
             "skipCRDs": {
               "description": "SkipCRDs tells the Helm install action to not install any CRDs. By default,\nCRDs are installed if not already present.\n\nDeprecated use CRD policy (`crds`) attribute with value `Skip` instead.",
               "type": "boolean"
             },
             "strategy": {
-              "description": "Strategy defines the install strategy to use for this HelmRelease.\nDefaults to 'RemediateOnFailure'.",
+              "description": "Strategy defines the install strategy to use for this HelmRelease.\nDefaults to 'RemediateOnFailure', or 'RetryOnFailure' when the\nDefaultToRetryOnFailure feature gate is enabled.",
               "properties": {
                 "name": {
                   "description": "Name of the install strategy.",
@@ -611,12 +651,21 @@
               "type": "boolean"
             },
             "force": {
-              "description": "Force forces resource updates through a replacement strategy.",
+              "description": "Force forces resource updates through a replacement strategy\nthat avoids 3-way merge conflicts on client-side apply.\nThis field is ignored for server-side apply (which always\nforces conflicts with other field managers).",
               "type": "boolean"
             },
             "recreate": {
-              "description": "Recreate performs pod restarts for the resource if applicable.",
+              "description": "Recreate performs pod restarts for any managed workloads.\n\nDeprecated: This behavior was deprecated in Helm 3:\n  - Deprecation: https://github.com/helm/helm/pull/6463\n  - Removal: https://github.com/helm/helm/pull/31023\nAfter helm-controller was upgraded to the Helm 4 SDK,\nthis field is no longer functional and will print a\nwarning if set to true. It will also be removed in a\nfuture release.",
               "type": "boolean"
+            },
+            "serverSideApply": {
+              "description": "ServerSideApply enables server-side apply for resources during rollback.\nCan be \"enabled\", \"disabled\", or \"auto\".\nWhen \"auto\", server-side apply usage will be based on the release's previous usage.\nDefaults to \"auto\".",
+              "enum": [
+                "enabled",
+                "disabled",
+                "auto"
+              ],
+              "type": "string"
             },
             "timeout": {
               "description": "Timeout is the time to wait for any individual Kubernetes operation (like\nJobs for hooks) during the performance of a Helm rollback action. Defaults to\n'HelmReleaseSpec.Timeout'.",
@@ -773,7 +822,7 @@
               "type": "boolean"
             },
             "force": {
-              "description": "Force forces resource updates through a replacement strategy.",
+              "description": "Force forces resource updates through a replacement strategy\nthat avoids 3-way merge conflicts on client-side apply.\nThis field is ignored for server-side apply (which always\nforces conflicts with other field managers).",
               "type": "boolean"
             },
             "preserveValues": {
@@ -807,8 +856,17 @@
               "type": "object",
               "additionalProperties": false
             },
+            "serverSideApply": {
+              "description": "ServerSideApply enables server-side apply for resources during upgrade.\nCan be \"enabled\", \"disabled\", or \"auto\".\nWhen \"auto\", server-side apply usage will be based on the release's previous usage.\nDefaults to \"auto\".",
+              "enum": [
+                "enabled",
+                "disabled",
+                "auto"
+              ],
+              "type": "string"
+            },
             "strategy": {
-              "description": "Strategy defines the upgrade strategy to use for this HelmRelease.\nDefaults to 'RemediateOnFailure'.",
+              "description": "Strategy defines the upgrade strategy to use for this HelmRelease.\nDefaults to 'RemediateOnFailure', or 'RetryOnFailure' when the\nDefaultToRetryOnFailure feature gate is enabled.",
               "properties": {
                 "name": {
                   "description": "Name of the upgrade strategy.",
@@ -893,6 +951,24 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "waitStrategy": {
+          "description": "WaitStrategy defines Helm's wait strategy for waiting for applied\nresources to become ready.",
+          "properties": {
+            "name": {
+              "description": "Name is Helm's wait strategy for waiting for applied resources to\nbecome ready. One of 'poller' or 'legacy'. The 'poller' strategy uses\nkstatus to poll resource statuses, while the 'legacy' strategy uses\nHelm v3's waiting logic.\nDefaults to 'poller', or to 'legacy' when UseHelm3Defaults feature\ngate is enabled.",
+              "enum": [
+                "poller",
+                "legacy"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "required": [
@@ -983,8 +1059,12 @@
           "items": {
             "description": "Snapshot captures a point-in-time copy of the status information for a Helm release,\nas managed by the controller.",
             "properties": {
+              "action": {
+                "description": "Action is the action that resulted in this snapshot being created.",
+                "type": "string"
+              },
               "apiVersion": {
-                "description": "APIVersion is the API version of the Snapshot.\nProvisional: when the calculation method of the Digest field is changed,\nthis field will be used to distinguish between the old and new methods.",
+                "description": "APIVersion is the API version of the Snapshot.\nWhen the calculation method of the Digest field is changed, this\nfield will be used to distinguish between the old and new methods.",
                 "type": "string"
               },
               "appVersion": {
@@ -1089,6 +1169,39 @@
           "description": "InstallFailures is the install failure count against the latest desired\nstate. It is reset after a successful reconciliation.",
           "format": "int64",
           "type": "integer"
+        },
+        "inventory": {
+          "description": "Inventory contains the list of Kubernetes resource object references\nthat have been applied for this release.",
+          "properties": {
+            "entries": {
+              "description": "Entries of Kubernetes resource object references.",
+              "items": {
+                "description": "ResourceRef contains the information necessary to locate a resource within a cluster.",
+                "properties": {
+                  "id": {
+                    "description": "ID is the string representation of the Kubernetes resource object's metadata,\nin the format '<namespace>_<name>_<group>_<kind>'.",
+                    "type": "string"
+                  },
+                  "v": {
+                    "description": "Version is the API version of the Kubernetes resource object's kind.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "v"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "entries"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "lastAttemptedConfigDigest": {
           "description": "LastAttemptedConfigDigest is the digest for the config (better known as\n\"values\") of the last reconciliation attempt.",

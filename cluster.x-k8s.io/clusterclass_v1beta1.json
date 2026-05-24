@@ -138,6 +138,51 @@
                   "maxItems": 100,
                   "type": "array"
                 },
+                "unhealthyMachineConditions": {
+                  "description": "unhealthyMachineConditions contains a list of the machine conditions that determine\nwhether a machine is considered unhealthy.  The conditions are combined in a\nlogical OR, i.e. if any of the conditions is met, the machine is unhealthy.",
+                  "items": {
+                    "description": "UnhealthyMachineCondition represents a Machine condition type and value with a timeout\nspecified as a duration.  When the named condition has been in the given\nstatus for at least the timeout value, a machine is considered unhealthy.",
+                    "properties": {
+                      "status": {
+                        "description": "status of the condition, one of True, False, Unknown.",
+                        "enum": [
+                          "True",
+                          "False",
+                          "Unknown"
+                        ],
+                        "type": "string"
+                      },
+                      "timeout": {
+                        "description": "timeout is the duration that a Machine must be in a given status for,\nafter which the Machine is considered unhealthy.\nFor example, with a value of \"1h\", the Machine must match the status\nfor at least 1 hour before being considered unhealthy.",
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "type of Machine condition",
+                        "maxLength": 316,
+                        "minLength": 1,
+                        "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                        "type": "string",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "type must not be one of: Ready, Available, HealthCheckSucceeded, OwnerRemediated, ExternallyRemediated",
+                            "rule": "!(self in ['Ready','Available','HealthCheckSucceeded','OwnerRemediated','ExternallyRemediated'])"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "timeout",
+                      "type"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 100,
+                  "minItems": 1,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
                 "unhealthyRange": {
                   "description": "unhealthyRange specifies the range of unhealthy machines allowed.\nAny further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"unhealthyRange\". Takes precedence over maxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
                   "maxLength": 32,
@@ -310,6 +355,60 @@
               "type": "object",
               "x-kubernetes-map-type": "atomic",
               "additionalProperties": false
+            },
+            "taints": {
+              "description": "taints are the node taints that Cluster API will manage.\nThis list is not necessarily complete: other Kubernetes components may add or remove other taints from nodes,\ne.g. the node controller might add the node.kubernetes.io/not-ready taint.\nOnly those taints defined in this list will be added or removed by core Cluster API controllers.\n\nThere can be at most 64 taints.\nA pod would have to tolerate all existing taints to run on the corresponding node.\n\nNOTE: This list is implemented as a \"map\" type, meaning that individual elements can be managed by different owners.",
+              "items": {
+                "description": "MachineTaint defines a taint equivalent to corev1.Taint, but additionally having a propagation field.",
+                "properties": {
+                  "effect": {
+                    "description": "effect is the effect for the taint. Valid values are NoSchedule, PreferNoSchedule and NoExecute.",
+                    "enum": [
+                      "NoSchedule",
+                      "PreferNoSchedule",
+                      "NoExecute"
+                    ],
+                    "type": "string"
+                  },
+                  "key": {
+                    "description": "key is the taint key to be applied to a node.\nMust be a valid qualified name of maximum size 63 characters\nwith an optional subdomain prefix of maximum size 253 characters,\nseparated by a `/`.",
+                    "maxLength": 317,
+                    "minLength": 1,
+                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$",
+                    "type": "string"
+                  },
+                  "propagation": {
+                    "description": "propagation defines how this taint should be propagated to nodes.\nValid values are 'Always' and 'OnInitialization'.\nAlways: The taint will be continuously reconciled. If it is not set for a node, it will be added during reconciliation.\nOnInitialization: The taint will be added during node initialization. If it gets removed from the node later on it will not get added again.",
+                    "enum": [
+                      "Always",
+                      "OnInitialization"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "value is the taint value corresponding to the taint key.\nIt must be a valid label value of maximum size 63 characters.",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "effect",
+                  "key",
+                  "propagation"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 64,
+              "minItems": 1,
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "key",
+                "effect"
+              ],
+              "x-kubernetes-list-type": "map"
             }
           },
           "required": [
@@ -376,6 +475,18 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "kubernetesVersions": {
+          "description": "kubernetesVersions is the list of Kubernetes versions that can be\nused for clusters using this ClusterClass.\nThe list of version must be ordered from the older to the newer version, and there should be\nat least one version for every minor in between the first and the last version.",
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "patches": {
           "description": "patches defines the patches which are applied to customize\nreferenced templates of a ClusterClass.\nNote: Patches will be applied in the order of the array.",
@@ -584,6 +695,28 @@
           },
           "maxItems": 1000,
           "type": "array"
+        },
+        "upgrade": {
+          "description": "upgrade defines the upgrade configuration for clusters using this ClusterClass.",
+          "minProperties": 1,
+          "properties": {
+            "external": {
+              "description": "external defines external runtime extensions for upgrade operations.",
+              "minProperties": 1,
+              "properties": {
+                "generateUpgradePlanExtension": {
+                  "description": "generateUpgradePlanExtension references an extension which is called to generate upgrade plan.",
+                  "maxLength": 512,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "variables": {
           "description": "variables defines the variables which can be configured\nin the Cluster topology and are then used in patches.",
@@ -975,6 +1108,51 @@
                         "maxItems": 100,
                         "type": "array"
                       },
+                      "unhealthyMachineConditions": {
+                        "description": "unhealthyMachineConditions contains a list of the machine conditions that determine\nwhether a machine is considered unhealthy.  The conditions are combined in a\nlogical OR, i.e. if any of the conditions is met, the machine is unhealthy.",
+                        "items": {
+                          "description": "UnhealthyMachineCondition represents a Machine condition type and value with a timeout\nspecified as a duration.  When the named condition has been in the given\nstatus for at least the timeout value, a machine is considered unhealthy.",
+                          "properties": {
+                            "status": {
+                              "description": "status of the condition, one of True, False, Unknown.",
+                              "enum": [
+                                "True",
+                                "False",
+                                "Unknown"
+                              ],
+                              "type": "string"
+                            },
+                            "timeout": {
+                              "description": "timeout is the duration that a Machine must be in a given status for,\nafter which the Machine is considered unhealthy.\nFor example, with a value of \"1h\", the Machine must match the status\nfor at least 1 hour before being considered unhealthy.",
+                              "type": "string"
+                            },
+                            "type": {
+                              "description": "type of Machine condition",
+                              "maxLength": 316,
+                              "minLength": 1,
+                              "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                              "type": "string",
+                              "x-kubernetes-validations": [
+                                {
+                                  "message": "type must not be one of: Ready, Available, HealthCheckSucceeded, OwnerRemediated, ExternallyRemediated",
+                                  "rule": "!(self in ['Ready','Available','HealthCheckSucceeded','OwnerRemediated','ExternallyRemediated'])"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "status",
+                            "timeout",
+                            "type"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "maxItems": 100,
+                        "minItems": 1,
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      },
                       "unhealthyRange": {
                         "description": "unhealthyRange specifies the range of unhealthy machines allowed.\nAny further remediation is only allowed if the number of machines selected by \"selector\" as not healthy\nis within the range of \"unhealthyRange\". Takes precedence over maxUnhealthy.\nEg. \"[3-5]\" - This means that remediation will be allowed only when:\n(a) there are at least 3 unhealthy machines (and)\n(b) there are at most 5 unhealthy machines",
                         "maxLength": 32,
@@ -1123,6 +1301,60 @@
                     },
                     "type": "object",
                     "additionalProperties": false
+                  },
+                  "taints": {
+                    "description": "taints are the node taints that Cluster API will manage.\nThis list is not necessarily complete: other Kubernetes components may add or remove other taints from nodes,\ne.g. the node controller might add the node.kubernetes.io/not-ready taint.\nOnly those taints defined in this list will be added or removed by core Cluster API controllers.\n\nThere can be at most 64 taints.\nA pod would have to tolerate all existing taints to run on the corresponding node.\n\nNOTE: This list is implemented as a \"map\" type, meaning that individual elements can be managed by different owners.",
+                    "items": {
+                      "description": "MachineTaint defines a taint equivalent to corev1.Taint, but additionally having a propagation field.",
+                      "properties": {
+                        "effect": {
+                          "description": "effect is the effect for the taint. Valid values are NoSchedule, PreferNoSchedule and NoExecute.",
+                          "enum": [
+                            "NoSchedule",
+                            "PreferNoSchedule",
+                            "NoExecute"
+                          ],
+                          "type": "string"
+                        },
+                        "key": {
+                          "description": "key is the taint key to be applied to a node.\nMust be a valid qualified name of maximum size 63 characters\nwith an optional subdomain prefix of maximum size 253 characters,\nseparated by a `/`.",
+                          "maxLength": 317,
+                          "minLength": 1,
+                          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$",
+                          "type": "string"
+                        },
+                        "propagation": {
+                          "description": "propagation defines how this taint should be propagated to nodes.\nValid values are 'Always' and 'OnInitialization'.\nAlways: The taint will be continuously reconciled. If it is not set for a node, it will be added during reconciliation.\nOnInitialization: The taint will be added during node initialization. If it gets removed from the node later on it will not get added again.",
+                          "enum": [
+                            "Always",
+                            "OnInitialization"
+                          ],
+                          "type": "string"
+                        },
+                        "value": {
+                          "description": "value is the taint value corresponding to the taint key.\nIt must be a valid label value of maximum size 63 characters.",
+                          "maxLength": 63,
+                          "minLength": 1,
+                          "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "effect",
+                        "key",
+                        "propagation"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 64,
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-map-keys": [
+                      "key",
+                      "effect"
+                    ],
+                    "x-kubernetes-list-type": "map"
                   },
                   "template": {
                     "description": "template is a local struct containing a collection of templates for creation of\nMachineDeployment objects representing a set of worker nodes.",
@@ -1313,6 +1545,60 @@
                   "nodeVolumeDetachTimeout": {
                     "description": "nodeVolumeDetachTimeout is the total amount of time that the controller will spend on waiting for all volumes\nto be detached. The default value is 0, meaning that the volumes can be detached without any time limitations.\nNOTE: This value can be overridden while defining a Cluster.Topology using this MachinePoolClass.",
                     "type": "string"
+                  },
+                  "taints": {
+                    "description": "taints are the node taints that Cluster API will manage.\nThis list is not necessarily complete: other Kubernetes components may add or remove other taints from nodes,\ne.g. the node controller might add the node.kubernetes.io/not-ready taint.\nOnly those taints defined in this list will be added or removed by core Cluster API controllers.\n\nThere can be at most 64 taints.\nA pod would have to tolerate all existing taints to run on the corresponding node.\n\nNOTE: This list is implemented as a \"map\" type, meaning that individual elements can be managed by different owners.",
+                    "items": {
+                      "description": "MachineTaint defines a taint equivalent to corev1.Taint, but additionally having a propagation field.",
+                      "properties": {
+                        "effect": {
+                          "description": "effect is the effect for the taint. Valid values are NoSchedule, PreferNoSchedule and NoExecute.",
+                          "enum": [
+                            "NoSchedule",
+                            "PreferNoSchedule",
+                            "NoExecute"
+                          ],
+                          "type": "string"
+                        },
+                        "key": {
+                          "description": "key is the taint key to be applied to a node.\nMust be a valid qualified name of maximum size 63 characters\nwith an optional subdomain prefix of maximum size 253 characters,\nseparated by a `/`.",
+                          "maxLength": 317,
+                          "minLength": 1,
+                          "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$",
+                          "type": "string"
+                        },
+                        "propagation": {
+                          "description": "propagation defines how this taint should be propagated to nodes.\nValid values are 'Always' and 'OnInitialization'.\nAlways: The taint will be continuously reconciled. If it is not set for a node, it will be added during reconciliation.\nOnInitialization: The taint will be added during node initialization. If it gets removed from the node later on it will not get added again.",
+                          "enum": [
+                            "Always",
+                            "OnInitialization"
+                          ],
+                          "type": "string"
+                        },
+                        "value": {
+                          "description": "value is the taint value corresponding to the taint key.\nIt must be a valid label value of maximum size 63 characters.",
+                          "maxLength": 63,
+                          "minLength": 1,
+                          "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "effect",
+                        "key",
+                        "propagation"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 64,
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-map-keys": [
+                      "key",
+                      "effect"
+                    ],
+                    "x-kubernetes-list-type": "map"
                   },
                   "template": {
                     "description": "template is a local struct containing a collection of templates for creation of\nMachinePools objects representing a pool of worker nodes.",

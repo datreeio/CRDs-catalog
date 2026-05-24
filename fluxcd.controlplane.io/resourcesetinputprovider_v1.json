@@ -16,7 +16,7 @@
       "description": "ResourceSetInputProviderSpec defines the desired state of ResourceSetInputProvider",
       "properties": {
         "certSecretRef": {
-          "description": "CertSecretRef specifies the Kubernetes Secret containing either or both of\n\n- a PEM-encoded CA certificate (`ca.crt`)\n- a PEM-encoded client certificate (`tls.crt`) and private key (`tls.key`)\n\nWhen connecting to a Git or OCI provider that uses self-signed certificates, the CA certificate\nmust be set in the Secret under the 'ca.crt' key to establish the trust relationship.\nWhen connecting to an OCI provider that supports client certificates (mTLS), the client certificate\nand private key must be set in the Secret under the 'tls.crt' and 'tls.key' keys, respectively.",
+          "description": "CertSecretRef specifies the Kubernetes Secret containing either or both of\n\n- a PEM-encoded CA certificate (`ca.crt`)\n- a PEM-encoded client certificate (`tls.crt`) and private key (`tls.key`)\n\nWhen connecting to a Git, OCI, or ExternalService provider that uses self-signed certificates,\nthe CA certificate must be set in the Secret under the 'ca.crt' key to establish the trust relationship.\nWhen connecting to a provider that supports client certificates (mTLS), the client certificate\nand private key must be set in the Secret under the 'tls.crt' and 'tls.key' keys, respectively.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -43,12 +43,20 @@
               "description": "ExcludeBranch specifies the regular expression to filter the branches\nthat the input provider should exclude.",
               "type": "string"
             },
+            "excludeEnvironment": {
+              "description": "ExcludeEnvironment specifies the regular expression to filter the environments\nthat the input provider should exclude.",
+              "type": "string"
+            },
             "excludeTag": {
               "description": "ExcludeTag specifies the regular expression to filter the tags\nthat the input provider should exclude.",
               "type": "string"
             },
             "includeBranch": {
               "description": "IncludeBranch specifies the regular expression to filter the branches\nthat the input provider should include.",
+              "type": "string"
+            },
+            "includeEnvironment": {
+              "description": "IncludeEnvironment specifies the regular expression to filter the environments\nthat the input provider should include.",
               "type": "string"
             },
             "includeTag": {
@@ -74,6 +82,10 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "insecure": {
+          "description": "Insecure allows connecting to an ExternalService or OCIArtifactTag provider\nover plain HTTP without TLS. When not set, the URL must use HTTPS.",
+          "type": "boolean"
         },
         "schedule": {
           "description": "Schedule defines the schedules for the input provider to run.",
@@ -105,7 +117,7 @@
           "type": "array"
         },
         "secretRef": {
-          "description": "SecretRef specifies the Kubernetes Secret containing the basic-auth credentials\nto access the input provider.\nWhen connecting to a Git provider, the secret must contain the keys\n'username' and 'password', and the password should be a personal access token\nthat grants read-only access to the repository.\nWhen connecting to an OCI provider, the secret must contain a Kubernetes\nImage Pull Secret, as if created by `kubectl create secret docker-registry`.",
+          "description": "SecretRef specifies the Kubernetes Secret containing the credentials\nto access the input provider.\nWhen connecting to a Git provider, the secret must contain the keys\n'username' and 'password', and the password should be a personal access token\nthat grants read-only access to the repository.\nWhen connecting to an OCI provider, the secret must contain a Kubernetes\nImage Pull Secret, as if created by `kubectl create secret docker-registry`.\nWhen connecting to an ExternalService provider, the secret must contain either\na 'token' key for bearer token authentication, or 'username' and 'password'\nkeys for basic authentication.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -146,13 +158,21 @@
             "GitLabBranch",
             "GitLabTag",
             "GitLabMergeRequest",
+            "GitLabEnvironment",
             "AzureDevOpsBranch",
             "AzureDevOpsTag",
             "AzureDevOpsPullRequest",
+            "AWSCodeCommitBranch",
+            "AWSCodeCommitTag",
+            "AWSCodeCommitPullRequest",
+            "GiteaBranch",
+            "GiteaTag",
+            "GiteaPullRequest",
             "OCIArtifactTag",
             "ACRArtifactTag",
             "ECRArtifactTag",
-            "GARArtifactTag"
+            "GARArtifactTag",
+            "ExternalService"
           ],
           "type": "string"
         },
@@ -180,24 +200,40 @@
           "rule": "!self.type.startsWith('Git') || self.url.startsWith('http')"
         },
         {
-          "message": "spec.url must start with 'http://' or 'https://' when spec.type is a Git provider",
-          "rule": "!self.type.startsWith('AzureDevOps') || self.url.startsWith('http')"
+          "message": "spec.url must start with 'http://' or 'https://' when spec.type is an AzureDevOps provider",
+          "rule": "!self.type.startsWith('AzureDevOps') || self.url.startsWith('http://') || self.url.startsWith('https://')"
+        },
+        {
+          "message": "spec.url must start with 'https://' when spec.type is a AWSCodeCommit provider",
+          "rule": "!self.type.startsWith('AWSCodeCommit') || self.url.startsWith('https://')"
         },
         {
           "message": "spec.url must start with 'oci://' when spec.type is an OCI provider",
           "rule": "!self.type.endsWith('ArtifactTag') || self.url.startsWith('oci')"
         },
         {
-          "message": "cannot specify spec.serviceAccountName when spec.type is not one of AzureDevOps* or *ArtifactTag",
-          "rule": "!has(self.serviceAccountName) || self.type.startsWith('AzureDevOps') || self.type.endsWith('ArtifactTag')"
+          "message": "spec.url must start with 'http://' or 'https://' when spec.type is 'ExternalService'",
+          "rule": "self.type != 'ExternalService' || self.url.startsWith('http')"
         },
         {
-          "message": "cannot specify spec.certSecretRef when spec.type is one of Static, AzureDevOps*, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
-          "rule": "!has(self.certSecretRef) || !(self.url == 'Static' || self.type.startsWith('AzureDevOps') || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
+          "message": "spec.insecure can only be set when spec.type is 'ExternalService' or 'OCIArtifactTag'",
+          "rule": "!has(self.insecure) || !self.insecure || self.type == 'ExternalService' || self.type == 'OCIArtifactTag'"
         },
         {
-          "message": "cannot specify spec.secretRef when spec.type is one of Static, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
-          "rule": "!has(self.secretRef) || !(self.url == 'Static' || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
+          "message": "spec.url must use 'https://' unless spec.insecure is true",
+          "rule": "self.type != 'ExternalService' || !self.url.startsWith('http://') || (has(self.insecure) && self.insecure)"
+        },
+        {
+          "message": "cannot specify spec.serviceAccountName when spec.type is not one of AzureDevOps*, AWSCodeCommit* or *ArtifactTag",
+          "rule": "!has(self.serviceAccountName) || self.type.startsWith('AzureDevOps') || self.type.startsWith('AWSCodeCommit') || self.type.endsWith('ArtifactTag')"
+        },
+        {
+          "message": "cannot specify spec.certSecretRef when spec.type is one of Static, AzureDevOps*, AWSCodeCommit*, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
+          "rule": "!has(self.certSecretRef) || !(self.url == 'Static' || self.type.startsWith('AzureDevOps') || self.type.startsWith('AWSCodeCommit') || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
+        },
+        {
+          "message": "cannot specify spec.secretRef when spec.type is one of Static, AWSCodeCommit*, ACRArtifactTag, ECRArtifactTag or GARArtifactTag",
+          "rule": "!has(self.secretRef) || !(self.url == 'Static' || self.type.startsWith('AWSCodeCommit') || (self.type.endsWith('ArtifactTag') && self.type != 'OCIArtifactTag'))"
         }
       ],
       "additionalProperties": false

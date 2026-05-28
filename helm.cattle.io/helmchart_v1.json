@@ -1,123 +1,177 @@
 {
+  "description": "HelmChart represents configuration and state for the deployment of a Helm chart.",
   "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
     "spec": {
+      "description": "HelmChartSpec represents the user-configurable details for installation and upgrade of a Helm chart release.",
       "properties": {
         "authPassCredentials": {
+          "description": "Pass Basic auth credentials to all domains.\nHelm CLI positional argument/flag: `--pass-credentials`",
           "type": "boolean"
         },
         "authSecret": {
-          "nullable": true,
+          "description": "Reference to Secret of type kubernetes.io/basic-auth holding Basic auth credentials for the Chart repo.",
           "properties": {
             "name": {
-              "nullable": true,
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
               "type": "string"
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
         "backOffLimit": {
-          "nullable": true,
+          "description": "Specify the number of retries before considering the helm job failed.",
+          "format": "int32",
           "type": "integer"
         },
         "bootstrap": {
+          "description": "Set to True if this chart is needed to bootstrap the cluster (Cloud Controller Manager, CNI, etc).",
           "type": "boolean"
         },
         "chart": {
-          "nullable": true,
+          "description": "Helm Chart name in repository, or complete HTTPS URL to chart archive (.tgz)\nHelm CLI positional argument/flag: `CHART`",
           "type": "string"
         },
         "chartContent": {
-          "nullable": true,
+          "description": "Base64-encoded chart archive .tgz; overides `.spec.chart` and `.spec.version`.\nHelm CLI positional argument/flag: `CHART`",
           "type": "string"
         },
         "createNamespace": {
+          "description": "Create target namespace if not present.\nHelm CLI positional argument/flag: `--create-namespace`",
           "type": "boolean"
         },
         "dockerRegistrySecret": {
-          "nullable": true,
+          "description": "Reference to Secret of type kubernetes.io/dockerconfigjson holding Docker auth credentials for the OCI-based registry acting as the Chart repo.",
           "properties": {
             "name": {
-              "nullable": true,
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
               "type": "string"
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
+        "driver": {
+          "default": "secret",
+          "description": "Helm storage driver to use for this chart's release metadata.\n`secret` stores releases in Kubernetes Secrets (default).\n`configmap` stores releases in ConfigMaps.\nThis field is effectively immutable after the first install; changing the storage backend is not a supported migration path.\nHelm CLI environment variable: `HELM_DRIVER`",
+          "enum": [
+            "secret",
+            "configmap"
+          ],
+          "type": "string",
+          "x-kubernetes-validations": [
+            {
+              "message": "driver is immutable after creation",
+              "optionalOldSelf": true,
+              "rule": "!oldSelf.hasValue() || self == oldSelf.value()"
+            }
+          ]
+        },
         "failurePolicy": {
-          "nullable": true,
+          "default": "reinstall",
+          "description": "Configures handling of failed chart installation or upgrades.\n- `reinstall` will perform a clean uninstall and reinstall of the chart.\n- `abort` will take no action and leave the chart in a failed state so that the administrator can manually resolve the error.",
+          "enum": [
+            "abort",
+            "reinstall"
+          ],
           "type": "string"
         },
         "helmVersion": {
-          "nullable": true,
+          "description": "DEPRECATED. Helm version to use. Only v3 is currently supported.",
           "type": "string"
         },
         "insecureSkipTLSVerify": {
+          "description": "Skip TLS certificate checks for the chart download.\nHelm CLI positional argument/flag: `--insecure-skip-tls-verify`",
           "type": "boolean"
         },
         "jobImage": {
-          "nullable": true,
+          "description": "Specify the image to use for tht helm job pod when installing or upgrading the helm chart.",
           "type": "string"
         },
         "plainHTTP": {
+          "description": "Use insecure HTTP connections for the chart download.\nHelm CLI positional argument/flag: `--plain-http`",
           "type": "boolean"
         },
         "podSecurityContext": {
-          "nullable": true,
+          "description": "Custom PodSecurityContext for the helm job pod.",
           "properties": {
             "appArmorProfile": {
-              "nullable": true,
+              "description": "appArmorProfile is the AppArmor options to use by the containers in this pod.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "localhostProfile": {
-                  "nullable": true,
+                  "description": "localhostProfile indicates a profile loaded on the node that should be used.\nThe profile must be preconfigured on the node to work.\nMust match the loaded name of the profile.\nMust be set if and only if type is \"Localhost\".",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "type indicates which kind of AppArmor profile will be applied.\nValid options are:\n  Localhost - a profile pre-loaded on the node.\n  RuntimeDefault - the container runtime's default profile.\n  Unconfined - no AppArmor enforcement.",
                   "type": "string"
                 }
               },
+              "required": [
+                "type"
+              ],
               "type": "object",
               "additionalProperties": false
             },
             "fsGroup": {
-              "nullable": true,
+              "description": "A special supplemental group that applies to all containers in a pod.\nSome volume types allow the Kubelet to change the ownership of that volume\nto be owned by the pod:\n\n1. The owning GID will be the FSGroup\n2. The setgid bit is set (new files created in the volume will be owned by FSGroup)\n3. The permission bits are OR'd with rw-rw----\n\nIf unset, the Kubelet will not modify the ownership and permissions of any volume.\nNote that this field cannot be set when spec.os.name is windows.",
+              "format": "int64",
               "type": "integer"
             },
             "fsGroupChangePolicy": {
-              "nullable": true,
+              "description": "fsGroupChangePolicy defines behavior of changing ownership and permission of the volume\nbefore being exposed inside Pod. This field will only apply to\nvolume types which support fsGroup based ownership(and permissions).\nIt will have no effect on ephemeral volume types such as: secret, configmaps\nand emptydir.\nValid values are \"OnRootMismatch\" and \"Always\". If not specified, \"Always\" is used.\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "string"
             },
             "runAsGroup": {
-              "nullable": true,
+              "description": "The GID to run the entrypoint of the container process.\nUses runtime default if unset.\nMay also be set in SecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence\nfor that container.\nNote that this field cannot be set when spec.os.name is windows.",
+              "format": "int64",
               "type": "integer"
             },
             "runAsNonRoot": {
-              "nullable": true,
+              "description": "Indicates that the container must run as a non-root user.\nIf true, the Kubelet will validate the image at runtime to ensure that it\ndoes not run as UID 0 (root) and fail to start the container if it does.\nIf unset or false, no such validation will be performed.\nMay also be set in SecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.",
               "type": "boolean"
             },
             "runAsUser": {
-              "nullable": true,
+              "description": "The UID to run the entrypoint of the container process.\nDefaults to user specified in image metadata if unspecified.\nMay also be set in SecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence\nfor that container.\nNote that this field cannot be set when spec.os.name is windows.",
+              "format": "int64",
               "type": "integer"
             },
+            "seLinuxChangePolicy": {
+              "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used.\nIf not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes\nand \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
+              "type": "string"
+            },
             "seLinuxOptions": {
-              "nullable": true,
+              "description": "The SELinux context to be applied to all containers.\nIf unspecified, the container runtime will allocate a random SELinux context for each\ncontainer.  May also be set in SecurityContext.  If set in\nboth SecurityContext and PodSecurityContext, the value specified in SecurityContext\ntakes precedence for that container.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "level": {
-                  "nullable": true,
+                  "description": "Level is SELinux level label that applies to the container.",
                   "type": "string"
                 },
                 "role": {
-                  "nullable": true,
+                  "description": "Role is a SELinux role label that applies to the container.",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "Type is a SELinux type label that applies to the container.",
                   "type": "string"
                 },
                 "user": {
-                  "nullable": true,
+                  "description": "User is a SELinux user label that applies to the container.",
                   "type": "string"
                 }
               },
@@ -125,66 +179,77 @@
               "additionalProperties": false
             },
             "seccompProfile": {
-              "nullable": true,
+              "description": "The seccomp options to use by the containers in this pod.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "localhostProfile": {
-                  "nullable": true,
+                  "description": "localhostProfile indicates a profile defined in a file on the node should be used.\nThe profile must be preconfigured on the node to work.\nMust be a descending path, relative to the kubelet's configured seccomp profile location.\nMust be set if type is \"Localhost\". Must NOT be set for any other type.",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "type indicates which kind of seccomp profile will be applied.\nValid options are:\n\nLocalhost - a profile defined in a file on the node should be used.\nRuntimeDefault - the container runtime default profile should be used.\nUnconfined - no profile should be applied.",
                   "type": "string"
                 }
               },
+              "required": [
+                "type"
+              ],
               "type": "object",
               "additionalProperties": false
             },
             "supplementalGroups": {
+              "description": "A list of groups applied to the first process run in each container, in\naddition to the container's primary GID and fsGroup (if specified).  If\nthe SupplementalGroupsPolicy feature is enabled, the\nsupplementalGroupsPolicy field determines whether these are in addition\nto or instead of any group memberships defined in the container image.\nIf unspecified, no additional groups are added, though group memberships\ndefined in the container image may still be used, depending on the\nsupplementalGroupsPolicy field.\nNote that this field cannot be set when spec.os.name is windows.",
               "items": {
+                "format": "int64",
                 "type": "integer"
               },
-              "nullable": true,
-              "type": "array"
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
             },
             "supplementalGroupsPolicy": {
-              "nullable": true,
+              "description": "Defines how supplemental groups of the first container processes are calculated.\nValid values are \"Merge\" and \"Strict\". If not specified, \"Merge\" is used.\n(Alpha) Using the field requires the SupplementalGroupsPolicy feature gate to be enabled\nand the container runtime must implement support for this feature.\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "string"
             },
             "sysctls": {
+              "description": "Sysctls hold a list of namespaced sysctls used for the pod. Pods with unsupported\nsysctls (by the container runtime) might fail to launch.\nNote that this field cannot be set when spec.os.name is windows.",
               "items": {
+                "description": "Sysctl defines a kernel parameter to be set",
                 "properties": {
                   "name": {
-                    "nullable": true,
+                    "description": "Name of a property to set",
                     "type": "string"
                   },
                   "value": {
-                    "nullable": true,
+                    "description": "Value of a property to set",
                     "type": "string"
                   }
                 },
+                "required": [
+                  "name",
+                  "value"
+                ],
                 "type": "object",
                 "additionalProperties": false
               },
-              "nullable": true,
-              "type": "array"
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
             },
             "windowsOptions": {
-              "nullable": true,
+              "description": "The Windows specific settings applied to all containers.\nIf unspecified, the options within a container's SecurityContext will be used.\nIf set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.\nNote that this field cannot be set when spec.os.name is linux.",
               "properties": {
                 "gmsaCredentialSpec": {
-                  "nullable": true,
+                  "description": "GMSACredentialSpec is where the GMSA admission webhook\n(https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the\nGMSA credential spec named by the GMSACredentialSpecName field.",
                   "type": "string"
                 },
                 "gmsaCredentialSpecName": {
-                  "nullable": true,
+                  "description": "GMSACredentialSpecName is the name of the GMSA credential spec to use.",
                   "type": "string"
                 },
                 "hostProcess": {
-                  "nullable": true,
+                  "description": "HostProcess determines if a container should be run as a 'Host Process' container.\nAll of a Pod's containers must have the same effective HostProcess value\n(it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).\nIn addition, if HostProcess is true then HostNetwork must also be set to true.",
                   "type": "boolean"
                 },
                 "runAsUserName": {
-                  "nullable": true,
+                  "description": "The UserName in Windows to run the entrypoint of the container process.\nDefaults to the user specified in image metadata if unspecified.\nMay also be set in PodSecurityContext. If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.",
                   "type": "string"
                 }
               },
@@ -196,110 +261,119 @@
           "additionalProperties": false
         },
         "repo": {
-          "nullable": true,
+          "description": "Helm Chart repository URL.\nHelm CLI positional argument/flag: `--repo`",
           "type": "string"
         },
         "repoCA": {
-          "nullable": true,
+          "description": "Verify certificates of HTTPS-enabled servers using this CA bundle. Should be a string containing one or more PEM-encoded CA Certificates.\nHelm CLI positional argument/flag: `--ca-file`",
           "type": "string"
         },
         "repoCAConfigMap": {
-          "nullable": true,
+          "description": "Reference to a ConfigMap containing CA Certificates to be be trusted by Helm. Can be used along with or instead of `.spec.repoCA`\nHelm CLI positional argument/flag: `--ca-file`",
           "properties": {
             "name": {
-              "nullable": true,
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
               "type": "string"
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
         "securityContext": {
-          "nullable": true,
+          "description": "custom SecurityContext for the helm job pod.",
           "properties": {
             "allowPrivilegeEscalation": {
-              "nullable": true,
+              "description": "AllowPrivilegeEscalation controls whether a process can gain more\nprivileges than its parent process. This bool directly controls if\nthe no_new_privs flag will be set on the container process.\nAllowPrivilegeEscalation is true always when the container is:\n1) run as Privileged\n2) has CAP_SYS_ADMIN\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "boolean"
             },
             "appArmorProfile": {
-              "nullable": true,
+              "description": "appArmorProfile is the AppArmor options to use by this container. If set, this profile\noverrides the pod's appArmorProfile.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "localhostProfile": {
-                  "nullable": true,
+                  "description": "localhostProfile indicates a profile loaded on the node that should be used.\nThe profile must be preconfigured on the node to work.\nMust match the loaded name of the profile.\nMust be set if and only if type is \"Localhost\".",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "type indicates which kind of AppArmor profile will be applied.\nValid options are:\n  Localhost - a profile pre-loaded on the node.\n  RuntimeDefault - the container runtime's default profile.\n  Unconfined - no AppArmor enforcement.",
                   "type": "string"
                 }
               },
+              "required": [
+                "type"
+              ],
               "type": "object",
               "additionalProperties": false
             },
             "capabilities": {
-              "nullable": true,
+              "description": "The capabilities to add/drop when running containers.\nDefaults to the default set of capabilities granted by the container runtime.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "add": {
+                  "description": "Added capabilities",
                   "items": {
-                    "nullable": true,
+                    "description": "Capability represent POSIX capabilities type",
                     "type": "string"
                   },
-                  "nullable": true,
-                  "type": "array"
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
                 },
                 "drop": {
+                  "description": "Removed capabilities",
                   "items": {
-                    "nullable": true,
+                    "description": "Capability represent POSIX capabilities type",
                     "type": "string"
                   },
-                  "nullable": true,
-                  "type": "array"
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
                 }
               },
               "type": "object",
               "additionalProperties": false
             },
             "privileged": {
-              "nullable": true,
+              "description": "Run container in privileged mode.\nProcesses in privileged containers are essentially equivalent to root on the host.\nDefaults to false.\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "boolean"
             },
             "procMount": {
-              "nullable": true,
+              "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "string"
             },
             "readOnlyRootFilesystem": {
-              "nullable": true,
+              "description": "Whether this container has a read-only root filesystem.\nDefault is false.\nNote that this field cannot be set when spec.os.name is windows.",
               "type": "boolean"
             },
             "runAsGroup": {
-              "nullable": true,
+              "description": "The GID to run the entrypoint of the container process.\nUses runtime default if unset.\nMay also be set in PodSecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.\nNote that this field cannot be set when spec.os.name is windows.",
+              "format": "int64",
               "type": "integer"
             },
             "runAsNonRoot": {
-              "nullable": true,
+              "description": "Indicates that the container must run as a non-root user.\nIf true, the Kubelet will validate the image at runtime to ensure that it\ndoes not run as UID 0 (root) and fail to start the container if it does.\nIf unset or false, no such validation will be performed.\nMay also be set in PodSecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.",
               "type": "boolean"
             },
             "runAsUser": {
-              "nullable": true,
+              "description": "The UID to run the entrypoint of the container process.\nDefaults to user specified in image metadata if unspecified.\nMay also be set in PodSecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.\nNote that this field cannot be set when spec.os.name is windows.",
+              "format": "int64",
               "type": "integer"
             },
             "seLinuxOptions": {
-              "nullable": true,
+              "description": "The SELinux context to be applied to the container.\nIf unspecified, the container runtime will allocate a random SELinux context for each\ncontainer.  May also be set in PodSecurityContext.  If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "level": {
-                  "nullable": true,
+                  "description": "Level is SELinux level label that applies to the container.",
                   "type": "string"
                 },
                 "role": {
-                  "nullable": true,
+                  "description": "Role is a SELinux role label that applies to the container.",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "Type is a SELinux type label that applies to the container.",
                   "type": "string"
                 },
                 "user": {
-                  "nullable": true,
+                  "description": "User is a SELinux user label that applies to the container.",
                   "type": "string"
                 }
               },
@@ -307,37 +381,40 @@
               "additionalProperties": false
             },
             "seccompProfile": {
-              "nullable": true,
+              "description": "The seccomp options to use by this container. If seccomp options are\nprovided at both the pod & container level, the container options\noverride the pod options.\nNote that this field cannot be set when spec.os.name is windows.",
               "properties": {
                 "localhostProfile": {
-                  "nullable": true,
+                  "description": "localhostProfile indicates a profile defined in a file on the node should be used.\nThe profile must be preconfigured on the node to work.\nMust be a descending path, relative to the kubelet's configured seccomp profile location.\nMust be set if type is \"Localhost\". Must NOT be set for any other type.",
                   "type": "string"
                 },
                 "type": {
-                  "nullable": true,
+                  "description": "type indicates which kind of seccomp profile will be applied.\nValid options are:\n\nLocalhost - a profile defined in a file on the node should be used.\nRuntimeDefault - the container runtime default profile should be used.\nUnconfined - no profile should be applied.",
                   "type": "string"
                 }
               },
+              "required": [
+                "type"
+              ],
               "type": "object",
               "additionalProperties": false
             },
             "windowsOptions": {
-              "nullable": true,
+              "description": "The Windows specific settings applied to all containers.\nIf unspecified, the options from the PodSecurityContext will be used.\nIf set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.\nNote that this field cannot be set when spec.os.name is linux.",
               "properties": {
                 "gmsaCredentialSpec": {
-                  "nullable": true,
+                  "description": "GMSACredentialSpec is where the GMSA admission webhook\n(https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the\nGMSA credential spec named by the GMSACredentialSpecName field.",
                   "type": "string"
                 },
                 "gmsaCredentialSpecName": {
-                  "nullable": true,
+                  "description": "GMSACredentialSpecName is the name of the GMSA credential spec to use.",
                   "type": "string"
                 },
                 "hostProcess": {
-                  "nullable": true,
+                  "description": "HostProcess determines if a container should be run as a 'Host Process' container.\nAll of a Pod's containers must have the same effective HostProcess value\n(it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).\nIn addition, if HostProcess is true then HostNetwork must also be set to true.",
                   "type": "boolean"
                 },
                 "runAsUserName": {
-                  "nullable": true,
+                  "description": "The UserName in Windows to run the entrypoint of the container process.\nDefaults to the user specified in image metadata if unspecified.\nMay also be set in PodSecurityContext. If set in both SecurityContext and\nPodSecurityContext, the value specified in SecurityContext takes precedence.",
                   "type": "string"
                 }
               },
@@ -350,25 +427,67 @@
         },
         "set": {
           "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "x-kubernetes-int-or-string": true
           },
-          "nullable": true,
+          "description": "Override simple Chart values. These take precedence over options set via values or valuesContent.\nHelm CLI positional argument/flag: `--set`, `--set-string`",
           "type": "object"
         },
+        "takeOwnership": {
+          "description": "Set to True if helm should take ownership of existing resources when installing/upgrading the chart.\nHelm CLI positional argument/flag: `--take-ownership`",
+          "type": "boolean"
+        },
         "targetNamespace": {
-          "nullable": true,
+          "description": "Helm Chart target namespace.\nHelm CLI positional argument/flag: `--namespace`",
           "type": "string"
         },
         "timeout": {
-          "nullable": true,
+          "description": "Timeout for Helm operations.\nHelm CLI positional argument/flag: `--timeout`",
           "type": "string"
+        },
+        "values": {
+          "description": "Override complex Chart values via structured YAML. Takes precedence over options set via valuesContent.\nHelm CLI positional argument/flag: `--values`",
+          "x-kubernetes-preserve-unknown-fields": true
         },
         "valuesContent": {
-          "nullable": true,
+          "description": "Override complex Chart values via inline YAML content.\nHelm CLI positional argument/flag: `--values`",
           "type": "string"
         },
+        "valuesSecrets": {
+          "description": "Override complex Chart values via references to external Secrets.\nHelm CLI positional argument/flag: `--values`",
+          "items": {
+            "description": "SecretSpec describes a key in a secret to load chart values from.",
+            "properties": {
+              "ignoreUpdates": {
+                "description": "Ignore changes to the secret, and mark the secret as optional.\nBy default, the secret must exist, and changes to the secret will trigger an upgrade of the chart to apply the updated values.\nIf `ignoreUpdates` is true, the secret is optional, and changes to the secret will not trigger an upgrade of the chart.",
+                "type": "boolean"
+              },
+              "keys": {
+                "description": "Keys to read values content from. If no keys are specified, the secret is not used.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "description": "Name of the secret. Must be in the same namespace as the HelmChart resource.",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "version": {
-          "nullable": true,
+          "description": "Helm Chart version. Only used when installing from repository; ignored when .spec.chart or .spec.chartContent is used to install a specific chart archive.\nHelm CLI positional argument/flag: `--version`",
           "type": "string"
         }
       },
@@ -376,35 +495,44 @@
       "additionalProperties": false
     },
     "status": {
+      "description": "HelmChartStatus represents the resulting state from processing HelmChart events",
       "properties": {
         "conditions": {
+          "description": "`JobCreated` indicates that a job has been created to install or upgrade the chart.\n`Failed` indicates that the helm job has failed and the failure policy is set to `abort`.",
           "items": {
             "properties": {
               "message": {
-                "nullable": true,
+                "description": "Human readable message indicating details about last transition.",
                 "type": "string"
               },
               "reason": {
-                "nullable": true,
+                "description": "(brief) reason for the condition's last transition.",
                 "type": "string"
               },
               "status": {
-                "nullable": true,
+                "description": "Status of the condition, one of True, False, Unknown.",
                 "type": "string"
               },
               "type": {
-                "nullable": true,
+                "description": "Type of job condition.",
                 "type": "string"
               }
             },
+            "required": [
+              "status",
+              "type"
+            ],
             "type": "object",
             "additionalProperties": false
           },
-          "nullable": true,
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
         },
         "jobName": {
-          "nullable": true,
+          "description": "The name of the job created to install or upgrade the chart.",
           "type": "string"
         }
       },

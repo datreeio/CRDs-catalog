@@ -1,0 +1,448 @@
+{
+  "description": "QuotaPolicy specifies token quota configuration for inference services.\nProviding a list of backends in the AIGatewayRouteRule allows failover to a different service\nif token quota for a service had been exceeded.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "QuotaPolicySpec specifies rules for computing token based costs of requests.",
+      "properties": {
+        "perModelQuotas": {
+          "description": "PerModelQuotas specifies quota for different models served by the AIServiceBackend(s) where this\npolicy is attached.",
+          "items": {
+            "properties": {
+              "modelName": {
+                "description": "Model name for which the quota is specified.",
+                "minLength": 1,
+                "type": "string"
+              },
+              "quota": {
+                "description": "Expression for computing request cost and rules for matching requests to quota buckets.",
+                "properties": {
+                  "bucketRules": {
+                    "description": "BucketRules are a list of client selectors and quotas. If a request\nmatches multiple rules, each of their associated quotas get applied, so a\nsingle request might burn down the quota for multiple rules.",
+                    "items": {
+                      "properties": {
+                        "clientSelectors": {
+                          "description": "ClientSelectors holds the list of conditions to select\nspecific clients using attributes from the traffic flow.\nAll individual select conditions must hold True for this rule\nand its limit to be applied.\n\nIf no client selectors are specified, the rule applies to all traffic of\nthe targeted AIServiceBackend.",
+                          "items": {
+                            "description": "RateLimitSelectCondition specifies the attributes within the traffic flow that can\nbe used to select a subset of clients to be ratelimited.\nAll the individual conditions must hold True for the overall condition to hold True.\nAnd, at least one of headers or methods or path or sourceCIDR or queryParams condition must be specified.",
+                            "properties": {
+                              "headers": {
+                                "description": "Headers is a list of request headers to match. Multiple header values are ANDed together,\nmeaning, a request MUST match all the specified headers.",
+                                "items": {
+                                  "description": "HeaderMatch defines the match attributes within the HTTP Headers of the request.",
+                                  "properties": {
+                                    "invert": {
+                                      "default": false,
+                                      "description": "Invert specifies whether the value match result will be inverted.\nDo not set this field when Type=\"Distinct\", implying matching on any/all unique\nvalues within the header.",
+                                      "type": "boolean"
+                                    },
+                                    "name": {
+                                      "description": "Name of the HTTP header.\nThe header name is case-insensitive unless PreserveHeaderCase is set to true.\nFor example, \"Foo\" and \"foo\" are considered the same header.",
+                                      "maxLength": 256,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "default": "Exact",
+                                      "description": "Type specifies how to match against the value of the header.",
+                                      "enum": [
+                                        "Exact",
+                                        "RegularExpression",
+                                        "Distinct"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "Value within the HTTP header.\nDo not set this field when Type=\"Distinct\", implying matching on any/all unique\nvalues within the header.",
+                                      "maxLength": 1024,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "maxItems": 16,
+                                "type": "array"
+                              },
+                              "methods": {
+                                "description": "Methods is a list of request methods to match. Multiple method values are ORed together,\nmeaning, a request can match any one of the specified methods. If not specified, it matches all methods.",
+                                "items": {
+                                  "description": "MethodMatch defines the matching criteria for the HTTP method of a request.",
+                                  "properties": {
+                                    "invert": {
+                                      "default": false,
+                                      "description": "Invert specifies whether the value match result will be inverted.",
+                                      "type": "boolean"
+                                    },
+                                    "value": {
+                                      "description": "Value specifies the HTTP method.",
+                                      "enum": [
+                                        "GET",
+                                        "HEAD",
+                                        "POST",
+                                        "PUT",
+                                        "DELETE",
+                                        "CONNECT",
+                                        "OPTIONS",
+                                        "TRACE",
+                                        "PATCH"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "value"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "type": "array"
+                              },
+                              "path": {
+                                "description": "Path is the request path to match.\nSupport Exact, PathPrefix and RegularExpression match types.",
+                                "properties": {
+                                  "invert": {
+                                    "default": false,
+                                    "description": "Invert specifies whether the value match result will be inverted.",
+                                    "type": "boolean"
+                                  },
+                                  "type": {
+                                    "default": "PathPrefix",
+                                    "description": "Type specifies how to match against the value of the path.",
+                                    "enum": [
+                                      "Exact",
+                                      "PathPrefix",
+                                      "RegularExpression"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "default": "/",
+                                    "description": "Value specifies the HTTP path.",
+                                    "maxLength": 1024,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "value"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "queryParams": {
+                                "description": "QueryParams is a list of query parameters to match. Multiple query parameter values are ANDed together,\nmeaning, a request MUST match all the specified query parameters.",
+                                "items": {
+                                  "description": "QueryParamMatch defines the match attributes within the query parameters of the request.",
+                                  "properties": {
+                                    "invert": {
+                                      "default": false,
+                                      "description": "Invert specifies whether the value match result will be inverted.\nDo not set this field when Type=\"Distinct\", implying matching on any/all unique\nvalues within the query parameter.",
+                                      "type": "boolean"
+                                    },
+                                    "name": {
+                                      "description": "Name of the query parameter.",
+                                      "maxLength": 256,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "default": "Exact",
+                                      "description": "Type specifies how to match against the value of the query parameter.",
+                                      "enum": [
+                                        "Exact",
+                                        "RegularExpression",
+                                        "Distinct"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "Value of the query parameter.\nDo not set this field when Type=\"Distinct\", implying matching on any/all unique\nvalues within the query parameter.",
+                                      "maxLength": 1024,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "maxItems": 16,
+                                "type": "array"
+                              },
+                              "sourceCIDR": {
+                                "description": "SourceCIDR is the client IP Address range to match on.",
+                                "properties": {
+                                  "type": {
+                                    "default": "Exact",
+                                    "enum": [
+                                      "Exact",
+                                      "Distinct"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "description": "Value is the IP CIDR that represents the range of Source IP Addresses of the client.\nThese could also be the intermediate addresses through which the request has flown through and is part of the  `X-Forwarded-For` header.\nFor example, `192.168.0.1/32`, `192.168.0.0/24`, `001:db8::/64`.",
+                                    "maxLength": 256,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "value"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              }
+                            },
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "at least one of headers, methods, path, sourceCIDR or queryParams must be specified",
+                                "rule": "has(self.headers) || has(self.methods) || has(self.path) || has(self.sourceCIDR) || has(self.queryParams)"
+                              }
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 8,
+                          "type": "array"
+                        },
+                        "quota": {
+                          "description": "Quota value for given client selectors.\nThis quota is applied for traffic flows when the selectors\ncompute to True, causing the request to be counted towards the limit.\nA response with 429 HTTP status code is sent back to the client when\nthe selected requests have exceeded the quota.",
+                          "properties": {
+                            "duration": {
+                              "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                              "type": "string"
+                            },
+                            "limit": {
+                              "description": "The limit alloted for a specified time window.",
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "duration",
+                            "limit"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "shadowMode": {
+                          "description": "ShadowMode indicates whether this quota rule runs in shadow mode.\nWhen enabled, all quota checks are performed (cache lookups,\ncounter updates, telemetry generation), but the outcome is never enforced.\nThe request always succeeds, even if the configured quota is exceeded.",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "quota"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array"
+                  },
+                  "costExpression": {
+                    "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n * \"input_tokens + cached_input_tokens * 0.1 + output_tokens * 6\"",
+                    "type": "string"
+                  },
+                  "defaultBucket": {
+                    "description": "Quota applicable to all traffic. This value can be overridden for specific classes of requests\nusing the \"BucketRules\" configuration.",
+                    "properties": {
+                      "duration": {
+                        "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                        "type": "string"
+                      },
+                      "limit": {
+                        "description": "The limit alloted for a specified time window.",
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "duration",
+                      "limit"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "mode": {
+                    "description": "The \"Mode\" determines how quota is charged to the \"DefaultBucket\" and matching \"BucketRules\".\nIn the \"exclusive\" mode the quota is charged to matching BucketRules or the DefaultBucket\nif no BucketRules match the request. The request is denied if all matching buckets are out of quota.\nIn the \"shared\" mode the quota is charged to all matching \"BucketRules\" AND the \"DefaultBucket\"\nand request is allowed only if the quota is available in all matching buckets.",
+                    "enum": [
+                      "Exclusive",
+                      "Shared"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mode"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "modelName",
+              "quota"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 128,
+          "type": "array"
+        },
+        "serviceQuota": {
+          "description": "Quota for all models served by AIServiceBackend(s). This value can be overridden for specific models using the \"PerModelQuotas\"\nconfiguration.",
+          "properties": {
+            "costExpression": {
+              "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n * \"input_tokens + cached_input_tokens * 0.1 + output_tokens * 6\"",
+              "type": "string"
+            },
+            "quota": {
+              "description": "Quota value applicable to all requests.\nA response with 429 HTTP status code is sent back to the client when\nthe selected requests have exceeded the quota.",
+              "properties": {
+                "duration": {
+                  "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                  "type": "string"
+                },
+                "limit": {
+                  "description": "The limit alloted for a specified time window.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "duration",
+                "limit"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "quota"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "targetRefs": {
+          "description": "TargetRefs are the names of the AIServiceBackend resources this QuotaPolicy is being attached to.",
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "targetRefs must reference AIServiceBackend resources",
+              "rule": "self.all(ref, ref.group == 'aigateway.envoyproxy.io' && ref.kind == 'AIServiceBackend')"
+            }
+          ]
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status defines the status details of the QuotaPolicy.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions is the list of conditions by the reconciliation result.\nCurrently, at most one condition is set.\n\nKnown .status.conditions.type are: \"Accepted\", \"NotAccepted\".",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

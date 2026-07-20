@@ -1,0 +1,557 @@
+{
+  "description": "ProxmoxCluster is the Schema for the proxmoxclusters API.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec is the Proxmox Cluster spec",
+      "properties": {
+        "allowedNodes": {
+          "description": "allowedNodes specifies all Proxmox nodes which will be considered\nfor operations. This implies that VMs can be cloned on different nodes from\nthe node which holds the VM template.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "controlPlaneEndpoint": {
+          "description": "controlPlaneEndpoint represents the endpoint used to communicate with the control plane.",
+          "minProperties": 1,
+          "properties": {
+            "host": {
+              "description": "host is the hostname on which the API server is serving.",
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string"
+            },
+            "port": {
+              "description": "port is the port on which the API server is serving.",
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "port must be within 1-65535",
+              "rule": "self.port > 0 && self.port < 65536"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "credentialsRef": {
+          "description": "credentialsRef is a reference to a Secret that contains the credentials to use for provisioning this cluster. If not\nsupplied then the credentials of the controller will be used.\nif no namespace is provided, the namespace of the ProxmoxCluster will be used.",
+          "properties": {
+            "name": {
+              "description": "name is unique within a namespace to reference a secret resource.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "namespace defines the space within which the secret name must be unique.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "dnsServers": {
+          "description": "dnsServers contains information about nameservers used by the machines.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "externalManagedControlPlane": {
+          "default": false,
+          "description": "externalManagedControlPlane can be enabled to allow externally managed Control Planes to patch the\nProxmox cluster with the Load Balancer IP provided by Control Plane provider.",
+          "type": "boolean"
+        },
+        "ipv4Config": {
+          "description": "ipv4Config contains information about available IPv4 address pools and the gateway.\nThis can be combined with ipv6Config in order to enable dual stack.\nEither IPv4Config or IPv6Config must be provided.",
+          "properties": {
+            "addresses": {
+              "description": "addresses is a list of IP addresses that can be assigned. This set of addresses can be non-contiguous.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
+            "gateway": {
+              "description": "gateway is the network gateway",
+              "minLength": 1,
+              "type": "string"
+            },
+            "metric": {
+              "default": 100,
+              "description": "metric is the route priority applied to the default gateway",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "prefix": {
+              "description": "prefix is the network prefix to use.",
+              "format": "int32",
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "addresses",
+            "gateway",
+            "prefix"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "IPv4Config addresses must be provided",
+              "rule": "self.addresses.size() > 0"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "ipv6Config": {
+          "description": "ipv6Config contains information about available IPv6 address pools and the gateway.\nThis can be combined with ipv4Config in order to enable dual stack.\nEither IPv4Config or IPv6Config must be provided.",
+          "properties": {
+            "addresses": {
+              "description": "addresses is a list of IP addresses that can be assigned. This set of addresses can be non-contiguous.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
+            "gateway": {
+              "description": "gateway is the network gateway",
+              "minLength": 1,
+              "type": "string"
+            },
+            "metric": {
+              "default": 100,
+              "description": "metric is the route priority applied to the default gateway",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "prefix": {
+              "description": "prefix is the network prefix to use.",
+              "format": "int32",
+              "maximum": 128,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "addresses",
+            "gateway",
+            "prefix"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "IPv6Config addresses must be provided",
+              "rule": "self.addresses.size() > 0"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "schedulerHints": {
+          "description": "schedulerHints allows to influence the decision on where a VM will be scheduled. For example by applying a multiplicator\nto a node's resources, to allow for overprovisioning or to ensure a node will always have a safety buffer.",
+          "properties": {
+            "memoryAdjustment": {
+              "description": "memoryAdjustment allows to adjust a node's memory by a given percentage.\nFor example, setting it to 300 allows to allocate 300% of a host's memory for VMs,\nand setting it to 95 limits memory allocation to 95% of a host's memory.\nSetting it to 0 entirely disables scheduling memory constraints.\nBy default 100% of a node's memory will be used for allocation.",
+              "format": "int64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "zoneConfig": {
+          "description": "zoneConfig defines a IPAddress config per deployment zone.",
+          "items": {
+            "description": "ZoneConfigSpec is the Network Configuration for further deployment zones.",
+            "properties": {
+              "dnsServers": {
+                "description": "dnsServers contains information about nameservers used by the machines in this zone.",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
+              "ipv4Config": {
+                "description": "ipv4Config contains information about available IPv4 address pools and the gateway.\nThis can be combined with ipv6Config in order to enable dual stack.\nEither IPv4Config or IPv6Config must be provided.",
+                "properties": {
+                  "addresses": {
+                    "description": "addresses is a list of IP addresses that can be assigned. This set of addresses can be non-contiguous.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "set"
+                  },
+                  "gateway": {
+                    "description": "gateway is the network gateway",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "metric": {
+                    "default": 100,
+                    "description": "metric is the route priority applied to the default gateway",
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "prefix": {
+                    "description": "prefix is the network prefix to use.",
+                    "format": "int32",
+                    "maximum": 128,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "addresses",
+                  "gateway",
+                  "prefix"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "IPv4Config addresses must be provided",
+                    "rule": "self.addresses.size() > 0"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "ipv6Config": {
+                "description": "ipv6Config contains information about available IPv6 address pools and the gateway.\nThis can be combined with ipv4Config in order to enable dual stack.\nEither IPv4Config or IPv6Config must be provided.",
+                "properties": {
+                  "addresses": {
+                    "description": "addresses is a list of IP addresses that can be assigned. This set of addresses can be non-contiguous.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "set"
+                  },
+                  "gateway": {
+                    "description": "gateway is the network gateway",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "metric": {
+                    "default": 100,
+                    "description": "metric is the route priority applied to the default gateway",
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "prefix": {
+                    "description": "prefix is the network prefix to use.",
+                    "format": "int32",
+                    "maximum": 128,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "addresses",
+                  "gateway",
+                  "prefix"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "IPv6Config addresses must be provided",
+                    "rule": "self.addresses.size() > 0"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "zone": {
+                "description": "zone is the name of your deployment zone.",
+                "pattern": "^[a-z0-9A-Z](?:[a-z0-9A-Z-_.]{0,61}[a-z0-9A-Z])?$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "dnsServers",
+              "zone"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "zone"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      },
+      "required": [
+        "dnsServers"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "at least one ip config must be set, either ipv4Config or ipv6Config",
+          "rule": "self.ipv4Config != null || self.ipv6Config != null"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "status is the Proxmox Cluster status",
+      "properties": {
+        "conditions": {
+          "description": "conditions represents the observations of a ProxmoxCluster's current state.\nKnown condition types are Ready, ProxmoxAvailable and Paused.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "inClusterIPPoolRef": {
+          "description": "inClusterIPPoolRef is the reference to the created in-cluster IP pool.",
+          "items": {
+            "description": "LocalObjectReference contains enough information to let you locate the\nreferenced object inside the same namespace.",
+            "properties": {
+              "name": {
+                "default": "",
+                "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "x-kubernetes-map-type": "atomic",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "inClusterZoneRef": {
+          "description": "inClusterZoneRef lists InClusterIPPools per proxmox-zone.",
+          "items": {
+            "description": "InClusterZoneRef holds the InClusterIPPools associated with a zone.",
+            "properties": {
+              "inClusterIPPoolRefV4": {
+                "description": "inClusterIPPoolRefV4 is the reference to the created in-cluster IP pool.",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "inClusterIPPoolRefV6": {
+                "description": "inClusterIPPoolRefV6 is the reference to the created in-cluster IP pool.",
+                "properties": {
+                  "name": {
+                    "default": "",
+                    "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              },
+              "zone": {
+                "default": "default",
+                "description": "zone defines the deployment proxmox-zone.",
+                "pattern": "^[a-z0-9A-Z](?:[a-z0-9A-Z-_.]{0,61}[a-z0-9A-Z])?$",
+                "type": "string"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "zone"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "initialization": {
+          "description": "initialization provides observations of the ProxmoxCluster initialization process.\nNOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Cluster provisioning.",
+          "minProperties": 1,
+          "properties": {
+            "provisioned": {
+              "description": "provisioned is true when the infrastructure provider reports that the Cluster's infrastructure is fully provisioned.\nNOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Cluster provisioning.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "nodeLocations": {
+          "description": "nodeLocations keeps track of which nodes have been selected\nfor different machines.",
+          "properties": {
+            "controlPlane": {
+              "description": "controlPlane contains all deployed control plane nodes.",
+              "items": {
+                "description": "NodeLocation holds information about a single VM\nin Proxmox.",
+                "properties": {
+                  "machine": {
+                    "description": "machine is the reference to the ProxmoxMachine that the node is on.",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "node": {
+                    "description": "node is the Proxmox node.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "zone": {
+                    "description": "zone is the zone the Machine is in.",
+                    "pattern": "^[a-z0-9A-Z](?:[a-z0-9A-Z-_.]{0,61}[a-z0-9A-Z])?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "machine",
+                  "node"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "workers": {
+              "description": "workers contains all deployed worker nodes.",
+              "items": {
+                "description": "NodeLocation holds information about a single VM\nin Proxmox.",
+                "properties": {
+                  "machine": {
+                    "description": "machine is the reference to the ProxmoxMachine that the node is on.",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "node": {
+                    "description": "node is the Proxmox node.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "zone": {
+                    "description": "zone is the zone the Machine is in.",
+                    "pattern": "^[a-z0-9A-Z](?:[a-z0-9A-Z-_.]{0,61}[a-z0-9A-Z])?$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "machine",
+                  "node"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

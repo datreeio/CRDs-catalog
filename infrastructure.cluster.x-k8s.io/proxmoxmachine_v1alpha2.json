@@ -1,0 +1,830 @@
+{
+  "description": "ProxmoxMachine is the Schema for the proxmoxmachines API.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec is the Proxmox machine spec.",
+      "properties": {
+        "allowedNodes": {
+          "description": "allowedNodes specifies all Proxmox nodes which will be considered\nfor operations. This implies that VMs can be cloned on different nodes from\nthe node which holds the VM template.\n\nThis field is optional and should only be set if you want to restrict\nthe nodes where the VM can be cloned.\nIf not set, the ProxmoxCluster will be used to determine the nodes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "checks": {
+          "description": "checks defines possible checks to skip.",
+          "properties": {
+            "skipCloudInitStatus": {
+              "description": "skipCloudInitStatus skip checking CloudInit status which can be useful with specific Operating Systems like TalOS",
+              "type": "boolean"
+            },
+            "skipQemuGuestAgent": {
+              "description": "skipQemuGuestAgent skips checking QEMU Agent readiness which can be useful with specific Operating Systems like TalOS",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "description": {
+          "description": "description for the new VM.",
+          "type": "string"
+        },
+        "disks": {
+          "description": "disks contains a set of disk configuration options,\nwhich will be applied before the first startup.",
+          "properties": {
+            "bootVolume": {
+              "description": "bootVolume defines the storage size for the boot volume.\nThis field is optional, and should only be set if you want\nto change the size of the boot volume.",
+              "properties": {
+                "disk": {
+                  "description": "disk is the name of the disk device that should be resized.\nExample values are: ide[0-3], scsi[0-30], sata[0-5].",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sizeGb": {
+                  "description": "sizeGb defines the size in gigabytes.\n\nAs Proxmox does not support shrinking, the size\nmust be bigger than the already configured size in the\ntemplate.",
+                  "format": "int32",
+                  "minimum": 5,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "disk",
+                "sizeGb"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Value is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ],
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "format": {
+          "description": "format for file storage. Only valid for full clone.",
+          "enum": [
+            "raw",
+            "qcow2",
+            "vmdk"
+          ],
+          "type": "string"
+        },
+        "full": {
+          "default": true,
+          "description": "full Create a full copy of all disks.\nThis is always done when you clone a normal VM.\nDefaults to true when not specified, creating a full clone by default.",
+          "type": "boolean"
+        },
+        "memoryMiB": {
+          "description": "memoryMiB is the size of a virtual machine's memory, in MiB.\nDefaults to the property value in the template from which the virtual machine is cloned.",
+          "format": "int32",
+          "minimum": 0,
+          "multipleOf": 8,
+          "type": "integer"
+        },
+        "metadataSettings": {
+          "description": "metadataSettings defines the metadata settings for this machine's VM.",
+          "properties": {
+            "providerIDInjection": {
+              "description": "providerIDInjection enables the injection of the `providerID` into the cloudinit metadata.\nthis will basically set the `provider-id` field in the metadata to `proxmox://<instanceID>`.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "providerIDInjection"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "network": {
+          "description": "network is the network configuration for this machine's VM.",
+          "properties": {
+            "networkDevices": {
+              "description": "networkDevices is a list of network devices.",
+              "items": {
+                "description": "NetworkDevice defines the required details of a virtual machine network device.",
+                "properties": {
+                  "bridge": {
+                    "description": "bridge is the network bridge to attach to the machine.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "defaultIPv4": {
+                    "description": "defaultIPv4 attaches the ipv4 host network to this interface.",
+                    "type": "boolean"
+                  },
+                  "defaultIPv6": {
+                    "description": "defaultIPv6 attaches the ipv6 host network to this interface.",
+                    "type": "boolean"
+                  },
+                  "dnsServers": {
+                    "description": "dnsServers contains information about nameservers to be used for this interface.\nIf this field is not set, it will use the default dns servers from the ProxmoxCluster.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-type": "set"
+                  },
+                  "ipPoolRef": {
+                    "description": "ipPoolRef is a reference to an IPAM Pool resource, which exposes IPv4 addresses.\nThe network device will use an available IP address from the referenced pool.\nThis can be combined with `IPv6PoolRef` in order to enable dual stack.",
+                    "items": {
+                      "description": "TypedLocalObjectReference contains enough information to let you locate the\ntyped referenced object inside the same namespace.",
+                      "properties": {
+                        "apiGroup": {
+                          "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "description": "Kind is the type of resource being referenced",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name is the name of resource being referenced",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-map-type": "atomic",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "ipPoolRef allows only IPAM apiGroup ipam.cluster.x-k8s.io",
+                          "rule": "self.apiGroup == 'ipam.cluster.x-k8s.io'"
+                        },
+                        {
+                          "message": "ipPoolRef allows either InClusterIPPool or GlobalInClusterIPPool",
+                          "rule": "self.kind == 'InClusterIPPool' || self.kind == 'GlobalInClusterIPPool'"
+                        }
+                      ],
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "linkMtu": {
+                    "description": "linkMtu is the network device Maximum Transmission Unit.",
+                    "format": "int32",
+                    "type": "integer",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "invalid MTU value",
+                        "rule": "self == 1 || (self >= 576 && self <= 65520)"
+                      }
+                    ]
+                  },
+                  "model": {
+                    "default": "virtio",
+                    "description": "model is the network device model.\nDefaults to \"virtio\" when not specified.",
+                    "enum": [
+                      "e1000",
+                      "virtio",
+                      "rtl8139",
+                      "vmxnet3"
+                    ],
+                    "type": "string"
+                  },
+                  "mtu": {
+                    "description": "mtu is the network device Maximum Transmission Unit.\nWhen set to 1, virtio devices inherit the MTU value from the underlying bridge.",
+                    "format": "int32",
+                    "type": "integer",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "invalid MTU value",
+                        "rule": "self == 1 || (self >= 576 && self <= 65520)"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "default": "net0",
+                    "description": "name is the network device name.",
+                    "minLength": 4,
+                    "pattern": "^net[0-9]+$",
+                    "type": "string"
+                  },
+                  "queues": {
+                    "description": "queues is the number of queues assigned to the device.\nThis value is passed to the Multiqueue field in PROXMOX.",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "routes": {
+                    "description": "routes are the routes associated with this interface.",
+                    "items": {
+                      "description": "RouteSpec describes an IPv4/IPv6 Route.",
+                      "properties": {
+                        "is6": {
+                          "description": "is6 defines if a RouteSpec is IPv6.\nIt is only required to disambiguate a 'default'|'all' placeholder 'to'\nwhen 'via' is unset, otherwise the family is derived from 'via'.",
+                          "type": "boolean"
+                        },
+                        "metric": {
+                          "description": "metric is the priority of the route in the routing table.",
+                          "format": "int32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "table": {
+                          "description": "table is the routing table used for this route.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "to": {
+                          "description": "to is the subnet to be routed.",
+                          "type": "string"
+                        },
+                        "via": {
+                          "description": "via is the gateway to the subnet.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "routingPolicy": {
+                    "description": "routingPolicy is an interface-specific policy inserted into FIB (forwarding information base).",
+                    "items": {
+                      "description": "RoutingPolicySpec is a Linux FIB rule.",
+                      "properties": {
+                        "from": {
+                          "description": "from is the subnet of the source.",
+                          "type": "string"
+                        },
+                        "is6": {
+                          "description": "is6 defines if a RoutingPolicySpec is IPv6.\nIt is only required to disambiguate a 'default'|'all' placeholder when\nneither 'to' nor 'from' carries a concrete address to derive the family.",
+                          "type": "boolean"
+                        },
+                        "priority": {
+                          "description": "priority is the position in the ip rule FIB table.",
+                          "format": "int64",
+                          "maximum": 4294967295,
+                          "type": "integer",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "Cowardly refusing to insert FIB rule matching kernel rules",
+                              "rule": "(self > 0 && self < 32765) || (self > 32766)"
+                            }
+                          ]
+                        },
+                        "table": {
+                          "description": "table is the routing table ID.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "to": {
+                          "description": "to is the subnet of the target.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "vlan": {
+                    "description": "vlan is the network L2 VLAN.",
+                    "format": "int32",
+                    "maximum": 4094,
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "name"
+              ],
+              "x-kubernetes-list-type": "map"
+            },
+            "vrfs": {
+              "description": "vrfs defines VRF Devices.",
+              "items": {
+                "description": "VRFDevice defines Virtual Routing Flow devices.",
+                "properties": {
+                  "interfaces": {
+                    "description": "interfaces is the list of proxmox network devices managed by this virtual device.",
+                    "items": {
+                      "description": "NetName is a formally verified Proxmox network name string.",
+                      "minLength": 4,
+                      "pattern": "^net[0-9]+$",
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "name": {
+                    "description": "name is the virtual network device name.\nMust be unique within the virtual machine.",
+                    "minLength": 3,
+                    "type": "string"
+                  },
+                  "routes": {
+                    "description": "routes are the routes associated with this interface.",
+                    "items": {
+                      "description": "RouteSpec describes an IPv4/IPv6 Route.",
+                      "properties": {
+                        "is6": {
+                          "description": "is6 defines if a RouteSpec is IPv6.\nIt is only required to disambiguate a 'default'|'all' placeholder 'to'\nwhen 'via' is unset, otherwise the family is derived from 'via'.",
+                          "type": "boolean"
+                        },
+                        "metric": {
+                          "description": "metric is the priority of the route in the routing table.",
+                          "format": "int32",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "table": {
+                          "description": "table is the routing table used for this route.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "to": {
+                          "description": "to is the subnet to be routed.",
+                          "type": "string"
+                        },
+                        "via": {
+                          "description": "via is the gateway to the subnet.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "routingPolicy": {
+                    "description": "routingPolicy is an interface-specific policy inserted into FIB (forwarding information base).",
+                    "items": {
+                      "description": "RoutingPolicySpec is a Linux FIB rule.",
+                      "properties": {
+                        "from": {
+                          "description": "from is the subnet of the source.",
+                          "type": "string"
+                        },
+                        "is6": {
+                          "description": "is6 defines if a RoutingPolicySpec is IPv6.\nIt is only required to disambiguate a 'default'|'all' placeholder when\nneither 'to' nor 'from' carries a concrete address to derive the family.",
+                          "type": "boolean"
+                        },
+                        "priority": {
+                          "description": "priority is the position in the ip rule FIB table.",
+                          "format": "int64",
+                          "maximum": 4294967295,
+                          "type": "integer",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "Cowardly refusing to insert FIB rule matching kernel rules",
+                              "rule": "(self > 0 && self < 32765) || (self > 32766)"
+                            }
+                          ]
+                        },
+                        "table": {
+                          "description": "table is the routing table ID.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "to": {
+                          "description": "to is the subnet of the target.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "table": {
+                    "description": "table is the ID of the routing table used for the l3mdev vrf device.",
+                    "format": "int32",
+                    "maximum": 4294967295,
+                    "minimum": 1,
+                    "type": "integer",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "Cowardly refusing to insert l3mdev rules into kernel tables",
+                        "rule": "(self > 0 && self < 254) || (self > 255)"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "table"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "name"
+              ],
+              "x-kubernetes-list-type": "map"
+            },
+            "zone": {
+              "description": "zone is the cluster deployment zone this machine will refer to.",
+              "pattern": "^[a-z0-9A-Z](?:[a-z0-9A-Z-_.]{0,61}[a-z0-9A-Z])?$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "networkDevices"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "numCores": {
+          "description": "numCores is the number of cores per CPU socket in a virtual machine.\nDefaults to the property value in the template from which the virtual machine is cloned.",
+          "format": "int32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "numSockets": {
+          "description": "numSockets is the number of CPU sockets in a virtual machine.\nDefaults to the property value in the template from which the virtual machine is cloned.",
+          "format": "int32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pool": {
+          "description": "pool Add the new VM to the specified pool.",
+          "type": "string"
+        },
+        "providerID": {
+          "description": "providerID is the virtual machine BIOS UUID formatted as\nproxmox://6c3fa683-bef9-4425-b413-eaa45a9d6191",
+          "maxLength": 46,
+          "minLength": 46,
+          "pattern": "^proxmox://[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+          "type": "string"
+        },
+        "snapName": {
+          "description": "snapName is the name of the snapshot.",
+          "type": "string"
+        },
+        "sourceNode": {
+          "description": "sourceNode is the initially selected proxmox node.\nThis node will be used to locate the template VM, which will\nbe used for cloning operations.\n\nCloning will be performed according to the configuration.\nSetting the `Target` field will tell Proxmox to clone the\nVM on that target node.\n\nWhen Target is not set and the ProxmoxCluster contains\na set of `AllowedNodes`, the algorithm will instead evenly\ndistribute the VMs across the nodes from that list.\n\nIf neither a `Target` nor `AllowedNodes` was set, the VM\nwill be cloned onto the same node as SourceNode.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "storage": {
+          "description": "storage for full clone.",
+          "type": "string"
+        },
+        "tags": {
+          "description": "tags is a list of tags to be applied to the virtual machine.",
+          "items": {
+            "pattern": "^(?i)[a-z0-9_][a-z0-9_\\-\\+\\.]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        },
+        "templateID": {
+          "description": "templateID the vm_template vmid used for cloning a new VM.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "templateSelector": {
+          "description": "templateSelector defines MatchTags for looking up VM templates.\nIf a templateID is defined, templateSelector will be ignored.",
+          "properties": {
+            "matchPolicy": {
+              "default": "exact",
+              "description": "matchPolicy controls how MatchTags are evaluated against template tags.\nWhen not set, or set to \"exact\", the behaviour is identical to the previous implementation\nand requires an exact 1:1 tag match. When set to \"subset\", the template's tags must contain\nall MatchTags, but may include additional tags.",
+              "enum": [
+                "exact",
+                "uniqueSubset",
+                "bestSubset"
+              ],
+              "type": "string"
+            },
+            "matchTags": {
+              "description": "matchTags specifies all tags to look for when looking up the VM template.\nPassed tags must be an exact 1:1 match with the tags on the template you want to use.\nIf multiple VM templates with the same set of tags are found, provisioning will fail.",
+              "items": {
+                "pattern": "^(?i)[a-z0-9_][a-z0-9_\\-\\+\\.]*$",
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            }
+          },
+          "required": [
+            "matchTags"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "virtualMachineID": {
+          "description": "virtualMachineID is the Proxmox identifier for the ProxmoxMachine VM.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "vmIDRange": {
+          "description": "vmIDRange is the range of VMIDs to use for VMs.",
+          "properties": {
+            "end": {
+              "description": "end is the end of the VMID range to use for VMs.\nOnly used if VMIDRangeStart is set.",
+              "format": "int64",
+              "maximum": 999999999,
+              "minimum": 100,
+              "type": "integer"
+            },
+            "start": {
+              "description": "start is the start of the VMID range to use for VMs.",
+              "format": "int64",
+              "maximum": 999999999,
+              "minimum": 100,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "end",
+            "start"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "end should be greater than or equal to start",
+              "rule": "self.end >= self.start"
+            }
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "network"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "must define either a SourceNode with a TemplateID or a TemplateSelector",
+          "rule": "[has(self.sourceNode), has(self.templateSelector)].exists_one(c, c)"
+        },
+        {
+          "message": "must define either a SourceNode with a TemplateID or a TemplateSelector",
+          "rule": "[has(self.templateID), has(self.templateSelector)].exists_one(c, c)"
+        },
+        {
+          "message": "Must set full=true when specifying format",
+          "rule": "self.full || !has(self.format)"
+        },
+        {
+          "message": "Must set full=true when specifying storage",
+          "rule": "self.full || !has(self.storage)"
+        },
+        {
+          "message": "Must specify either templateID or templateSelector",
+          "rule": "has(self.templateSelector) || (has(self.templateID) && has(self.sourceNode))"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "status is the status of the Proxmox machine.",
+      "properties": {
+        "addresses": {
+          "description": "addresses contains the Proxmox VM instance associated addresses.",
+          "items": {
+            "description": "MachineAddress contains information for the node's address.",
+            "properties": {
+              "address": {
+                "description": "address is the machine address.",
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": {
+                "description": "type is the machine address type, one of Hostname, ExternalIP, InternalIP, ExternalDNS or InternalDNS.",
+                "enum": [
+                  "Hostname",
+                  "ExternalIP",
+                  "InternalIP",
+                  "ExternalDNS",
+                  "InternalDNS"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "address",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "bootstrapDataProvided": {
+          "description": "bootstrapDataProvided whether the virtual machine has an injected bootstrap data.",
+          "type": "boolean"
+        },
+        "conditions": {
+          "description": "conditions defines current service state of the ProxmoxMachine.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "initialization": {
+          "description": "initialization provides observations of the ProxmoxMachine initialization process.\nNOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.",
+          "minProperties": 1,
+          "properties": {
+            "provisioned": {
+              "description": "provisioned is true when the infrastructure provider reports that the Machine's infrastructure is fully provisioned.\nNOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Machine provisioning.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "ipAddresses": {
+          "description": "ipAddresses are the IP addresses used to access the virtual machine.",
+          "items": {
+            "description": "IPAddressesSpec stores the IP addresses of a network interface. Used for status.",
+            "properties": {
+              "ipv4": {
+                "description": "ipv4 is the IPv4 address.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
+              "ipv6": {
+                "description": "ipv6 is the IPv6 address.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
+              "net": {
+                "description": "net is the proxmox network name these ipaddresses are attached to.",
+                "minLength": 4,
+                "pattern": "^(net[0-9]+|default)$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "net"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "net"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "network": {
+          "description": "network returns the network status for each of the machine's configured\nnetwork interfaces.",
+          "items": {
+            "description": "NetworkStatus provides information about one of a VM's networks.",
+            "properties": {
+              "connected": {
+                "description": "connected is a flag that indicates whether this network is currently\nconnected to the VM.",
+                "type": "boolean"
+              },
+              "ipAddrs": {
+                "description": "ipAddrs is one or more IP addresses reported by vm-tools.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
+              "macAddr": {
+                "description": "macAddr is the MAC address of the network device.",
+                "maxLength": 17,
+                "minLength": 17,
+                "pattern": "^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$",
+                "type": "string"
+              },
+              "networkName": {
+                "description": "networkName is the name of the network.",
+                "minLength": 4,
+                "pattern": "^net[0-9]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "connected",
+              "macAddr"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "proxmoxNode": {
+          "description": "proxmoxNode is the name of the proxmox node, which was chosen for this\nmachine to be deployed on.",
+          "type": "string"
+        },
+        "retryAfter": {
+          "description": "retryAfter tracks the time we can retry queueing a task.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "taskRef": {
+          "description": "taskRef is a managed object reference to a Task related to the ProxmoxMachine.\nThis value is set automatically at runtime and should not be set or\nmodified by users.",
+          "type": "string"
+        },
+        "vmStatus": {
+          "description": "vmStatus is used to identify the virtual machine status.",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

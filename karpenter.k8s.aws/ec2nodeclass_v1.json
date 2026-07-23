@@ -259,9 +259,58 @@
             }
           ]
         },
+        "connectionTracking": {
+          "description": "ConnectionTracking configures idle connection tracking timeouts for\nENIs Karpenter provisions in the launch template. EFA-only interfaces\nare excluded. See ConnectionTracking.",
+          "properties": {
+            "tcpEstablishedTimeout": {
+              "description": "TCPEstablishedTimeout is the timeout (in seconds) for idle TCP connections\nin an established state.\nValue must be between 60 and 432,000 (5 days).\nIf unset, EC2 applies its default which is 350 seconds for Nitro v6\ninstance types (excluding P6e-GB200) and 432,000 seconds for other\ninstance types.",
+              "format": "int32",
+              "maximum": 432000,
+              "minimum": 60,
+              "type": "integer"
+            },
+            "udpStreamTimeout": {
+              "description": "UDPStreamTimeout is the timeout (in seconds) for idle UDP \"stream\" flows\nthat have seen more than one request-response transaction.\nValue must be between 60 and 180.\nIf unset, EC2 applies its default of 180 seconds.",
+              "format": "int32",
+              "maximum": 180,
+              "minimum": 60,
+              "type": "integer"
+            },
+            "udpTimeout": {
+              "description": "UDPTimeout is the timeout (in seconds) for idle UDP flows that have seen\ntraffic only in a single direction or a single request-response transaction.\nValue must be between 30 and 60.\nIf unset, EC2 applies its default of 30 seconds.",
+              "format": "int32",
+              "maximum": 60,
+              "minimum": 30,
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of tcpEstablishedTimeout, udpStreamTimeout, or udpTimeout must be set",
+              "rule": "has(self.tcpEstablishedTimeout) || has(self.udpStreamTimeout) || has(self.udpTimeout)"
+            }
+          ],
+          "additionalProperties": false
+        },
         "context": {
           "description": "Context is a Reserved field in EC2 APIs\nhttps://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateFleet.html",
           "type": "string"
+        },
+        "cpuOptions": {
+          "description": "CPUOptions defines the CPU options for the instance.",
+          "properties": {
+            "nestedVirtualization": {
+              "description": "NestedVirtualization enables or disables nested virtualization on the instance.\nWhen enabled, Karpenter filters instance types to only those reporting\n\"nested-virtualization\" in ProcessorInfo.SupportedFeatures from DescribeInstanceTypes.",
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "detailedMonitoring": {
           "description": "DetailedMonitoring controls if detailed monitoring is enabled for instances that are launched",
@@ -476,6 +525,80 @@
             }
           },
           "type": "object",
+          "additionalProperties": false
+        },
+        "networkInterfaces": {
+          "description": "NetworkInterfaces specifies the network interface configurations to be attached to provisioned instances.",
+          "items": {
+            "description": "NetworkInterface specifies the configuration for a network interface to be attached\nto provisioned instances.",
+            "properties": {
+              "deviceIndex": {
+                "description": "DeviceIndex is the device index for the network interface attachment.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "interfaceType": {
+                "description": "InterfaceType is the type of network interface. Valid values are \"interface\" and \"efa-only\".",
+                "enum": [
+                  "interface",
+                  "efa-only"
+                ],
+                "type": "string"
+              },
+              "networkCardIndex": {
+                "description": "NetworkCardIndex is the index of the network card to attach the interface to.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "deviceIndex",
+              "interfaceType",
+              "networkCardIndex"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 150,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "networkInterfaces must include a primary interface with interfaceType='interface'",
+              "rule": "self.size() == 0 || self.exists(x, x.deviceIndex == 0 && x.networkCardIndex == 0 && x.interfaceType == 'interface')"
+            },
+            {
+              "message": "networkInterfaces must not have duplicate networkCardIndex and deviceIndex pairs, and can have at most one efa device per network card",
+              "rule": "self.all(x, self.filter(y, x.networkCardIndex == y.networkCardIndex && x.deviceIndex == y.deviceIndex).size() == 1 && (x.interfaceType != 'efa-only' || self.filter(y, x.networkCardIndex == y.networkCardIndex && y.interfaceType == 'efa-only').size() == 1))"
+            }
+          ]
+        },
+        "placementGroupSelector": {
+          "description": "PlacementGroupSelector defines the name or the id of the placement to resolve with the nodeclass.",
+          "properties": {
+            "id": {
+              "description": "ID is the placement group id in EC2",
+              "pattern": "^pg-[0-9a-z]+$",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name is the placement group name in EC2",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "expected at least one, got none, ['name', 'id']",
+              "rule": "has(self.name) || has(self.id)"
+            },
+            {
+              "message": "'name' and 'id' are mutually exclusive",
+              "rule": "!(has(self.name) && has(self.id))"
+            }
+          ],
           "additionalProperties": false
         },
         "role": {
@@ -756,6 +879,10 @@
               "instanceType": {
                 "description": "The instance type for the capacity reservation.",
                 "type": "string"
+              },
+              "interruptible": {
+                "description": "Indicates whether this capacity reservation is interruptible",
+                "type": "boolean"
               },
               "ownerID": {
                 "description": "The ID of the AWS account that owns the capacity reservation.",

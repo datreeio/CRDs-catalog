@@ -3642,7 +3642,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "(Optional) Annotations to add to the Dragonfly pods.",
+          "description": "Deprecated: use spec.podMetadata.annotations instead.",
           "type": "object"
         },
         "args": {
@@ -3850,6 +3850,49 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "customLivenessProbeConfigMap": {
+          "description": "Custom ConfigMap providing key \"liveness-check.sh\" to override the default liveness probe.\nAn additionalVolumes entry named \"liveness-probe\" takes precedence.",
+          "properties": {
+            "name": {
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "customReadinessProbeConfigMap": {
+          "description": "Custom ConfigMap providing key \"readiness-check.sh\" to override the default readiness probe.\nAn additionalVolumes entry named \"readiness-probe\" takes precedence.",
+          "properties": {
+            "name": {
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "customStartupProbeConfigMap": {
+          "description": "Custom ConfigMap providing key \"startup-check.sh\" to override the default startup probe.\nAn additionalVolumes entry named \"startup-probe\" takes precedence.",
+          "properties": {
+            "name": {
+              "default": "",
+              "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "enableReplicationReadinessGate": {
+          "description": "(Optional) When enabled, adds a custom readiness gate to pods that prevents\nthem from being considered Ready until replication is fully synced.\nProtects against data loss during external node drains.\nWARNING: Enabling this on an existing cluster will trigger a rolling update.",
+          "type": "boolean"
         },
         "env": {
           "description": "(Optional) Env variables to add to the Dragonfly pods.",
@@ -5327,13 +5370,18 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "(Optional) Labels to add to the Dragonfly pods.",
+          "description": "Deprecated: use spec.podMetadata.labels instead.",
           "type": "object"
         },
         "memcachedPort": {
           "description": "(Optional) Dragonfly memcached port",
           "format": "int32",
           "type": "integer"
+        },
+        "networkPolicyEnabled": {
+          "default": true,
+          "description": "(Optional) Whether to create a NetworkPolicy for this Dragonfly instance.\nThe NetworkPolicy restricts admin port access to operator and peer pods only.\nDefaults to true.",
+          "type": "boolean"
         },
         "nodeSelector": {
           "additionalProperties": {
@@ -5343,7 +5391,63 @@
           "type": "object"
         },
         "ownedObjectsMetadata": {
-          "description": "(Optional) Dragonfly direct child resources additional annotations and labels",
+          "description": "(Optional) Labels and annotations to add to all owned resources (StatefulSet, Service, PDB, etc).",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "pdb": {
+          "description": "(Optional) Dragonfly Pod Disruption Budget configuration",
+          "properties": {
+            "maxUnavailable": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "(Optional) Maximum number of Dragonfly pods that can be unavailable during voluntary disruptions.\nAccepts an absolute number (e.g. \"1\") or a percentage of total pods (e.g. \"25%\").\nCannot be used together with MinAvailable; only one of maxUnavailable or minAvailable should be set.",
+              "x-kubernetes-int-or-string": true
+            },
+            "minAvailable": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "(Optional) Minimum number of Dragonfly pods that must be available during voluntary disruptions.\nAccepts an absolute number (e.g. \"1\") or a percentage of total pods (e.g. \"25%\").\nCannot be used together with MaxUnavailable; only one of minAvailable or maxUnavailable should be set.",
+              "x-kubernetes-int-or-string": true
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "minAvailable and maxUnavailable cannot be both set",
+              "rule": "!(has(self.minAvailable) && has(self.maxUnavailable))"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "podMetadata": {
+          "description": "(Optional) Labels and annotations to add to the Dragonfly pods.",
           "properties": {
             "annotations": {
               "additionalProperties": {
@@ -5644,6 +5748,10 @@
             "enableOnMasterOnly": {
               "description": "(Optional) Enable snapshot on master only",
               "type": "boolean"
+            },
+            "existingPersistentVolumeClaimName": {
+              "description": "(Optional) Name of an existing PVC to use for Dragonfly snapshots",
+              "type": "string"
             },
             "persistentVolumeClaimSpec": {
               "description": "(Optional) Dragonfly PVC spec",

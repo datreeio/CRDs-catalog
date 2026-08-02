@@ -111,8 +111,16 @@
         "nodePoolConfig": {
           "description": "NodePoolConfig defines required node pool configuration. Existing node pools will be matched with the ComputeClass\nonly if their configuration match this field. Auto-provisioned node pools will be created with this configuration.",
           "properties": {
+            "autoRepair": {
+              "description": "AutoRepair if set to true specifies that a node pool should have auto repair enabled, disabled in case of being set to false.",
+              "type": "boolean"
+            },
+            "autoUpgrade": {
+              "description": "AutoUpgrade if set to true specifies that a node pool should have auto upgrade enabled, disabled in case of being set to false.",
+              "type": "boolean"
+            },
             "confidentialNodeType": {
-              "description": "ConfidentialNodeType: Defines the type of technology used by the\nconfidential node.\n\n\nPossible values:\n  \"CONFIDENTIAL_INSTANCE_TYPE_UNSPECIFIED\" - No type specified. Do not use\nthis value.\n  \"SEV\" - AMD Secure Encrypted Virtualization.\n  \"SEV_SNP\" - AMD Secure Encrypted Virtualization - Secure Nested Paging.\n  \"TDX\" - Intel Trust Domain eXtension.",
+              "description": "ConfidentialNodeType: Defines the type of technology used by the\nconfidential node.\n\nPossible values:\n  \"CONFIDENTIAL_INSTANCE_TYPE_UNSPECIFIED\" - No type specified. Do not use\nthis value.\n  \"SEV\" - AMD Secure Encrypted Virtualization.\n  \"SEV_SNP\" - AMD Secure Encrypted Virtualization - Secure Nested Paging.\n  \"TDX\" - Intel Trust Domain eXtension.",
               "enum": [
                 "CONFIDENTIAL_INSTANCE_TYPE_UNSPECIFIED",
                 "SEV",
@@ -120,6 +128,53 @@
                 "TDX"
               ],
               "type": "string"
+            },
+            "dra": {
+              "description": "Dra describes settings related to dynamic resource allocation\nand its integration with autoprovisioning",
+              "properties": {
+                "networking": {
+                  "properties": {
+                    "enabled": {
+                      "default": false,
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "gvnic": {
+              "description": "Gvnic contains Google Virtual NIC settings.",
+              "properties": {
+                "enabled": {
+                  "default": false,
+                  "description": "Enabled indicates whether gVNIC is enabled on the node pool.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "imageStreaming": {
+              "description": "ImageStreaming contains image streaming settings.",
+              "properties": {
+                "enabled": {
+                  "default": false,
+                  "description": "Enabled enables container image` streaming.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object",
+              "additionalProperties": false
             },
             "imageType": {
               "description": "Image type used by nodes in the node pool.",
@@ -129,23 +184,65 @@
               ],
               "type": "string"
             },
+            "ipType": {
+              "description": "IPType specifies whether the nodes in the node pool use public or private IP addresses.\nPossible values are \"public\" or \"private\".\nAn empty string indicates the default IP type.\nThis setting corresponds to the presence and value of the cloud.google.com/private-node node selector.",
+              "enum": [
+                "public",
+                "private"
+              ],
+              "type": "string"
+            },
+            "loggingConfig": {
+              "description": "Contains logging configuration.",
+              "properties": {
+                "loggingVariantConfig": {
+                  "description": "Logging variant configuration.",
+                  "properties": {
+                    "variant": {
+                      "description": "Logging variant deployed on nodes.",
+                      "enum": [
+                        "DEFAULT",
+                        "MAX_THROUGHPUT"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "nodeLabels": {
               "additionalProperties": {
                 "type": "string"
               },
               "description": "NodeLabels is used to add user defined Kubernetes labels to all nodes in the new node pool.\nThese labels are applied to the Kubernetes API node object and can be used in nodeSelectors for pod scheduling.\nNote: Node labels are distinct from GKE labels.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-labels",
               "maxProperties": 100,
-              "type": "object",
-              "x-kubernetes-validations": [
-                {
-                  "message": "Node labels cannot contain reserved prefixes.",
-                  "rule": "self.all(key, !key.matches('.*(cloud.google.com|kubernetes.io|gke.io|k8s.io|autoscaling.gke.io)'))"
+              "type": "object"
+            },
+            "resourceManagerTags": {
+              "description": "ResourceManagerTags defines what existing GCE resource manager tag key/value pairs\nwith purpose GCE_FIREWALL to attach to all node pools.\nReferenced Tags must be created beforehand via Resource Manager API.",
+              "items": {
+                "description": "Tags define the key/value of resource manager tags.\nTags must be in one of the following formats ([KEY]=[VALUE])\n1. tagKeys/{tag_key_id}=tagValues/{tag_value_id}\n2. {org_id}/{tag_key_name}={tag_value_name}\n3. {project_id}/{tag_key_name}={tag_value_name}",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
                 },
-                {
-                  "message": "Node labels must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to 63 characters each.",
-                  "rule": "self.all(key, key.matches('^[a-zA-Z0-9][a-zA-Z0-9-._]{0,62}$'))"
-                }
-              ]
+                "required": [
+                  "key",
+                  "value"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 5,
+              "type": "array"
             },
             "serviceAccount": {
               "description": "ServiceAccount used by the node pool.",
@@ -166,23 +263,21 @@
                     "type": "string"
                   },
                   "key": {
-                    "description": "Node taint key. The key must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores up to 253 characters.",
-                    "maxLength": 253,
-                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
-                    "type": "string",
-                    "x-kubernetes-validations": [
-                      {
-                        "message": "Taint keys cannot contain reserved prefixes.",
-                        "rule": "!self.matches('.*(cloud.google.com|kubernetes.io|gke.io|k8s.io|autoscaling.gke.io)')"
-                      }
-                    ]
+                    "description": "Node taint key. The key must conform to syntax described in https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set.",
+                    "maxLength": 320,
+                    "type": "string"
                   },
                   "value": {
                     "description": "The value that matches the specified taint key.",
-                    "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                    "maxLength": 63,
+                    "pattern": "^([a-z0-9][-A-Za-z0-9_.]{1,61})?[A-Za-z0-9]$",
                     "type": "string"
                   }
                 },
+                "required": [
+                  "effect",
+                  "key"
+                ],
                 "type": "object",
                 "additionalProperties": false
               },
@@ -223,6 +318,16 @@
             "description": "Priority is a specification of preferred machine characteristics.",
             "minProperties": 1,
             "properties": {
+              "acceleratorNetworkProfile": {
+                "description": "AcceleratorNetworkProfile defines the type of automated accelerator network provisioning to use.\nPossible values:\n\"auto\": Enables automatic ANP configuration based on the machine type.\n\"auto-<suffix>\": Enables automatic ANP with a custom network profile suffix.",
+                "type": "string",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "acceleratorNetworkProfile must be 'auto' or start with 'auto-'",
+                    "rule": "self == 'auto' || self.startsWith('auto-')"
+                  }
+                ]
+              },
               "capacityCheckWaitTimeSeconds": {
                 "description": "CapacityCheckWaitTimeSeconds defines for how long will this priority be attempted to scale up before moving on to the next priority.",
                 "maximum": 86400,
@@ -278,6 +383,31 @@
                     ],
                     "type": "string"
                   },
+                  "gpuSharing": {
+                    "description": "GpuSharing defines the way the nodes would share the GPU.",
+                    "properties": {
+                      "gpuPartitionSize": {
+                        "description": "GpuPartitionSize is size of partitions to create on the GPU. Valid values are\ndescribed in the NVIDIA mig user guide. Example: \"1g.5gb\"\n(https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#partitioning).",
+                        "type": "string"
+                      },
+                      "maxSharedClientsPerGPU": {
+                        "description": "MaxSharedClientsPerGPU describes the max number of containers that can\nshare a physical GPU.",
+                        "format": "int64",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "sharingStrategy": {
+                        "description": "SharingStrategy The type of GPU sharing strategy to enable on the GPU node.\nPossible values:\n* TIME_SHARING - GPUs are time-shared between containers.\n* MPS - GPUs are shared between containers with NVIDIA MPS.",
+                        "enum": [
+                          "MPS",
+                          "TIME_SHARING"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
                   "type": {
                     "description": "Type describes preferred GPU accelerator type for a node.",
                     "type": "string"
@@ -289,6 +419,29 @@
               "location": {
                 "description": "Location describes CCC zonal preferences config.",
                 "properties": {
+                  "locationPolicy": {
+                    "description": "LocationPolicy specifies the strategy for selecting zones when scaling up a node\npool managed by this Compute Class. This setting controls the distribution of new\nnodes across zones in the node pool's region and corresponds to the node pool\nsetting of the same name.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--location-policy",
+                    "enum": [
+                      "ANY",
+                      "BALANCED"
+                    ],
+                    "type": "string"
+                  },
+                  "zoneTypes": {
+                    "description": "ZoneTypes specifies sets of zones used for provisioning.\nSTANDARD zone type designates the core Google Cloud zones within a region.\nAI zone type designates specialized zones optimized for AI.\nCLUSTER_DEFAULT zone type designate zones specified in the cluster's autoprovisioningLocations or cluster\u2019s locations if autoprovisioningLocations is empty.",
+                    "items": {
+                      "description": "ZoneType is an enumeration of supported zone types.",
+                      "enum": [
+                        "STANDARD",
+                        "AI",
+                        "CLUSTER_DEFAULT"
+                      ],
+                      "type": "string"
+                    },
+                    "maxItems": 3,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "zones": {
                     "description": "Zones lists zones considered for node autoprovisioning.",
                     "items": {
@@ -326,10 +479,41 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "minCpuPlatform": {
+                "description": "MinCpuPlatform defines the minimum CPU platform for a node.",
+                "enum": [
+                  "Intel Sandy Bridge",
+                  "Intel Ivy Bridge",
+                  "Intel Haswell",
+                  "Intel Broadwell",
+                  "Intel Skylake",
+                  "Intel Cascade Lake",
+                  "Intel Ice Lake",
+                  "Intel Sapphire Rapids",
+                  "Intel Emerald Rapids",
+                  "Intel Granite Rapids",
+                  "AMD Rome",
+                  "AMD Milan",
+                  "AMD Genoa",
+                  "AMD Turin",
+                  "Ampere Altra",
+                  "Google Axion",
+                  "Nvidia Grace"
+                ],
+                "type": "string"
+              },
               "minMemoryGb": {
                 "description": "MinMemoryGb describes a minimum GBs of memory of a node.",
                 "minimum": 0,
                 "type": "integer"
+              },
+              "nodeLabels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "NodeLabels is used to add user defined Kubernetes labels to all nodes in the new node pool.\nThese labels are applied to the Kubernetes API node object and can be used in nodeSelectors for pod scheduling.\nNote: Node labels are distinct from GKE labels.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-labels",
+                "maxProperties": 100,
+                "type": "object"
               },
               "nodeSystemConfig": {
                 "description": "NodeSystemConfig defines node system config for a node.",
@@ -340,6 +524,9 @@
                       "allowedUnsafeSysctls": {
                         "description": "This setting defines a comma-separated allowlist of unsafe sysctls or sysctl patterns\n(ending in `*`). The unsafe namespaced sysctl groups are `kernel.shm*`, `kernel.msg*`,\n`kernel.sem`, `fs.mqueue.*`, and `net.*`. Leaving this allowlist empty means they cannot be set on Pods.",
                         "items": {
+                          "maxLength": 253,
+                          "minLength": 1,
+                          "pattern": "^([a-z0-9]([-_a-z0-9]*[a-z0-9])?[./])*([a-z0-9][-_a-z0-9]*)?[a-z0-9*]$",
                           "type": "string"
                         },
                         "maxItems": 100,
@@ -374,6 +561,124 @@
                         ],
                         "type": "string"
                       },
+                      "evictionMaxPodGracePeriodSeconds": {
+                        "description": "EvictionMaxPodGracePeriodSeconds is the maximum allowed grace period\n(in seconds) to use when terminating pods in response to a soft eviction\nthreshold being met.",
+                        "format": "int64",
+                        "maximum": 300,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "evictionMinimumReclaim": {
+                        "description": "EvictionMinimumReclaim defines minimum reclaims.",
+                        "properties": {
+                          "imagefsAvailable": {
+                            "description": "ImagefsAvailable is the minimum reclaim for imagefs.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "imagefsInodesFree": {
+                            "description": "ImagefsInodesFree is the minimum reclaim for imagefs.inodesFree.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "memoryAvailable": {
+                            "description": "MemoryAvailable is the minimum reclaim for memory.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "nodefsAvailable": {
+                            "description": "NodefsAvailable is the minimum reclaim for nodefs.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "nodefsInodesFree": {
+                            "description": "NodefsInodesFree is the minimum reclaim for nodefs.inodesFree.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "pidAvailable": {
+                            "description": "PidAvailable is the minimum reclaim for pid.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "evictionSoft": {
+                        "description": "EvictionSoft defines soft eviction thresholds.",
+                        "properties": {
+                          "imagefsAvailable": {
+                            "description": "ImagefsAvailable is the soft eviction threshold for imagefs.available.\nThe value must be a percentage. Eg. \"10%\".\nThe value must be between 15% and 50% inclusive.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "imagefsInodesFree": {
+                            "description": "ImagefsInodesFree is the soft eviction threshold for imagefs.inodesFree.\nThe value must be a percentage. Eg. \"5%\".\nThe value must be between 5% and 50% inclusive.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "memoryAvailable": {
+                            "description": "MemoryAvailable is the soft eviction threshold for memory.available.\nThe value must be a quantity, e.g., \"100Mi\".\nThe value must be greater than the GKE default hard eviction threshold of 100Mi and less than 50% of machine memory.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi)$",
+                            "type": "string"
+                          },
+                          "nodefsAvailable": {
+                            "description": "NodefsAvailable is the soft eviction threshold for nodefs.available.\nThe value must be a percentage, e.g., \"20%\".\nThe value must be between 10% and 50% inclusive.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "nodefsInodesFree": {
+                            "description": "NodefsInodesFree is the soft eviction threshold for nodefs.inodesFree.\nThe value must be a percentage. Eg. \"5%\".\nThe value must be between 5% and 50% inclusive.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          },
+                          "pidAvailable": {
+                            "description": "PidAvailable is the soft eviction threshold for pid.available.\nThe value must be a percentage. Eg. \"10%\".\nThe value must be between 10% and 50% inclusive.",
+                            "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "evictionSoftGracePeriod": {
+                        "description": "EvictionSoftGracePeriod defines grace periods for soft eviction thresholds.",
+                        "properties": {
+                          "imagefsAvailable": {
+                            "description": "ImagefsAvailable is the grace period for the imagefs.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          },
+                          "imagefsInodesFree": {
+                            "description": "ImagefsInodesFree is the grace period for the imagefs.inodesFree soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          },
+                          "memoryAvailable": {
+                            "description": "MemoryAvailable is the grace period for the memory.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          },
+                          "nodefsAvailable": {
+                            "description": "NodefsAvailable is the grace period for the nodefs.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          },
+                          "nodefsInodesFree": {
+                            "description": "NodefsInodesFree is the grace period for the nodefs.inodesFree soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          },
+                          "pidAvailable": {
+                            "description": "PidAvailable is the grace period for the pid.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "imageGcHighThresholdPercent": {
                         "description": "This setting sets the percent of disk usage after which image garbage collection is always\nrun. The percent is calculated as this field value out of 100. Default is 85 if unspecified.",
                         "format": "int64",
@@ -398,12 +703,23 @@
                         "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
                         "type": "string"
                       },
+                      "maxParallelImagePulls": {
+                        "description": "This setting sets the maximum number of image pulls in parallel. Default is 2 or 3 depending on boot disk type.",
+                        "format": "int64",
+                        "maximum": 5,
+                        "minimum": 2,
+                        "type": "integer"
+                      },
                       "podPidsLimit": {
                         "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
                         "format": "int64",
                         "maximum": 4194304,
                         "minimum": 1024,
                         "type": "integer"
+                      },
+                      "singleProcessOOMKill": {
+                        "description": "This setting sets whether to enable single process OOM killer.\nIf set to true, the processes in a container will be OOM killed individually instead of as a group.",
+                        "type": "boolean"
                       }
                     },
                     "type": "object",
@@ -439,6 +755,99 @@
                           }
                         },
                         "type": "object",
+                        "additionalProperties": false
+                      },
+                      "swapConfig": {
+                        "description": "SwapConfig specifies the swap memory configuration for a node pool.",
+                        "properties": {
+                          "bootDiskProfile": {
+                            "description": "Use the node's boot disk for swap.",
+                            "properties": {
+                              "swapSizeGib": {
+                                "description": "The size of the swap space in GiB.",
+                                "format": "int64",
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "swapSizePercent": {
+                                "description": "The size of the swap space as a percentage of the node's boot disk.",
+                                "format": "int32",
+                                "maximum": 50,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "only one of swapSizeGib or swapSizePercent may be set",
+                                "rule": "(has(self.swapSizeGib) ? 1 : 0) + (has(self.swapSizePercent) ? 1 : 0) <= 1"
+                              }
+                            ],
+                            "additionalProperties": false
+                          },
+                          "dedicatedLocalSsdProfile": {
+                            "description": "Provision a new, separate local NVMe SSD exclusively for swap.",
+                            "properties": {
+                              "diskCount": {
+                                "description": "The number of physical local NVMe SSD disks to attach.",
+                                "format": "int64",
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "enabled": {
+                            "description": "Enables or disables swap for the node pool. Default to false.",
+                            "type": "boolean"
+                          },
+                          "encryptionConfig": {
+                            "description": "If omitted, swap space is encrypted by default.",
+                            "properties": {
+                              "disabled": {
+                                "description": "If true, swap space will NOT be encrypted.\nDefaults to false, swap space is encrypted by default.",
+                                "type": "boolean"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "ephemeralLocalSsdProfile": {
+                            "description": "Use the local SSD (shared with ephemeral storage) for swap.",
+                            "properties": {
+                              "swapSizeGib": {
+                                "description": "The size of the swap space in GiB.",
+                                "format": "int64",
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "swapSizePercent": {
+                                "description": "The size of the swap space as a percentage of the node's ephemeral storage local SSDs.",
+                                "format": "int32",
+                                "maximum": 80,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "only one of swapSizeGib or swapSizePercent may be set",
+                                "rule": "(has(self.swapSizeGib) ? 1 : 0) + (has(self.swapSizePercent) ? 1 : 0) <= 1"
+                              }
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "type": "object",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "only one of bootDiskProfile, ephemeralLocalSsdProfile, or dedicatedLocalSsdProfile may be set",
+                            "rule": "(has(self.bootDiskProfile) ? 1 : 0) + (has(self.ephemeralLocalSsdProfile) ? 1 : 0) + (has(self.dedicatedLocalSsdProfile) ? 1 : 0) <= 1"
+                          }
+                        ],
                         "additionalProperties": false
                       },
                       "sysctls": {
@@ -477,6 +886,20 @@
                             "format": "int64",
                             "maximum": 2147483584,
                             "minimum": 1048576,
+                            "type": "integer"
+                          },
+                          "kernel.keys.maxbytes": {
+                            "description": "Represents the maximum number of bytes that a nonroot user can hold in the payload section of all their keys.",
+                            "format": "int64",
+                            "maximum": 2097152,
+                            "minimum": 20000,
+                            "type": "integer"
+                          },
+                          "kernel.keys.maxkeys": {
+                            "description": "Controls the maximum number of keys that a nonroot user may own.",
+                            "format": "int64",
+                            "maximum": 1048576,
+                            "minimum": 200,
                             "type": "integer"
                           },
                           "kernel.shmall": {
@@ -561,6 +984,33 @@
                             "format": "int64",
                             "maximum": 2147483647,
                             "minimum": 4608,
+                            "type": "integer"
+                          },
+                          "net.ipv4.neigh.default.gc_thresh1": {
+                            "description": "Tells the garbage collector the minimum number of network entries that can sit in cache (floor).",
+                            "format": "int64",
+                            "maximum": 262144,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "net.ipv4.neigh.default.gc_thresh2": {
+                            "description": "Acts as a soft limit to the number of network device entries stored in cache (soft ceiling).",
+                            "format": "int64",
+                            "maximum": 524288,
+                            "minimum": 512,
+                            "type": "integer"
+                          },
+                          "net.ipv4.neigh.default.gc_thresh3": {
+                            "description": "Sets a hard ceiling (absolute maximum) for the network neighbor cache.",
+                            "format": "int64",
+                            "maximum": 1048576,
+                            "minimum": 1024,
+                            "type": "integer"
+                          },
+                          "net.ipv4.tcp_max_orphans": {
+                            "format": "int64",
+                            "maximum": 262144,
+                            "minimum": 16384,
                             "type": "integer"
                           },
                           "net.ipv4.tcp_rmem": {
@@ -660,6 +1110,12 @@
                             "minimum": 65536,
                             "type": "integer"
                           },
+                          "vm.min_free_kbytes": {
+                            "format": "int64",
+                            "maximum": 1048576,
+                            "minimum": 67584,
+                            "type": "integer"
+                          },
                           "vm.overcommit_memory": {
                             "description": "Determines the kernel's memory overcommit handling strategy.\nSupported values:\n0: Rejects allocations that are obviously too large.\n1: Allows overcommit until memory is exhausted.\n2 (strict): Prevents overcommit beyond swap space plus a percentage of RAM defined by 'vm.overcommit_ratio'.",
                             "enum": [
@@ -677,16 +1133,50 @@
                             "minimum": 0,
                             "type": "integer"
                           },
+                          "vm.swappiness": {
+                            "format": "int64",
+                            "maximum": 200,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
                           "vm.vfs_cache_pressure": {
                             "description": "Adjusts the kernel's preference for reclaiming memory used for dentry (directory) and inode caches.",
                             "format": "int64",
                             "maximum": 100,
                             "minimum": 0,
                             "type": "integer"
+                          },
+                          "vm.watermark_scale_factor": {
+                            "format": "int64",
+                            "maximum": 3000,
+                            "minimum": 10,
+                            "type": "integer"
                           }
                         },
                         "type": "object",
                         "additionalProperties": false
+                      },
+                      "transparentHugepageDefrag": {
+                        "description": "Defines the transparent hugepage defrag configuration on the node. Currently supported values:\n* TRANSPARENT_HUGEPAGE_DEFRAG_ALWAYS: An application requesting THP will stall on allocation failure and directly reclaim pages and compact memory in an effort to allocate a THP immediately.\n* TRANSPARENT_HUGEPAGE_DEFRAG_DEFER: An application will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future. It is the responsibility of khugepaged to then install the THP pages later.\n* TRANSPARENT_HUGEPAGE_DEFRAG_DEFER_WITH_MADVISE: An application will enter direct reclaim and compaction like always, but only for regions that have used madvise(MADV_HUGEPAGE); all other regions will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future.\n* TRANSPARENT_HUGEPAGE_DEFRAG_MADVISE: An application will enter direct reclaim and compaction like always, but only for regions that have used madvise(MADV_HUGEPAGE); all other regions will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future.\n* TRANSPARENT_HUGEPAGE_DEFRAG_NEVER: An application will never enter direct reclaim or compaction.\n* TRANSPARENT_HUGEPAGE_DEFRAG_UNSPECIFIED: Default value. GKE will not modify the kernel configuration.",
+                        "enum": [
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_ALWAYS",
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_DEFER",
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_DEFER_WITH_MADVISE",
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_MADVISE",
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_NEVER",
+                          "TRANSPARENT_HUGEPAGE_DEFRAG_UNSPECIFIED"
+                        ],
+                        "type": "string"
+                      },
+                      "transparentHugepageEnabled": {
+                        "description": "Controls transparent hugepage support for anonymous memory. Currently supported values:\n* TRANSPARENT_HUGEPAGE_ENABLED_ALWAYS: Transparent hugepage is enabled system wide.\n* TRANSPARENT_HUGEPAGE_ENABLED_MADVISE: Transparent hugepage is enabled inside MADV_HUGEPAGE regions. This is the default kernel configuration.\n* TRANSPARENT_HUGEPAGE_ENABLED_NEVER: Transparent hugepage is disabled.\n* TRANSPARENT_HUGEPAGE_ENABLED_UNSPECIFIED: Default value. GKE will not modify the kernel configuration.",
+                        "enum": [
+                          "TRANSPARENT_HUGEPAGE_ENABLED_ALWAYS",
+                          "TRANSPARENT_HUGEPAGE_ENABLED_MADVISE",
+                          "TRANSPARENT_HUGEPAGE_ENABLED_NEVER",
+                          "TRANSPARENT_HUGEPAGE_ENABLED_UNSPECIFIED"
+                        ],
+                        "type": "string"
                       }
                     },
                     "type": "object",
@@ -704,10 +1194,10 @@
                 "type": "array"
               },
               "placement": {
-                "description": "Placement defines resource policy used for BYOPP and BYOWP.",
+                "description": "Placement defines resource policy used for BYOPP and BYOWP",
                 "properties": {
                   "policyName": {
-                    "description": "PolicyName defines the name of the resource policy, e.g. my-resource-policy.",
+                    "description": "PolicyName defines the name of the resource policy, e.g. my-resource-policy",
                     "minLength": 1,
                     "type": "string"
                   }
@@ -721,9 +1211,16 @@
               "podFamily": {
                 "description": "PodFamily represents pod-based provisioning and billing config.",
                 "enum": [
-                  "general-purpose"
+                  "general-purpose",
+                  "general-purpose-arm"
                 ],
                 "type": "string"
+              },
+              "priorityScore": {
+                "description": "A higher value is treated as a higher priority.\nPriorities with the same priorityScore value are treated equally.\nNot more than 3 priorities can have the same priorityScore.",
+                "maximum": 1000,
+                "minimum": 1,
+                "type": "integer"
               },
               "reservations": {
                 "description": "Reservations defines reservations config for a node.",
@@ -777,6 +1274,14 @@
                           ],
                           "type": "object",
                           "additionalProperties": false
+                        },
+                        "zones": {
+                          "description": "Zones is a list of GCE zones where reservations are to be consumed.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "minItems": 1,
+                          "type": "array"
                         }
                       },
                       "required": [
@@ -871,6 +1376,42 @@
                 "type": "object",
                 "additionalProperties": false
               },
+              "taints": {
+                "description": "Taints is used to add user defined Kubernetes taints to all nodes in the new node pool.\nThese taints are applied to the Kubernetes API node object and can be used in tolerations for pod scheduling.",
+                "items": {
+                  "description": "TaintConfig applies the given kubernetes taints on all nodes in the new node pool, which can be used with tolerations for pod scheduling.\nAny workload that does not tolerate the taints specified in this object will not be scheduled to the node pool.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--node-taints",
+                  "properties": {
+                    "effect": {
+                      "description": "It defines the taint's effect on pods that does not have the necessary toleration.\nThe following values are supported: NoSchedule, PreferNoSchedule, and NoExecute.",
+                      "enum": [
+                        "NoSchedule",
+                        "PreferNoSchedule",
+                        "NoExecute"
+                      ],
+                      "type": "string"
+                    },
+                    "key": {
+                      "description": "Node taint key. The key must conform to syntax described in https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set.",
+                      "maxLength": 320,
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "The value that matches the specified taint key.",
+                      "maxLength": 63,
+                      "pattern": "^([a-z0-9][-A-Za-z0-9_.]{1,61})?[A-Za-z0-9]$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "effect",
+                    "key"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
               "tpu": {
                 "description": "Tpu defines preferred TPU config for a node.",
                 "properties": {
@@ -907,10 +1448,6 @@
                 "rule": "!(has(self.machineType) && (has(self.minCores) || has(self.minMemoryGb)))"
               },
               {
-                "message": "Non-TPU reservations can be used only with machine type or machine family defined",
-                "rule": "has(self.reservations) && !has(self.tpu) ? has(self.machineFamily) || has(self.machineType) : true"
-              },
-              {
                 "message": "MachineFamily cannot be equal to 'ek'",
                 "rule": "!(has(self.machineFamily) && self.machineFamily == 'ek')"
               },
@@ -919,12 +1456,16 @@
                 "rule": "!(has(self.machineType) && self.machineType.startsWith('ek'))"
               },
               {
-                "message": "Flex Start provisioning model is incompatible with Spot",
-                "rule": "!(has(self.flexStart) && has(self.spot) && self.spot == true && self.flexStart.enabled == true)"
+                "message": "MachineFamily cannot be equal to 'e4a'",
+                "rule": "!(has(self.machineFamily) && self.machineFamily == 'e4a')"
               },
               {
-                "message": "Spot selection is the only configurable priority setting when using podFamily",
-                "rule": "has(self.podFamily) ? (has(self.spot) ? (size(dyn(self)) == 2) : (size(dyn(self)) == 1)) : true"
+                "message": "MachineType cannot start with 'e4a' prefix",
+                "rule": "!(has(self.machineType) && self.machineType.startsWith('e4a'))"
+              },
+              {
+                "message": "Flex Start provisioning model is incompatible with Spot",
+                "rule": "!(has(self.flexStart) && has(self.spot) && self.spot == true && self.flexStart.enabled == true)"
               },
               {
                 "message": "capacityCheckWaitTimeSeconds is only supported for Flex Start and for multi-host TPUs",
@@ -943,6 +1484,29 @@
             "location": {
               "description": "Location describes CCC zonal preferences config.",
               "properties": {
+                "locationPolicy": {
+                  "description": "LocationPolicy specifies the strategy for selecting zones when scaling up a node\npool managed by this Compute Class. This setting controls the distribution of new\nnodes across zones in the node pool's region and corresponds to the node pool\nsetting of the same name.\nMore info: https://cloud.google.com/sdk/gcloud/reference/container/node-pools/create#--location-policy",
+                  "enum": [
+                    "ANY",
+                    "BALANCED"
+                  ],
+                  "type": "string"
+                },
+                "zoneTypes": {
+                  "description": "ZoneTypes specifies sets of zones used for provisioning.\nSTANDARD zone type designates the core Google Cloud zones within a region.\nAI zone type designates specialized zones optimized for AI.\nCLUSTER_DEFAULT zone type designate zones specified in the cluster's autoprovisioningLocations or cluster\u2019s locations if autoprovisioningLocations is empty.",
+                  "items": {
+                    "description": "ZoneType is an enumeration of supported zone types.",
+                    "enum": [
+                      "STANDARD",
+                      "AI",
+                      "CLUSTER_DEFAULT"
+                    ],
+                    "type": "string"
+                  },
+                  "maxItems": 3,
+                  "minItems": 1,
+                  "type": "array"
+                },
                 "zones": {
                   "description": "Zones lists zones considered for node autoprovisioning.",
                   "items": {
@@ -964,6 +1528,9 @@
                     "allowedUnsafeSysctls": {
                       "description": "This setting defines a comma-separated allowlist of unsafe sysctls or sysctl patterns\n(ending in `*`). The unsafe namespaced sysctl groups are `kernel.shm*`, `kernel.msg*`,\n`kernel.sem`, `fs.mqueue.*`, and `net.*`. Leaving this allowlist empty means they cannot be set on Pods.",
                       "items": {
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^([a-z0-9]([-_a-z0-9]*[a-z0-9])?[./])*([a-z0-9][-_a-z0-9]*)?[a-z0-9*]$",
                         "type": "string"
                       },
                       "maxItems": 100,
@@ -998,6 +1565,124 @@
                       ],
                       "type": "string"
                     },
+                    "evictionMaxPodGracePeriodSeconds": {
+                      "description": "EvictionMaxPodGracePeriodSeconds is the maximum allowed grace period\n(in seconds) to use when terminating pods in response to a soft eviction\nthreshold being met.",
+                      "format": "int64",
+                      "maximum": 300,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "evictionMinimumReclaim": {
+                      "description": "EvictionMinimumReclaim defines minimum reclaims.",
+                      "properties": {
+                        "imagefsAvailable": {
+                          "description": "ImagefsAvailable is the minimum reclaim for imagefs.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "imagefsInodesFree": {
+                          "description": "ImagefsInodesFree is the minimum reclaim for imagefs.inodesFree.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "memoryAvailable": {
+                          "description": "MemoryAvailable is the minimum reclaim for memory.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "nodefsAvailable": {
+                          "description": "NodefsAvailable is the minimum reclaim for nodefs.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "nodefsInodesFree": {
+                          "description": "NodefsInodesFree is the minimum reclaim for nodefs.inodesFree.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "pidAvailable": {
+                          "description": "PidAvailable is the minimum reclaim for pid.available.\nThe value must be a percentage, e.g., \"5%\".\nThe value must be positive and less than 10%.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "evictionSoft": {
+                      "description": "EvictionSoft defines soft eviction thresholds.",
+                      "properties": {
+                        "imagefsAvailable": {
+                          "description": "ImagefsAvailable is the soft eviction threshold for imagefs.available.\nThe value must be a percentage. Eg. \"10%\".\nThe value must be between 15% and 50% inclusive.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "imagefsInodesFree": {
+                          "description": "ImagefsInodesFree is the soft eviction threshold for imagefs.inodesFree.\nThe value must be a percentage. Eg. \"5%\".\nThe value must be between 5% and 50% inclusive.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "memoryAvailable": {
+                          "description": "MemoryAvailable is the soft eviction threshold for memory.available.\nThe value must be a quantity, e.g., \"100Mi\".\nThe value must be greater than the GKE default hard eviction threshold of 100Mi and less than 50% of machine memory.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi)$",
+                          "type": "string"
+                        },
+                        "nodefsAvailable": {
+                          "description": "NodefsAvailable is the soft eviction threshold for nodefs.available.\nThe value must be a percentage, e.g., \"20%\".\nThe value must be between 10% and 50% inclusive.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "nodefsInodesFree": {
+                          "description": "NodefsInodesFree is the soft eviction threshold for nodefs.inodesFree.\nThe value must be a percentage. Eg. \"5%\".\nThe value must be between 5% and 50% inclusive.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        },
+                        "pidAvailable": {
+                          "description": "PidAvailable is the soft eviction threshold for pid.available.\nThe value must be a percentage. Eg. \"10%\".\nThe value must be between 10% and 50% inclusive.",
+                          "pattern": "^[0-9]+(\\.[0-9]+)?%$",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "evictionSoftGracePeriod": {
+                      "description": "EvictionSoftGracePeriod defines grace periods for soft eviction thresholds.",
+                      "properties": {
+                        "imagefsAvailable": {
+                          "description": "ImagefsAvailable is the grace period for the imagefs.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        },
+                        "imagefsInodesFree": {
+                          "description": "ImagefsInodesFree is the grace period for the imagefs.inodesFree soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        },
+                        "memoryAvailable": {
+                          "description": "MemoryAvailable is the grace period for the memory.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        },
+                        "nodefsAvailable": {
+                          "description": "NodefsAvailable is the grace period for the nodefs.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        },
+                        "nodefsInodesFree": {
+                          "description": "NodefsInodesFree is the grace period for the nodefs.inodesFree soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        },
+                        "pidAvailable": {
+                          "description": "PidAvailable is the grace period for the pid.available soft eviction threshold.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
                     "imageGcHighThresholdPercent": {
                       "description": "This setting sets the percent of disk usage after which image garbage collection is always\nrun. The percent is calculated as this field value out of 100. Default is 85 if unspecified.",
                       "format": "int64",
@@ -1022,12 +1707,23 @@
                       "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
                       "type": "string"
                     },
+                    "maxParallelImagePulls": {
+                      "description": "This setting sets the maximum number of image pulls in parallel. Default is 2 or 3 depending on boot disk type.",
+                      "format": "int64",
+                      "maximum": 5,
+                      "minimum": 2,
+                      "type": "integer"
+                    },
                     "podPidsLimit": {
                       "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
                       "format": "int64",
                       "maximum": 4194304,
                       "minimum": 1024,
                       "type": "integer"
+                    },
+                    "singleProcessOOMKill": {
+                      "description": "This setting sets whether to enable single process OOM killer.\nIf set to true, the processes in a container will be OOM killed individually instead of as a group.",
+                      "type": "boolean"
                     }
                   },
                   "type": "object",
@@ -1063,6 +1759,99 @@
                         }
                       },
                       "type": "object",
+                      "additionalProperties": false
+                    },
+                    "swapConfig": {
+                      "description": "SwapConfig specifies the swap memory configuration for a node pool.",
+                      "properties": {
+                        "bootDiskProfile": {
+                          "description": "Use the node's boot disk for swap.",
+                          "properties": {
+                            "swapSizeGib": {
+                              "description": "The size of the swap space in GiB.",
+                              "format": "int64",
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "swapSizePercent": {
+                              "description": "The size of the swap space as a percentage of the node's boot disk.",
+                              "format": "int32",
+                              "maximum": 50,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "only one of swapSizeGib or swapSizePercent may be set",
+                              "rule": "(has(self.swapSizeGib) ? 1 : 0) + (has(self.swapSizePercent) ? 1 : 0) <= 1"
+                            }
+                          ],
+                          "additionalProperties": false
+                        },
+                        "dedicatedLocalSsdProfile": {
+                          "description": "Provision a new, separate local NVMe SSD exclusively for swap.",
+                          "properties": {
+                            "diskCount": {
+                              "description": "The number of physical local NVMe SSD disks to attach.",
+                              "format": "int64",
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "enabled": {
+                          "description": "Enables or disables swap for the node pool. Default to false.",
+                          "type": "boolean"
+                        },
+                        "encryptionConfig": {
+                          "description": "If omitted, swap space is encrypted by default.",
+                          "properties": {
+                            "disabled": {
+                              "description": "If true, swap space will NOT be encrypted.\nDefaults to false, swap space is encrypted by default.",
+                              "type": "boolean"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "ephemeralLocalSsdProfile": {
+                          "description": "Use the local SSD (shared with ephemeral storage) for swap.",
+                          "properties": {
+                            "swapSizeGib": {
+                              "description": "The size of the swap space in GiB.",
+                              "format": "int64",
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "swapSizePercent": {
+                              "description": "The size of the swap space as a percentage of the node's ephemeral storage local SSDs.",
+                              "format": "int32",
+                              "maximum": 80,
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "only one of swapSizeGib or swapSizePercent may be set",
+                              "rule": "(has(self.swapSizeGib) ? 1 : 0) + (has(self.swapSizePercent) ? 1 : 0) <= 1"
+                            }
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "only one of bootDiskProfile, ephemeralLocalSsdProfile, or dedicatedLocalSsdProfile may be set",
+                          "rule": "(has(self.bootDiskProfile) ? 1 : 0) + (has(self.ephemeralLocalSsdProfile) ? 1 : 0) + (has(self.dedicatedLocalSsdProfile) ? 1 : 0) <= 1"
+                        }
+                      ],
                       "additionalProperties": false
                     },
                     "sysctls": {
@@ -1101,6 +1890,20 @@
                           "format": "int64",
                           "maximum": 2147483584,
                           "minimum": 1048576,
+                          "type": "integer"
+                        },
+                        "kernel.keys.maxbytes": {
+                          "description": "Represents the maximum number of bytes that a nonroot user can hold in the payload section of all their keys.",
+                          "format": "int64",
+                          "maximum": 2097152,
+                          "minimum": 20000,
+                          "type": "integer"
+                        },
+                        "kernel.keys.maxkeys": {
+                          "description": "Controls the maximum number of keys that a nonroot user may own.",
+                          "format": "int64",
+                          "maximum": 1048576,
+                          "minimum": 200,
                           "type": "integer"
                         },
                         "kernel.shmall": {
@@ -1185,6 +1988,33 @@
                           "format": "int64",
                           "maximum": 2147483647,
                           "minimum": 4608,
+                          "type": "integer"
+                        },
+                        "net.ipv4.neigh.default.gc_thresh1": {
+                          "description": "Tells the garbage collector the minimum number of network entries that can sit in cache (floor).",
+                          "format": "int64",
+                          "maximum": 262144,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "net.ipv4.neigh.default.gc_thresh2": {
+                          "description": "Acts as a soft limit to the number of network device entries stored in cache (soft ceiling).",
+                          "format": "int64",
+                          "maximum": 524288,
+                          "minimum": 512,
+                          "type": "integer"
+                        },
+                        "net.ipv4.neigh.default.gc_thresh3": {
+                          "description": "Sets a hard ceiling (absolute maximum) for the network neighbor cache.",
+                          "format": "int64",
+                          "maximum": 1048576,
+                          "minimum": 1024,
+                          "type": "integer"
+                        },
+                        "net.ipv4.tcp_max_orphans": {
+                          "format": "int64",
+                          "maximum": 262144,
+                          "minimum": 16384,
                           "type": "integer"
                         },
                         "net.ipv4.tcp_rmem": {
@@ -1284,6 +2114,12 @@
                           "minimum": 65536,
                           "type": "integer"
                         },
+                        "vm.min_free_kbytes": {
+                          "format": "int64",
+                          "maximum": 1048576,
+                          "minimum": 67584,
+                          "type": "integer"
+                        },
                         "vm.overcommit_memory": {
                           "description": "Determines the kernel's memory overcommit handling strategy.\nSupported values:\n0: Rejects allocations that are obviously too large.\n1: Allows overcommit until memory is exhausted.\n2 (strict): Prevents overcommit beyond swap space plus a percentage of RAM defined by 'vm.overcommit_ratio'.",
                           "enum": [
@@ -1301,16 +2137,50 @@
                           "minimum": 0,
                           "type": "integer"
                         },
+                        "vm.swappiness": {
+                          "format": "int64",
+                          "maximum": 200,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
                         "vm.vfs_cache_pressure": {
                           "description": "Adjusts the kernel's preference for reclaiming memory used for dentry (directory) and inode caches.",
                           "format": "int64",
                           "maximum": 100,
                           "minimum": 0,
                           "type": "integer"
+                        },
+                        "vm.watermark_scale_factor": {
+                          "format": "int64",
+                          "maximum": 3000,
+                          "minimum": 10,
+                          "type": "integer"
                         }
                       },
                       "type": "object",
                       "additionalProperties": false
+                    },
+                    "transparentHugepageDefrag": {
+                      "description": "Defines the transparent hugepage defrag configuration on the node. Currently supported values:\n* TRANSPARENT_HUGEPAGE_DEFRAG_ALWAYS: An application requesting THP will stall on allocation failure and directly reclaim pages and compact memory in an effort to allocate a THP immediately.\n* TRANSPARENT_HUGEPAGE_DEFRAG_DEFER: An application will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future. It is the responsibility of khugepaged to then install the THP pages later.\n* TRANSPARENT_HUGEPAGE_DEFRAG_DEFER_WITH_MADVISE: An application will enter direct reclaim and compaction like always, but only for regions that have used madvise(MADV_HUGEPAGE); all other regions will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future.\n* TRANSPARENT_HUGEPAGE_DEFRAG_MADVISE: An application will enter direct reclaim and compaction like always, but only for regions that have used madvise(MADV_HUGEPAGE); all other regions will wake kswapd in the background to reclaim pages and wake kcompactd to compact memory so that THP is available in the near future.\n* TRANSPARENT_HUGEPAGE_DEFRAG_NEVER: An application will never enter direct reclaim or compaction.\n* TRANSPARENT_HUGEPAGE_DEFRAG_UNSPECIFIED: Default value. GKE will not modify the kernel configuration.",
+                      "enum": [
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_ALWAYS",
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_DEFER",
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_DEFER_WITH_MADVISE",
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_MADVISE",
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_NEVER",
+                        "TRANSPARENT_HUGEPAGE_DEFRAG_UNSPECIFIED"
+                      ],
+                      "type": "string"
+                    },
+                    "transparentHugepageEnabled": {
+                      "description": "Controls transparent hugepage support for anonymous memory. Currently supported values:\n* TRANSPARENT_HUGEPAGE_ENABLED_ALWAYS: Transparent hugepage is enabled system wide.\n* TRANSPARENT_HUGEPAGE_ENABLED_MADVISE: Transparent hugepage is enabled inside MADV_HUGEPAGE regions. This is the default kernel configuration.\n* TRANSPARENT_HUGEPAGE_ENABLED_NEVER: Transparent hugepage is disabled.\n* TRANSPARENT_HUGEPAGE_ENABLED_UNSPECIFIED: Default value. GKE will not modify the kernel configuration.",
+                      "enum": [
+                        "TRANSPARENT_HUGEPAGE_ENABLED_ALWAYS",
+                        "TRANSPARENT_HUGEPAGE_ENABLED_MADVISE",
+                        "TRANSPARENT_HUGEPAGE_ENABLED_NEVER",
+                        "TRANSPARENT_HUGEPAGE_ENABLED_UNSPECIFIED"
+                      ],
+                      "type": "string"
                     }
                   },
                   "type": "object",
@@ -1356,28 +2226,16 @@
           "rule": "(has(self.autopilot) && self.autopilot.enabled) ? (!has(self.nodePoolConfig) || !has(self.nodePoolConfig.imageType) || self.nodePoolConfig.imageType == \"cos_containerd\") : true"
         },
         {
+          "message": "Only DEFAULT logging variant can be used when Autopilot is enabled",
+          "rule": "(has(self.autopilot) && self.autopilot.enabled) ? (!has(self.nodePoolConfig) || !has(self.nodePoolConfig.loggingConfig) || !has(self.nodePoolConfig.loggingConfig.loggingVariantConfig) || !has(self.nodePoolConfig.loggingConfig.loggingVariantConfig.variant) || self.nodePoolConfig.loggingConfig.loggingVariantConfig.variant == \"DEFAULT\") : true"
+        },
+        {
           "message": "If NodePoolGroup is not specified NodePoolConfig.WorkloadType can only be HIGH_AVAILABILITY if set",
           "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.workloadType) && !has(self.nodePoolGroup)) ? self.nodePoolConfig.workloadType == \"HIGH_AVAILABILITY\" : true"
         },
         {
           "message": "In GKE Standard, pod family can be used only if Autopilot is enabled",
           "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? (has(self.autopilot) && self.autopilot.enabled) : true"
-        },
-        {
-          "message": "Pod family cannot be used with nodePoolConfig",
-          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? !(has(self.nodePoolConfig)) : true"
-        },
-        {
-          "message": "Pod family cannot be used with priorityDefaults",
-          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? !(has(self.priorityDefaults)) : true"
-        },
-        {
-          "message": "Pod family cannot be used with ScaleUpAnyway",
-          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? (self.whenUnsatisfiable != \"ScaleUpAnyway\") : true"
-        },
-        {
-          "message": "Pod family priorities cannot be mixed with non-pod family priorities",
-          "rule": "self.priorities.exists(priority, has(priority.podFamily)) ? self.priorities.all(priority, has(priority.podFamily)) : true"
         },
         {
           "message": "If using NodePoolConfig.ConfidentialNodeType, each priority must specify either MachineFamily or MachineType.",
@@ -1392,8 +2250,28 @@
           "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV_SNP\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['n2d']) || (has(priority.machineType) && priority.machineType.split('-')[0] in ['n2d']))) : true"
         },
         {
-          "message": "ConfidentialNodeType TDX only supports C3 standard and A3 highgpu 1",
-          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['c3', 'a3']) || (has(priority.machineType) && (priority.machineType.startsWith('c3-standard-') || priority.machineType == 'a3-highgpu-1g')) || (has(priority.gpu) && has(priority.gpu.type) && priority.gpu.type == 'nvidia-h100-80gb'))) : true"
+          "message": "ConfidentialNodeType TDX only supports C3 standard, C4 standard, A3 and A4",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily in ['c3', 'c4', 'a3', 'a4']) || (has(priority.machineType) && (priority.machineType.startsWith('c3-standard-') || priority.machineType.startsWith('c4-standard-') || priority.machineType == 'a3-highgpu-1g' || priority.machineType == 'a4-highgpu-8g'))) : true"
+        },
+        {
+          "message": "ConfidentialNodeType TDX on C3 only supports c3-standard- machine type and nvidia-h100-80gb GPU type",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily == 'c3' || has(priority.machineType) && priority.machineType.startsWith('c3-standard-')) ? (!has(priority.gpu) || has(priority.gpu) && (!has(priority.gpu.type) || priority.gpu.type == 'nvidia-h100-80gb')) : true) : true"
+        },
+        {
+          "message": "ConfidentialNodeType TDX on C4 only supports c4-standard- machine type and nvidia-h100-80gb GPU type",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily == 'c4' || has(priority.machineType) && priority.machineType.startsWith('c4-standard-')) ? (!has(priority.gpu) || has(priority.gpu) && (!has(priority.gpu.type) || priority.gpu.type == 'nvidia-h100-80gb')) : true) : true"
+        },
+        {
+          "message": "ConfidentialNodeType TDX on A3 only supports a3-highgpu-1g machine type and nvidia-h100-80gb GPU type",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily == 'a3' || has(priority.machineType) && priority.machineType == 'a3-highgpu-1g') ? (!has(priority.gpu) || has(priority.gpu) && (!has(priority.gpu.type) || priority.gpu.type == 'nvidia-h100-80gb')) : true) : true"
+        },
+        {
+          "message": "ConfidentialNodeType TDX on A4 only supports a4-highgpu-8g machine type and nvidia-b200 GPU type",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"TDX\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily == 'a4' || has(priority.machineType) && priority.machineType == 'a4-highgpu-8g') ? (!has(priority.gpu) || has(priority.gpu) && (!has(priority.gpu.type) || priority.gpu.type == 'nvidia-b200')) : true) : true"
+        },
+        {
+          "message": "PriorityScore must be set for all priorities or for none of them",
+          "rule": "self.priorities.all(p, has(p.priorityScore)) || self.priorities.all(p, !has(p.priorityScore))"
         }
       ],
       "additionalProperties": false
@@ -1404,7 +2282,7 @@
         "conditions": {
           "description": "Conditions represent the observations of a ComputeClass's current state.",
           "items": {
-            "description": "Condition contains details for one aspect of the current state of this API Resource.\n---\nThis struct is intended for direct use as an array at the field path .status.conditions.  For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the observations of a foo's current state.\n\t    // Known .status.conditions.type are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t    // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t    // other fields\n\t}",
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
               "lastTransitionTime": {
                 "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
@@ -1439,7 +2317,7 @@
                 "type": "string"
               },
               "type": {
-                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.\n---\nMany .condition.type values are consistent across resources like Available, but because arbitrary conditions can be\nuseful (see .node.status.conditions), the ability to deconflict is important.\nThe regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)",
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
                 "maxLength": 316,
                 "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
                 "type": "string"

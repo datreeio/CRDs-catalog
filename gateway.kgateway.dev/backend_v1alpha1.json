@@ -15,7 +15,7 @@
       "description": "BackendSpec defines the desired state of Backend.",
       "properties": {
         "aws": {
-          "description": "Aws is the AWS backend configuration.\nThe Aws backend type is only supported with envoy-based gateways, it is not supported in agentgateway.",
+          "description": "Aws is the AWS backend configuration.",
           "properties": {
             "accountId": {
               "description": "AccountId is the AWS account ID to use for the backend.",
@@ -136,6 +136,26 @@
           "type": "object",
           "additionalProperties": false
         },
+        "gcp": {
+          "description": "Gcp is the GCP backend configuration.",
+          "properties": {
+            "audience": {
+              "description": "Audience is the GCP service account audience URL.\nWhen omitted, defaults to \"https://{host}\".\nThis is used by the GCP authn filter to request the appropriate token.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "host": {
+              "description": "Host is the hostname of the GCP service to connect to.\nThis will be used for SNI and as the target address.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "host"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "static": {
           "description": "Static is the static backend configuration.",
           "properties": {
@@ -188,7 +208,8 @@
           "enum": [
             "AWS",
             "Static",
-            "DynamicForwardProxy"
+            "DynamicForwardProxy",
+            "GCP"
           ],
           "type": "string"
         }
@@ -208,8 +229,12 @@
           "rule": "self.type == 'DynamicForwardProxy' ? has(self.dynamicForwardProxy) : true"
         },
         {
-          "message": "exactly one of the fields in [aws static dynamicForwardProxy] must be set",
-          "rule": "[has(self.aws),has(self.static),has(self.dynamicForwardProxy)].filter(x,x==true).size() == 1"
+          "message": "gcp backend must be specified when type is 'GCP'",
+          "rule": "self.type == 'GCP' ? has(self.gcp) : true"
+        },
+        {
+          "message": "exactly one of the fields in [aws static dynamicForwardProxy gcp] must be set",
+          "rule": "[has(self.aws),has(self.static),has(self.dynamicForwardProxy),has(self.gcp)].filter(x,x==true).size() == 1"
         }
       ],
       "additionalProperties": false

@@ -25,16 +25,18 @@
                 "items": {
                   "properties": {
                     "exclude": {
-                      "description": "Exclude specifies a list of glob patterns to exclude\nfiles and dirs matched by the 'From' field.",
+                      "description": "Exclude specifies a list of glob patterns to exclude\nfiles and dirs matched by the 'From' field. Patterns are matched\nagainst paths relative to the source alias root or to the non-glob\nprefix of 'From'. Patterns without a separator (e.g. \"*.md\") match\nthe file name at any depth.",
                       "items": {
+                        "maxLength": 1024,
                         "type": "string"
                       },
                       "maxItems": 100,
                       "type": "array"
                     },
                     "from": {
-                      "description": "From specifies the source (by alias) and the glob pattern to match files.\nThe format is \"@<alias>/<glob-pattern>\".",
+                      "description": "From specifies the source (by alias) and the glob pattern to match files.\nThe format is \"@<alias>/<glob-pattern>\". When pathPattern is set,\nthe path may use capture placeholders such as \"{app}\".",
                       "maxLength": 1024,
+                      "minLength": 1,
                       "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
                       "type": "string"
                     },
@@ -48,9 +50,10 @@
                       "type": "string"
                     },
                     "to": {
-                      "description": "To specifies the destination path within the artifact.\nThe format is \"@artifact/path\", the alias \"artifact\"\nrefers to the root path of the generated artifact.",
+                      "description": "To specifies the destination path within the artifact.\nThe format is \"@artifact/path\", the alias \"artifact\"\nrefers to the root path of the generated artifact. When pathPattern\nis set, the path may use capture placeholders such as \"{app}\".",
                       "maxLength": 1024,
-                      "pattern": "^@(artifact)/(.*)$",
+                      "minLength": 1,
+                      "pattern": "^@artifact/([^/]{0,1}|[^./][^/]|[.][^./]|[^/]{3,})(/([^/]{0,1}|[^./][^/]|[.][^./]|[^/]{3,}))*$",
                       "type": "string"
                     }
                   },
@@ -65,9 +68,9 @@
                 "type": "array"
               },
               "name": {
-                "description": "Name is the name of the generated artifact.",
+                "description": "Name is the name of the generated artifact.\nWhen pathPattern is set, this field may use capture placeholders such as \"{app}\".",
                 "maxLength": 253,
-                "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+                "minLength": 1,
                 "type": "string"
               },
               "originRevision": {
@@ -93,6 +96,33 @@
           "maxItems": 1000,
           "minItems": 1,
           "type": "array"
+        },
+        "commonMetadata": {
+          "description": "CommonMetadata specifies the common labels and annotations that are\napplied to all resources. Any existing label or annotation will be\noverridden if its key matches a common one.",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Annotations to be added to the object's metadata.",
+              "type": "object"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Labels to be added to the object's metadata.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "pathPattern": {
+          "description": "PathPattern specifies a directory traversal pattern to match within the sources.\nThe format is \"@<alias>/<pattern>\". Named captures in the pattern (e.g. \"{app}\")\ncan be used as placeholders in OutputArtifacts fields.",
+          "maxLength": 1024,
+          "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
+          "type": "string"
         },
         "sources": {
           "description": "Sources is a list of references to the Flux source-controller\nresources that will be used to generate the artifact.",
@@ -148,6 +178,12 @@
         "sources"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "artifact names must be valid Kubernetes object names when pathPattern is not set",
+          "rule": "has(self.pathPattern) && size(self.pathPattern) > 0 || self.artifacts.all(a, a.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'))"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

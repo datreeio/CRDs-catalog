@@ -88,10 +88,10 @@
                   "type": "object"
                 },
                 "signingKey": {
-                  "description": "SigningKey provides the option to sign commits with a GPG key",
+                  "description": "SigningKey provides the option to sign commits with an OpenPGP or\nSSH signing key, referenced from a Secret. See SigningKey.",
                   "properties": {
                     "secretRef": {
-                      "description": "SecretRef holds the name to a secret that contains a 'git.asc' key\ncorresponding to the ASCII Armored file containing the GPG signing\nkeypair as the value. It must be in the same namespace as the\nImageUpdateAutomation.",
+                      "description": "SecretRef references a Secret containing the signing key. For type\n'gpg', the Secret must contain a 'git.asc' (ASCII-armored OpenPGP\nkeypair) and may contain a 'passphrase'. For type 'ssh', the Secret\nmust contain an 'identity' (an SSH private key in any format\ngolang.org/x/crypto/ssh.ParsePrivateKey accepts; typically the\nOpenSSH format produced by 'ssh-keygen') and may contain a 'password'\n(the key's passphrase). The SSH conventions match the GitRepository\nSSH transport-auth Secret format, allowing a single Secret to serve\nboth transport and signing when the ImageUpdateAutomation lives in\nthe same namespace as the GitRepository.\n\nThe Secret itself must live in the same namespace as the\nImageUpdateAutomation.\n\nSupported SSH key algorithms: ed25519, ecdsa-sha2-nistp256/384/521,\nand rsa (>= 2048-bit).",
                       "properties": {
                         "name": {
                           "description": "Name of the referent.",
@@ -103,6 +103,14 @@
                       ],
                       "type": "object",
                       "additionalProperties": false
+                    },
+                    "type": {
+                      "description": "Type selects the signing-key format expected in the referenced\nSecret. When empty, the controller defaults to 'gpg'.",
+                      "enum": [
+                        "gpg",
+                        "ssh"
+                      ],
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -133,7 +141,8 @@
                   "type": "object"
                 },
                 "refspec": {
-                  "description": "Refspec specifies the Git Refspec to use for a push operation.\nIf both Branch and Refspec are provided, then the commit is pushed\nto the branch and also using the specified refspec.\nFor more details about Git Refspecs, see:\nhttps://git-scm.com/book/en/v2/Git-Internals-The-Refspec",
+                  "description": "Refspec specifies the Git Refspec to use for a push operation.\nIf both Branch and Refspec are provided, then the commit is pushed\nto the branch and also using the specified refspec.\nDeletion refspecs and refspecs prefixed with '+' are not supported.\nFor more details about Git Refspecs, see:\nhttps://git-scm.com/book/en/v2/Git-Internals-The-Refspec",
+                  "pattern": "^$|^[^+:]",
                   "type": "string"
                 }
               },
@@ -375,7 +384,7 @@
           "type": "object"
         },
         "observedSourceRevision": {
-          "description": "ObservedPolicies []ObservedPolicy `json:\"observedPolicies,omitempty\"`\nObservedSourceRevision is the last observed source revision. This can be\nused to determine if the source has been updated since last observation.",
+          "description": "ObservedSourceRevision is the last observed source revision. This can be\nused to determine if the source has been updated since last observation.",
           "type": "string"
         }
       },

@@ -201,6 +201,20 @@
                         "type": "string"
                       },
                       "type": "array"
+                    },
+                    "headersToClient": {
+                      "description": "HeadersToClient specifies which headers from the authorization response\nshould be forwarded back to the downstream client when the request is denied.\nMaps to Envoy's allowed_client_headers. Required for redirect-based flows\n(e.g. oauth2-proxy returning 302 + Location) so that the redirect Location\nheader reaches the browser on denial.\nCommon examples: [\"location\", \"set-cookie\", \"www-authenticate\"]",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "headersToClientOnSuccess": {
+                      "description": "HeadersToClientOnSuccess specifies which headers from the authorization response\nshould be forwarded back to the downstream client when the request is allowed.\nMaps to Envoy's allowed_client_headers_on_success.\nCommon examples: [\"set-cookie\", \"x-auth-token\"]",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
                     }
                   },
                   "type": "object",
@@ -481,6 +495,43 @@
               "description": "FailOpen determines if requests are allowed when the ext proc service is unavailable.\nDefaults to true, meaning requests are allowed upstream even if the ext proc service is unavailable.",
               "type": "boolean"
             },
+            "filterStage": {
+              "description": "FilterStage specifies where in the HTTP filter chain the ExtProc filter\nshould be placed. If not specified, the ExtProc filter defaults to running\nafter the AuthZ stage.",
+              "properties": {
+                "predicate": {
+                  "default": "During",
+                  "description": "Predicate specifies placement relative to the stage: Before, During,\nor After.",
+                  "enum": [
+                    "Before",
+                    "During",
+                    "After"
+                  ],
+                  "type": "string"
+                },
+                "stage": {
+                  "description": "Stage selects the well-known position in the filter chain.",
+                  "enum": [
+                    "Fault",
+                    "AuthN",
+                    "AuthZ",
+                    "RateLimit",
+                    "Route"
+                  ],
+                  "type": "string"
+                },
+                "weight": {
+                  "default": 0,
+                  "description": "Weight controls ordering among multiple filters at the same\nstage and predicate. Higher weight places the filter earlier in the\nchain. Defaults to 0. Filters with the same stage, predicate, and\nweight are sorted alphabetically by filter name for consistency.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "stage"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "grpcService": {
               "description": "GrpcService is the GRPC service that will handle the processing.",
               "properties": {
@@ -749,6 +800,13 @@
               "type": "object",
               "additionalProperties": false
             },
+            "requestAttributes": {
+              "description": "RequestAttributes specifies a list of Envoy attribute expressions whose values will be\nincluded in the ProcessingRequest.attributes map sent to the external processing server\non every HTTP request.\nSee: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/http/ext_proc/v3/ext_proc.proto",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
             "routeCacheAction": {
               "default": "FromResponse",
               "description": "RouteCacheAction describes the route cache action to be taken when an\nexternal processor response is received in response to request headers.\nThe default behavior is \"FromResponse\" which will only clear the route cache when\nan external processing response has the clear_route_cache field set.",
@@ -864,6 +922,31 @@
                       "remote": {
                         "description": "RemoteJWKS configures getting the public keys to validate the JWT from a remote JWKS server.",
                         "properties": {
+                          "asyncFetch": {
+                            "description": "AsyncFetch configures fetching the JWKS asynchronously and caching it on a timer,\ninstead of fetching it on demand during request handling.",
+                            "properties": {
+                              "failedRefetchDuration": {
+                                "description": "FailedRefetchDuration is how long to wait before retrying the fetch after a failure.\nIf unspecified, Envoy default of 1 second is used.",
+                                "type": "string",
+                                "x-kubernetes-validations": [
+                                  {
+                                    "message": "invalid duration value",
+                                    "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                                  },
+                                  {
+                                    "message": "failedRefetchDuration must be at least 1ms.",
+                                    "rule": "duration(self) >= duration('1ms')"
+                                  }
+                                ]
+                              },
+                              "fastListener": {
+                                "description": "FastListener controls when the listener is considered ready relative to the\ninitial JWKS fetch.\nIf false or unset, the listener waits for the first JWKS fetch to complete before\nit starts serving traffic, so requests are never validated against an empty key set.\nIf true, the listener starts immediately and the first fetch happens in the background.",
+                                "type": "boolean"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "backendRef": {
                             "description": "BackendRef is reference to the backend of the JWKS server.",
                             "properties": {
@@ -928,6 +1011,63 @@
                                 "rule": "duration(self) >= duration('1ms')"
                               }
                             ]
+                          },
+                          "retryPolicy": {
+                            "description": "RetryPolicy configures how the JWKS fetch is retried (with exponential backoff)\nwhen the remote JWKS server is unavailable.",
+                            "properties": {
+                              "backOff": {
+                                "description": "BackOff configures the exponential backoff strategy between retries.\nIf unset, the default base interval is 1000ms and the default maximum interval is\n10 times the base interval.",
+                                "properties": {
+                                  "baseInterval": {
+                                    "description": "BaseInterval is the base interval for the exponential backoff computation.\nIt must be greater than zero and less than or equal to MaxInterval.",
+                                    "type": "string",
+                                    "x-kubernetes-validations": [
+                                      {
+                                        "message": "invalid duration value",
+                                        "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                                      },
+                                      {
+                                        "message": "baseInterval must be at least 1ms.",
+                                        "rule": "duration(self) >= duration('1ms')"
+                                      }
+                                    ]
+                                  },
+                                  "maxInterval": {
+                                    "description": "MaxInterval is the maximum interval between retries. If set, it must be greater than\nor equal to BaseInterval. Defaults to 10 times the BaseInterval.",
+                                    "type": "string",
+                                    "x-kubernetes-validations": [
+                                      {
+                                        "message": "invalid duration value",
+                                        "rule": "matches(self, '^([0-9]{1,5}(h|m|s|ms)){1,4}$')"
+                                      },
+                                      {
+                                        "message": "maxInterval must be at least 1ms.",
+                                        "rule": "duration(self) >= duration('1ms')"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "baseInterval"
+                                ],
+                                "type": "object",
+                                "x-kubernetes-validations": [
+                                  {
+                                    "message": "maxInterval must be greater than or equal to baseInterval",
+                                    "rule": "!has(self.maxInterval) || duration(self.maxInterval) >= duration(self.baseInterval)"
+                                  }
+                                ],
+                                "additionalProperties": false
+                              },
+                              "numRetries": {
+                                "description": "NumRetries is the allowed number of retries when fetching the JWKS fails.\nDefaults to 1 if unset.",
+                                "format": "int32",
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "url": {
                             "description": "URL is the URL of the remote JWKS server, it must be a full FQDN with protocol, host and path.\nFor example, https://example.com/keys",
@@ -1324,6 +1464,57 @@
                     }
                   },
                   "type": "object",
+                  "additionalProperties": false
+                },
+                "jwksBackendRef": {
+                  "description": "JWKSBackendRef specifies the backend to use for fetching the JWKS.\nIf not set, the parent OAuth2Provider's BackendRef is used.",
+                  "properties": {
+                    "group": {
+                      "default": "",
+                      "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                      "maxLength": 253,
+                      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "default": "Service",
+                      "description": "Kind is the Kubernetes resource kind of the referent. For example\n\"Service\".\n\nDefaults to \"Service\" when not specified.\n\nExternalName services can refer to CNAME DNS records that may live\noutside of the cluster and as such are difficult to reason about in\nterms of conformance. They also may not be safe to forward to (see\nCVE-2021-25740 for more information). Implementations SHOULD NOT\nsupport ExternalName Services.\n\nSupport: Core (Services with a type other than ExternalName)\n\nSupport: Implementation-specific (Services with type ExternalName)",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Name is the name of the referent.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "namespace": {
+                      "description": "Namespace is the namespace of the backend. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    },
+                    "port": {
+                      "description": "Port specifies the destination port number to use for this resource.\nPort is required when the referent is a Kubernetes Service. In this\ncase, the port number is the service port number, not the target port.\nFor other resources, destination port might be derived from the referent\nresource or this field.",
+                      "format": "int32",
+                      "maximum": 65535,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "Must have port for Service reference",
+                      "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                    }
+                  ],
                   "additionalProperties": false
                 },
                 "jwksURI": {

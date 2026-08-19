@@ -28,17 +28,96 @@
           "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
           "type": "string"
         },
+        "oidcProviders": {
+          "description": "OIDCProviders specifies the OIDC providers used to authenticate incoming\nrequests when Type is 'generic-oidc'. The provider whose IssuerURL matches\nthe token's 'iss' claim is used to verify the token signature, expiration\nand audience, and to evaluate the configured CEL validations against the\ntoken claims.",
+          "items": {
+            "description": "OIDCProvider configures an OIDC issuer used to authenticate requests for a\n'generic-oidc' Receiver.",
+            "properties": {
+              "audience": {
+                "description": "Audience is the expected audience ('aud' claim) for tokens issued by\nthis provider. Defaults to 'notification-controller'.",
+                "type": "string"
+              },
+              "issuerURL": {
+                "description": "IssuerURL is the OIDC issuer URL used for provider discovery. It must\nmatch the 'iss' claim of tokens issued by this provider.",
+                "pattern": "^https?://",
+                "type": "string"
+              },
+              "validations": {
+                "description": "Validations is the list of CEL boolean expressions evaluated against the\ntoken claims and the variables. The request is accepted only if all of\nthem evaluate to true; the message of each failing expression is returned\nto the caller.\n\nAt least one validation is required. A valid signature alone does not\nauthorize a request: public issuers issue tokens to any caller on the\nplatform, so the validations must constrain the caller's identity claims\n(e.g. 'repository_owner' for GitHub Actions).",
+                "items": {
+                  "description": "OIDCValidation is a CEL boolean expression evaluated against the OIDC token\nclaims and variables of a 'generic-oidc' Receiver.",
+                  "properties": {
+                    "expression": {
+                      "description": "Expression is the CEL boolean expression to evaluate.",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "Message is returned to the caller when the expression evaluates to false.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expression",
+                    "message"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "variables": {
+                "description": "Variables is an optional list of named CEL expressions, evaluated in order\nand exposed as 'vars.<name>'. Each expression can read the token claims\nvia 'claims' and any variable defined before it. Use it to share\nsub-expressions across validations.",
+                "items": {
+                  "description": "OIDCVariable is a named CEL expression evaluated against the OIDC token\nclaims of a 'generic-oidc' Receiver.",
+                  "properties": {
+                    "expression": {
+                      "description": "Expression is the CEL expression that defines the variable value.",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Name is the variable name; it must be a valid CEL identifier.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "expression",
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "issuerURL",
+              "validations"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "issuerURL"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "resourceFilter": {
-          "description": "ResourceFilter is a CEL expression expected to return a boolean that is\nevaluated for each resource referenced in the Resources field when a\nwebhook is received. If the expression returns false then the controller\nwill not request a reconciliation for the resource.\nWhen the expression is specified the controller will parse it and mark\nthe object as terminally failed if the expression is invalid or does not\nreturn a boolean.",
+          "description": "ResourceFilter is a CEL expression expected to return a boolean that is\nevaluated for each resource referenced in the Resources field when a\nwebhook is received. If the expression returns false then the controller\nwill not request a reconciliation for the resource.\nThe expression can read the resource metadata via 'res' and the webhook\nrequest body via 'req'. For generic-oidc receivers, the verified OIDC\ntoken claims are also available via 'claims'.\nWhen the expression is specified the controller will parse it and mark\nthe object as terminally failed if the expression is invalid or does not\nreturn a boolean.",
           "type": "string"
         },
         "resources": {
           "description": "A list of resources to be notified about changes.",
           "items": {
-            "description": "CrossNamespaceObjectReference contains enough information to let you locate the\ntyped referenced object at cluster level",
+            "description": "ReceiverResource references a resource to be notified about changes, with an\noptional per-resource CEL filter.",
             "properties": {
               "apiVersion": {
                 "description": "API version of the referent",
+                "type": "string"
+              },
+              "filter": {
+                "description": "Filter is a CEL expression expected to return a boolean that is evaluated\nfor each resource matched by this reference when a webhook is received,\nin addition to the top-level resourceFilter. A reconciliation is requested\nonly when both expressions (when set) return true.\nThe expression can read the resource metadata via 'res' and the webhook\nrequest body via 'req'. For generic-oidc receivers, the verified OIDC\ntoken claims are also available via 'claims'.\nWhen the expression is specified the controller will parse it and mark\nthe object as terminally failed if the expression is invalid or does not\nreturn a boolean.",
                 "type": "string"
               },
               "kind": {
@@ -92,7 +171,7 @@
           "type": "array"
         },
         "secretRef": {
-          "description": "SecretRef specifies the Secret containing the token used\nto validate the payload authenticity. The Secret must contain a 'token'\nkey. For GCR receivers, the Secret must also contain an 'email' key\nwith the IAM service account email configured on the Pub/Sub push\nsubscription, and an 'audience' key with the expected OIDC token audience.",
+          "description": "SecretRef specifies the Secret containing the token used\nto validate the payload authenticity. The Secret must contain a 'token'\nkey. For GCR receivers, the Secret must also contain an 'email' key\nwith the IAM service account email configured on the Pub/Sub push\nsubscription, and an 'audience' key with the expected OIDC token audience.\n\nRequired for all receiver types except 'generic-oidc', which authenticates\nrequests using the OIDC token instead and must not set this field.",
           "properties": {
             "name": {
               "description": "Name of the referent.",
@@ -114,6 +193,7 @@
           "enum": [
             "generic",
             "generic-hmac",
+            "generic-oidc",
             "github",
             "gitlab",
             "bitbucket",
@@ -130,10 +210,27 @@
       },
       "required": [
         "resources",
-        "secretRef",
         "type"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "generic-oidc receivers must define at least one oidcProvider",
+          "rule": "self.type != 'generic-oidc' || (has(self.oidcProviders) && size(self.oidcProviders) > 0)"
+        },
+        {
+          "message": "oidcProviders can only be set when type is generic-oidc",
+          "rule": "self.type == 'generic-oidc' || !has(self.oidcProviders) || size(self.oidcProviders) == 0"
+        },
+        {
+          "message": "secretRef cannot be set when type is generic-oidc",
+          "rule": "self.type != 'generic-oidc' || !has(self.secretRef)"
+        },
+        {
+          "message": "secretRef is required when type is not generic-oidc",
+          "rule": "self.type == 'generic-oidc' || has(self.secretRef)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

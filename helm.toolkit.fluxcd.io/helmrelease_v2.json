@@ -222,14 +222,14 @@
         "dependsOn": {
           "description": "DependsOn may contain a DependencyReference slice with\nreferences to HelmRelease resources that must be ready before this HelmRelease\ncan be reconciled.",
           "items": {
-            "description": "DependencyReference defines a HelmRelease dependency on another HelmRelease resource.",
+            "description": "DependencyReference contains enough information to locate the referenced Kubernetes resource object\nand optional CEL expression to assess its readiness.",
             "properties": {
               "name": {
                 "description": "Name of the referent.",
                 "type": "string"
               },
               "namespace": {
-                "description": "Namespace of the referent, defaults to the namespace of the HelmRelease\nresource object that contains the reference.",
+                "description": "Namespace of the referent, defaults to the namespace of the resource\nobject that contains the reference.",
                 "type": "string"
               },
               "readyExpr": {
@@ -345,8 +345,7 @@
             },
             "required": [
               "apiVersion",
-              "current",
-              "kind"
+              "current"
             ],
             "type": "object",
             "additionalProperties": false
@@ -523,6 +522,15 @@
         "persistentClient": {
           "description": "PersistentClient tells the controller to use a persistent Kubernetes\nclient for this release. When enabled, the client will be reused for the\nduration of the reconciliation, instead of being created and destroyed\nfor each (step of a) Helm action.\n\nThis can improve performance, but may cause issues with some Helm charts\nthat for example do create Custom Resource Definitions during installation\noutside Helm's CRD lifecycle hooks, which are then not observed to be\navailable by e.g. post-install hooks.\n\nIf not set, it defaults to true.",
           "type": "boolean"
+        },
+        "postRenderStrategy": {
+          "description": "PostRenderStrategy defines the strategy for sending hooks to post-renderers.\nValid values are 'nohooks' (hooks not sent to post-renderers, Helm 3 behavior),\n'combined' (hooks and templates sent together, Helm 4 default), and 'separate'\n(hooks and templates sent in separate streams, Helm 4.2 opt-in).\nDefaults to 'combined', or 'nohooks' when the UseHelm3Defaults feature gate is enabled.",
+          "enum": [
+            "nohooks",
+            "combined",
+            "separate"
+          ],
+          "type": "string"
         },
         "postRenderers": {
           "description": "PostRenderers holds an array of Helm PostRenderers, which will be applied in order\nof their definition.",
@@ -784,6 +792,14 @@
         "upgrade": {
           "description": "Upgrade holds the configuration for Helm upgrade actions for this HelmRelease.",
           "properties": {
+            "chartNameChangeStrategy": {
+              "description": "ChartNameChangeStrategy defines the strategy to use when a Helm chart name changes.\nValid values are 'Reinstall' or 'InPlaceUpdate'. Defaults to 'Reinstall' if omitted.\n\nReinstall: Reinstall the Helm release, uninstalling the existing Helm release.\n\nInPlaceUpdate: Update the Helm release in place.",
+              "enum": [
+                "InPlaceUpdate",
+                "Reinstall"
+              ],
+              "type": "string"
+            },
             "cleanupOnFail": {
               "description": "CleanupOnFail allows deletion of new resources created during the Helm\nupgrade action when it fails.",
               "type": "boolean"
@@ -919,6 +935,10 @@
                   "ConfigMap"
                 ],
                 "type": "string"
+              },
+              "literal": {
+                "description": "Literal marks this ValuesReference as a literal value. When set in\ncombination with TargetPath, the referenced value is merged at the target\npath without interpreting Helm's `--set` syntax (commas, brackets, dots,\nequal signs, etc.), mirroring the behavior of `helm --set-literal`. This\nis the only safe way to inject arbitrary file content (config files, JSON\nblobs, multi-line strings containing special characters) through\n`valuesFrom`. Has no effect when TargetPath is empty: in that mode the\nreferenced value is always YAML-merged at the root.",
+                "type": "boolean"
               },
               "name": {
                 "description": "Name of the values referent. Should reside in the same namespace as the\nreferring resource.",

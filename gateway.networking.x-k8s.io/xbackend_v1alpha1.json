@@ -1,0 +1,440 @@
+{
+  "description": "XBackend is a Gateway API resource that represents a backend destination for\nrouting traffic. It serves as a Gateway-native way to define where and how a\nGateway should connect to a backend.\n\nSupport: Extended",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the desired state of XBackend.",
+      "properties": {
+        "externalHostname": {
+          "description": "ExternalHostname specifies the configuration for an ExternalHostname\nbackend. This field must be set when type is ExternalHostname and must\nbe unset otherwise.\n\nSupport: Extended",
+          "properties": {
+            "hostname": {
+              "description": "Hostname specifies the FQDN used to reach this backend.\nIP addresses are not allowed in this field.",
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "hostname must not be an IP address or end with .cluster.local",
+                  "rule": "!self.endsWith('.cluster.local')"
+                }
+              ]
+            }
+          },
+          "required": [
+            "hostname"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "port": {
+          "description": "Port defines the port that the implementation should use when connecting\nto this backend.",
+          "properties": {
+            "name": {
+              "description": "Name represents the name of this port. All ports in a Backend must have\na unique name. Name must either be an empty string or pass DNS_LABEL\nvalidation (lowercase alphanumeric or '-', starting and ending with an\nalphanumeric character, at most 63 characters).",
+              "maxLength": 63,
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Name must be a valid DNS label",
+                  "rule": "size(self) == 0 || format.dns1123Label().validate(self) == null"
+                }
+              ]
+            },
+            "port": {
+              "description": "Port represents the port number of the endpoint.",
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "port"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "protocol": {
+          "description": "Protocol defines the protocol for backend communication.\n\nIn the common case, the underlying transport protocol for the\nproxied traffic will already have been determined and processed\nby the dataplane at the routing step. Where this field is useful\nis either for higher level protocols or asymmetrical protocol\nconfigurations (e.g. version upgrades or h2c).\n\nWhen set, the implementation uses the specified protocol when connecting\nto this backend. When not set, the implementation will use the protocol\ndetermined by the route or listener configuration.\n\nSupport: Core - HTTP, HTTP2, H2C, and HTTP11\n\nSupport: Extended - GRPC, MCP, TCP",
+          "enum": [
+            "TCP",
+            "HTTP",
+            "HTTP2",
+            "HTTP11",
+            "H2C",
+            "MCP"
+          ],
+          "type": "string"
+        },
+        "tls": {
+          "description": "TLS defines the TLS configuration that the implementation should use\nwhen connecting to the backend.\n\nExternalHostname backends SHOULD have TLS configured; the lack of TLS\nfor external hostnames should be considered insecure and a security risk.\n\nSupport: Extended",
+          "properties": {
+            "clientCertificateRef": {
+              "description": "ClientCertificateRef is a reference to a Secret containing the client\nTLS certificate and private key for mutual TLS. This field is required\nwhen mode is ClientAndServer and must be unset otherwise.",
+              "properties": {
+                "group": {
+                  "default": "",
+                  "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                  "maxLength": 253,
+                  "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "kind": {
+                  "default": "Secret",
+                  "description": "Kind is kind of the referent. For example \"Secret\".",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name is the name of the referent.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "Namespace is the namespace of the referenced object. When unspecified, the local\nnamespace is inferred.\n\nNote that when a namespace different than the local namespace is specified,\na ReferenceGrant object is required in the referent namespace to allow that\nnamespace's owner to accept the reference. See the ReferenceGrant\ndocumentation for details.\n\nSupport: Core",
+                  "maxLength": 63,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "mode": {
+              "description": "Mode defines the TLS mode for the backend connection.",
+              "enum": [
+                "None",
+                "ServerOnly",
+                "ClientAndServer"
+              ],
+              "type": "string"
+            },
+            "validation": {
+              "description": "Validation contains TLS validation configuration for the backend connection.",
+              "properties": {
+                "caCertificateRefs": {
+                  "description": "CACertificateRefs contains one or more references to Kubernetes objects that\ncontain a PEM-encoded TLS CA certificate bundle, which is used to\nvalidate a TLS handshake between the Gateway and backend Pod.\n\nIf CACertificateRefs is empty or unspecified, then WellKnownCACertificates must be\nspecified. Only one of CACertificateRefs or WellKnownCACertificates may be specified,\nnot both. If CACertificateRefs is empty or unspecified, the configuration for\nWellKnownCACertificates MUST be honored instead if supported by the implementation.\n\nA CACertificateRef is invalid if:\n\n* It refers to a resource that cannot be resolved (e.g., the referenced resource\n  does not exist) or is misconfigured (e.g., a ConfigMap does not contain a key\n  named `ca.crt`). In this case, the Reason must be set to `InvalidCACertificateRef`\n  and the Message of the Condition must indicate which reference is invalid and why.\n\n* It refers to an unknown or unsupported kind of resource. In this case, the Reason\n  must be set to `InvalidKind` and the Message of the Condition must explain which\n  kind of resource is unknown or unsupported.\n\n* It refers to a resource in another namespace. This may change in future\n  spec updates.\n\nImplementations MAY choose to perform further validation of the certificate\ncontent (e.g., checking expiry or enforcing specific formats). In such cases,\nan implementation-specific Reason and Message must be set for the invalid reference.\n\nIn all cases, the implementation MUST ensure the `ResolvedRefs` Condition on\nthe BackendTLSPolicy is set to `status: False`, with a Reason and Message\nthat indicate the cause of the error. Connections using an invalid\nCACertificateRef MUST fail, and the client MUST receive an HTTP 5xx error\nresponse. If ALL CACertificateRefs are invalid, the implementation MUST also\nensure the `Accepted` Condition on the BackendTLSPolicy is set to\n`status: False`, with a Reason `NoValidCACertificate`.\n\nA single CACertificateRef to a Kubernetes ConfigMap kind has \"Core\" support.\nImplementations MAY choose to support attaching multiple certificates to\na backend, but this behavior is implementation-specific.\n\nSupport: Core - An optional single reference to a Kubernetes ConfigMap,\nwith the CA certificate in a key named `ca.crt`.\n\nSupport: Implementation-specific - More than one reference, other kinds\nof resources, or a single reference that includes multiple certificates.",
+                  "items": {
+                    "description": "LocalObjectReference identifies an API object within the namespace of the\nreferrer.\nThe API object must be valid in the cluster; the Group and Kind must\nbe registered in the cluster for this reference to be valid.\n\nReferences to objects with invalid Group and Kind are not valid, and must\nbe rejected by the implementation, with appropriate Conditions set\non the containing object.",
+                    "properties": {
+                      "group": {
+                        "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                        "maxLength": 253,
+                        "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                        "maxLength": 63,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Name is the name of the referent.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "group",
+                      "kind",
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 8,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "hostname": {
+                  "description": "Hostname is used for two purposes in the connection between Gateways and\nbackends:\n\n1. Hostname MUST be used as the SNI to connect to the backend (RFC 6066).\n2. Hostname MUST be used for authentication and MUST match the certificate\n   served by the matching backend, unless SubjectAltNames is specified.\n3. If SubjectAltNames are specified, Hostname can be used for certificate selection\n   but MUST NOT be used for authentication. If you want to use the value\n   of the Hostname field for authentication, you MUST add it to the SubjectAltNames list.\n\nSupport: Core",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "subjectAltNames": {
+                  "description": "SubjectAltNames contains one or more Subject Alternative Names.\nWhen specified the certificate served from the backend MUST\nhave at least one Subject Alternate Name matching one of the specified SubjectAltNames.\n\nSupport: Extended",
+                  "items": {
+                    "description": "SubjectAltName represents Subject Alternative Name.",
+                    "properties": {
+                      "hostname": {
+                        "description": "Hostname contains Subject Alternative Name specified in DNS name format.\nRequired when Type is set to Hostname, ignored otherwise.\n\nSupport: Core",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^(\\*\\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "Type determines the format of the Subject Alternative Name. Always required.\n\nSupport: Core",
+                        "enum": [
+                          "Hostname",
+                          "URI"
+                        ],
+                        "type": "string"
+                      },
+                      "uri": {
+                        "description": "URI contains Subject Alternative Name specified in a full URI format.\nIt MUST include both a scheme (e.g., \"http\" or \"ftp\") and a scheme-specific-part.\nCommon values include SPIFFE IDs like \"spiffe://mycluster.example.com/ns/myns/sa/svc1sa\".\nRequired when Type is set to URI, ignored otherwise.\n\nSupport: Core",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^(([^:/?#]+):)(//([^/?#]*))([^?#]*)(\\?([^#]*))?(#(.*))?",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "SubjectAltName element must contain Hostname, if Type is set to Hostname",
+                        "rule": "!(self.type == \"Hostname\" && (!has(self.hostname) || self.hostname == \"\"))"
+                      },
+                      {
+                        "message": "SubjectAltName element must not contain Hostname, if Type is not set to Hostname",
+                        "rule": "!(self.type != \"Hostname\" && has(self.hostname) && self.hostname != \"\")"
+                      },
+                      {
+                        "message": "SubjectAltName element must contain URI, if Type is set to URI",
+                        "rule": "!(self.type == \"URI\" && (!has(self.uri) || self.uri == \"\"))"
+                      },
+                      {
+                        "message": "SubjectAltName element must not contain URI, if Type is not set to URI",
+                        "rule": "!(self.type != \"URI\" && has(self.uri) && self.uri != \"\")"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 5,
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "wellKnownCACertificates": {
+                  "description": "WellKnownCACertificates specifies whether a well-known set of CA certificates\nmay be used in the TLS handshake between the gateway and backend pod.\n\nIf WellKnownCACertificates is unspecified or empty (\"\"), then CACertificateRefs\nmust be specified with at least one entry for a valid configuration. Only one of\nCACertificateRefs or WellKnownCACertificates may be specified, not both.\nIf an implementation does not support the WellKnownCACertificates field, or\nthe supplied value is not recognized, the implementation MUST ensure the\n`Accepted` Condition on the BackendTLSPolicy is set to `status: False`, with\na Reason `Invalid`.\n\nValid values include:\n* \"System\" - indicates that well-known system CA certificates should be used.\n\nImplementations MAY define their own sets of CA certificates. Such definitions\nMUST use an implementation-specific, prefixed name, such as\n`mycompany.com/my-custom-ca-certificates`.\n\nSupport: Implementation-specific",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^(System|([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/([A-Za-z0-9][-A-Za-z0-9_.]{0,61})?[A-Za-z0-9]))$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hostname"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "must not contain both CACertificateRefs and WellKnownCACertificates",
+                  "rule": "!(has(self.caCertificateRefs) && size(self.caCertificateRefs) > 0 && has(self.wellKnownCACertificates) && self.wellKnownCACertificates != \"\")"
+                },
+                {
+                  "message": "must specify either CACertificateRefs or WellKnownCACertificates",
+                  "rule": "(has(self.caCertificateRefs) && size(self.caCertificateRefs) > 0 || has(self.wellKnownCACertificates) && self.wellKnownCACertificates != \"\")"
+                }
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "clientCertificateRef must be set if and only if mode is ClientAndServer",
+              "rule": "self.mode == 'ClientAndServer' ? has(self.clientCertificateRef) : !has(self.clientCertificateRef)"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "type": {
+          "description": "Type defines the backend type.",
+          "enum": [
+            "ExternalHostname"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "port",
+        "type"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "externalHostname must be set when type is ExternalHostname and must be unset otherwise",
+          "rule": "self.type == 'ExternalHostname' ? has(self.externalHostname) : !has(self.externalHostname)"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status defines the current state of XBackend.",
+      "properties": {
+        "parents": {
+          "description": "Ancestors is a list of parent resources associated with this Backend,\nand the status of the Backend with respect to each parent.\n\nA maximum of 32 parents will be represented in this list. An empty list\nindicates that the Backend is not associated with any parents.",
+          "items": {
+            "description": "BackendAncestorStatus describes the status of a Backend with respect to a\nspecific parent resource (typically a Gateway).",
+            "properties": {
+              "conditions": {
+                "description": "For Kubernetes API conventions, see:\nhttps://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties\nconditions represent the current state of the Backend resource.\nEach condition has a unique type and reflects the status of a specific aspect of the resource.\n\nDefined condition types include:\n- \"Accepted\": the resource has been acknowledged and accepteed by the controller\n\nThe status of each condition is one of True, False, or Unknown.",
+                "items": {
+                  "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                      "maxLength": 32768,
+                      "type": "string"
+                    },
+                    "observedGeneration": {
+                      "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "status of the condition, one of True, False, Unknown.",
+                      "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                      "maxLength": 316,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lastTransitionTime",
+                    "message",
+                    "reason",
+                    "status",
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "controllerName": {
+                "description": "ControllerName is a domain/path string that indicates the name of the\ncontroller that manages the Backend.\n\nExample: \"example.net/gateway-controller\".\n\nThe format of this field is DOMAIN \"/\" PATH, where DOMAIN and PATH are\nvalid Kubernetes names\n(https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names).",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&'()*+,;=:]+$",
+                "type": "string"
+              },
+              "parentRef": {
+                "description": "AncestorRef identifies the parent resource that this status is associated with.",
+                "properties": {
+                  "group": {
+                    "default": "gateway.networking.k8s.io",
+                    "description": "Group is the group of the referent.\nWhen unspecified, \"gateway.networking.k8s.io\" is inferred.\nTo set the core API group (such as for a \"Service\" kind referent),\nGroup must be explicitly set to \"\" (empty string).\n\nSupport: Core",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "default": "Gateway",
+                    "description": "Kind is kind of the referent.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nSupport for other resources is Implementation-Specific.",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the referent. When unspecified, this refers\nto the local namespace of the Route.\n\nNote that there are specific rules for ParentRefs which cross namespace\nboundaries. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example:\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable any other kind of cross-namespace reference.\n\n\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.\n\n\nSupport: Core",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the network port this Route targets. It can be interpreted\ndifferently based on the type of parent resource.\n\nWhen the parent resource is a Gateway, this targets all listeners\nlistening on the specified port that also support this kind of Route(and\nselect this Route). It's not recommended to set `Port` unless the\nnetworking behaviors specified in a Route must apply to a specific port\nas opposed to a listener(s) whose port(s) may be changed. When both Port\nand SectionName are specified, the name and port of the selected listener\nmust match both specified values.\n\n\nWhen the parent resource is a Service, this targets a specific port in the\nService spec. When both Port (experimental) and SectionName are specified,\nthe name and port of the selected port must match both specified values.\n\n\nImplementations MAY choose to support other parent resources.\nImplementations supporting other types of parent resources MUST clearly\ndocument how/if Port is interpreted.\n\nFor the purpose of status, an attachment is considered successful as\nlong as the parent resource accepts it partially. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment\nfrom the referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route,\nthe Route MUST be considered detached from the Gateway.\n\nSupport: Extended",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sectionName": {
+                    "description": "SectionName is the name of a section within the target resource. In the\nfollowing resources, SectionName is interpreted as the following:\n\n* Gateway: Listener name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n* Service: Port name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n\nImplementations MAY choose to support attaching Routes to other resources.\nIf that is the case, they MUST clearly document how SectionName is\ninterpreted.\n\nWhen unspecified (empty string), this will reference the entire resource.\nFor the purpose of status, an attachment is considered successful if at\nleast one section in the parent resource accepts it. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment from\nthe referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route, the\nRoute MUST be considered detached from the Gateway.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "controllerName",
+              "parentRef"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

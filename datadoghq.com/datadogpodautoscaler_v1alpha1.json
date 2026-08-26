@@ -35,7 +35,8 @@
                     "description": "Specifies whether recommendations are made to Requests and Limits (RequestsAndLimits) or Requests only (RequestsOnly).\nThe default is \"RequestsAndLimits\".",
                     "enum": [
                       "RequestsAndLimits",
-                      "RequestsOnly"
+                      "RequestsOnly",
+                      "CPURequestsRemoveLimitsMemoryRequestsAndLimits"
                     ],
                     "type": "string"
                   },
@@ -229,11 +230,26 @@
             "update": {
               "description": "Update defines the policy to update target resource.",
               "properties": {
+                "resizePendingPeriod": {
+                  "description": "Controls how long we wait before forcing an eviction when the kubelet reports a resize as pending.\nMust be greater than 0 and less than or equal to 3600 (1 hour).",
+                  "format": "int32",
+                  "maximum": 3600,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "rolloutFallbackDelay": {
+                  "description": "Controls how long we wait before falling back to a full rollout when evictions are blocked.\nMust be greater than 0 and less than or equal to 3600 (1 hour).",
+                  "format": "int32",
+                  "maximum": 3600,
+                  "minimum": 1,
+                  "type": "integer"
+                },
                 "strategy": {
                   "description": "Strategy defines the mode of the update policy.",
                   "enum": [
                     "Auto",
-                    "Disabled"
+                    "Disabled",
+                    "TriggerRollout"
                   ],
                   "type": "string"
                 }
@@ -806,6 +822,17 @@
           "type": "object",
           "additionalProperties": false
         },
+        "options": {
+          "description": "Options reflects the effective options applied by the autoscaler.",
+          "properties": {
+            "burstable": {
+              "description": "Burstable is the effective value of the burstable setting applied by the autoscaler.\nWhen not set in the spec, this reflects the default determined by the Cluster Agent\nsetting autoscaling.workload.options.burstable.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "vertical": {
           "description": "Vertical is the status of the vertical scaling, if activated.",
           "properties": {
@@ -885,6 +912,11 @@
                     "additionalProperties": false
                   },
                   "type": "array"
+                },
+                "evicted": {
+                  "description": "Evicted is the number of pods evicted as an in-place resize fallback during the\ncurrent recommendation cycle. Resets when the recommendation changes.",
+                  "format": "int32",
+                  "type": "integer"
                 },
                 "generatedAt": {
                   "description": "GeneratedAt is the timestamp at which the recommendation was generated",

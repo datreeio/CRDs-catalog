@@ -129,6 +129,11 @@
               "type": "object",
               "additionalProperties": false
             },
+            "runningDeadlineSeconds": {
+              "default": 1200,
+              "format": "int64",
+              "type": "integer"
+            },
             "schedule": {
               "items": {
                 "properties": {
@@ -137,6 +142,30 @@
                   },
                   "name": {
                     "type": "string"
+                  },
+                  "retention": {
+                    "properties": {
+                      "count": {
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "deleteFromStorage": {
+                        "default": true,
+                        "type": "boolean"
+                      },
+                      "type": {
+                        "enum": [
+                          "count"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "deleteFromStorage",
+                      "type"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "schedule": {
                     "type": "string"
@@ -863,6 +892,9 @@
                       "endpointUrl": {
                         "type": "string"
                       },
+                      "prefix": {
+                        "type": "string"
+                      },
                       "storageClass": {
                         "type": "string"
                       }
@@ -938,6 +970,31 @@
                                   },
                                   "required": [
                                     "fieldPath"
+                                  ],
+                                  "type": "object",
+                                  "x-kubernetes-map-type": "atomic",
+                                  "additionalProperties": false
+                                },
+                                "fileKeyRef": {
+                                  "properties": {
+                                    "key": {
+                                      "type": "string"
+                                    },
+                                    "optional": {
+                                      "default": false,
+                                      "type": "boolean"
+                                    },
+                                    "path": {
+                                      "type": "string"
+                                    },
+                                    "volumeName": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "path",
+                                    "volumeName"
                                   ],
                                   "type": "object",
                                   "x-kubernetes-map-type": "atomic",
@@ -1328,14 +1385,54 @@
                       "bucket": {
                         "type": "string"
                       },
+                      "caBundle": {
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "default": "",
+                            "type": "string"
+                          },
+                          "optional": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "key"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "checksumAlgorithm": {
+                        "enum": [
+                          "CRC64NVME",
+                          "CRC32",
+                          "CRC32C",
+                          "SHA1",
+                          "SHA256",
+                          "MD5"
+                        ],
+                        "type": "string"
+                      },
                       "credentialsSecret": {
                         "type": "string"
                       },
                       "endpointUrl": {
                         "type": "string"
                       },
+                      "forcePathStyle": {
+                        "type": "boolean"
+                      },
+                      "prefix": {
+                        "type": "string"
+                      },
                       "region": {
                         "type": "string"
+                      },
+                      "skipBucketExistsCheck": {
+                        "type": "boolean"
                       }
                     },
                     "type": "object",
@@ -1649,6 +1746,10 @@
             },
             "suspendedDeadlineSeconds": {
               "format": "int64",
+              "type": "integer"
+            },
+            "ttlSecondsAfterFinished": {
+              "format": "int32",
               "type": "integer"
             }
           },
@@ -2502,6 +2603,9 @@
                   },
                   "type": "object"
                 },
+                "loadBalancerClass": {
+                  "type": "string"
+                },
                 "loadBalancerIP": {
                   "type": "string"
                 },
@@ -2511,14 +2615,17 @@
                   },
                   "type": "array"
                 },
-                "trafficPolicy": {
-                  "type": "string"
-                },
                 "type": {
                   "type": "string"
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "'loadBalancerClass' can only be set when service type is 'LoadBalancer'",
+                  "rule": "!(has(self.loadBalancerClass)) || self.type == 'LoadBalancer'"
+                }
+              ],
               "additionalProperties": false
             },
             "exposeReplicas": {
@@ -2544,6 +2651,9 @@
                   },
                   "type": "object"
                 },
+                "loadBalancerClass": {
+                  "type": "string"
+                },
                 "loadBalancerIP": {
                   "type": "string"
                 },
@@ -2556,25 +2666,75 @@
                 "onlyReaders": {
                   "type": "boolean"
                 },
-                "trafficPolicy": {
-                  "type": "string"
-                },
                 "type": {
                   "type": "string"
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "'loadBalancerClass' can only be set when service type is 'LoadBalancer'",
+                  "rule": "!(has(self.loadBalancerClass)) || self.type == 'LoadBalancer'"
+                }
+              ],
               "additionalProperties": false
             },
-            "externalTrafficPolicy": {
-              "type": "string"
-            },
-            "forceUnsafeBootstrap": {
-              "type": "boolean"
+            "extraPVCs": {
+              "items": {
+                "properties": {
+                  "claimName": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "mountPath": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "subPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimName",
+                  "mountPath",
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
             },
             "gracePeriod": {
               "format": "int64",
               "type": "integer"
+            },
+            "healthCheck": {
+              "properties": {
+                "fall": {
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "interval": {
+                  "format": "int32",
+                  "minimum": 1000,
+                  "type": "integer"
+                },
+                "rise": {
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             },
             "hookScript": {
               "type": "string"
@@ -2814,6 +2974,9 @@
                   },
                   "type": "object",
                   "additionalProperties": false
+                },
+                "stopSignal": {
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -2954,15 +3117,6 @@
               },
               "type": "object",
               "additionalProperties": false
-            },
-            "loadBalancerIP": {
-              "type": "string"
-            },
-            "loadBalancerSourceRanges": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
             },
             "nodeSelector": {
               "additionalProperties": {
@@ -3261,35 +3415,14 @@
               "type": "object",
               "additionalProperties": false
             },
-            "replicasExternalTrafficPolicy": {
-              "type": "string"
-            },
-            "replicasLoadBalancerIP": {
-              "type": "string"
-            },
             "replicasLoadBalancerSourceRanges": {
               "items": {
                 "type": "string"
               },
               "type": "array"
             },
-            "replicasServiceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
             "replicasServiceEnabled": {
               "type": "boolean"
-            },
-            "replicasServiceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "replicasServiceType": {
-              "type": "string"
             },
             "resources": {
               "properties": {
@@ -3358,21 +3491,6 @@
             "serviceAccountName": {
               "type": "string"
             },
-            "serviceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceType": {
-              "type": "string"
-            },
             "sidecarPVCs": {
               "items": {
                 "properties": {
@@ -3383,7 +3501,34 @@
                     "type": "string"
                   },
                   "metadata": {
-                    "type": "object"
+                    "properties": {
+                      "annotations": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "finalizers": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "labels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "spec": {
                     "properties": {
@@ -4019,7 +4164,34 @@
                       "volumeClaimTemplate": {
                         "properties": {
                           "metadata": {
-                            "type": "object"
+                            "properties": {
+                              "annotations": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "finalizers": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "labels": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "spec": {
                             "properties": {
@@ -4644,6 +4816,41 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "podCertificate": {
+                              "properties": {
+                                "certificateChainPath": {
+                                  "type": "string"
+                                },
+                                "credentialBundlePath": {
+                                  "type": "string"
+                                },
+                                "keyPath": {
+                                  "type": "string"
+                                },
+                                "keyType": {
+                                  "type": "string"
+                                },
+                                "maxExpirationSeconds": {
+                                  "format": "int32",
+                                  "type": "integer"
+                                },
+                                "signerName": {
+                                  "type": "string"
+                                },
+                                "userAnnotations": {
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  },
+                                  "type": "object"
+                                }
+                              },
+                              "required": [
+                                "keyType",
+                                "signerName"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "secret": {
                               "properties": {
                                 "items": {
@@ -5003,6 +5210,31 @@
                               "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
+                            "fileKeyRef": {
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "optional": {
+                                  "default": false,
+                                  "type": "boolean"
+                                },
+                                "path": {
+                                  "type": "string"
+                                },
+                                "volumeName": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "path",
+                                "volumeName"
+                              ],
+                              "type": "object",
+                              "x-kubernetes-map-type": "atomic",
+                              "additionalProperties": false
+                            },
                             "resourceFieldRef": {
                               "properties": {
                                 "containerName": {
@@ -5324,6 +5556,9 @@
                         },
                         "type": "object",
                         "additionalProperties": false
+                      },
+                      "stopSignal": {
+                        "type": "string"
                       }
                     },
                     "type": "object",
@@ -5711,6 +5946,42 @@
                   },
                   "restartPolicy": {
                     "type": "string"
+                  },
+                  "restartPolicyRules": {
+                    "items": {
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "exitCodes": {
+                          "properties": {
+                            "operator": {
+                              "type": "string"
+                            },
+                            "values": {
+                              "items": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "set"
+                            }
+                          },
+                          "required": [
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "action"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
                   },
                   "securityContext": {
                     "properties": {
@@ -6687,6 +6958,30 @@
             "imagePullPolicy": {
               "type": "string"
             },
+            "logRotate": {
+              "properties": {
+                "configuration": {
+                  "type": "string"
+                },
+                "extraConfig": {
+                  "properties": {
+                    "name": {
+                      "default": "",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-map-type": "atomic",
+                  "additionalProperties": false
+                },
+                "schedule": {
+                  "default": "0 0 * * *",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "resources": {
               "properties": {
                 "claims": {
@@ -6750,6 +7045,39 @@
             }
           },
           "type": "object",
+          "additionalProperties": false
+        },
+        "passwordGenerationOptions": {
+          "properties": {
+            "maxLength": {
+              "default": 20,
+              "maximum": 32,
+              "minimum": 8,
+              "type": "integer"
+            },
+            "minLength": {
+              "default": 16,
+              "maximum": 32,
+              "minimum": 8,
+              "type": "integer"
+            },
+            "symbols": {
+              "default": "!#$%&()*+,-.<=>?@[]^_{}~",
+              "maxLength": 32,
+              "type": "string"
+            }
+          },
+          "required": [
+            "maxLength",
+            "minLength",
+            "symbols"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "rule": "self.maxLength >= self.minLength"
+            }
+          ],
           "additionalProperties": false
         },
         "pause": {
@@ -6874,6 +7202,9 @@
               },
               "type": "object",
               "additionalProperties": false
+            },
+            "customClusterName": {
+              "type": "string"
             },
             "enabled": {
               "type": "boolean"
@@ -8063,6 +8394,9 @@
                   },
                   "type": "object"
                 },
+                "loadBalancerClass": {
+                  "type": "string"
+                },
                 "loadBalancerIP": {
                   "type": "string"
                 },
@@ -8072,21 +8406,50 @@
                   },
                   "type": "array"
                 },
-                "trafficPolicy": {
-                  "type": "string"
-                },
                 "type": {
                   "type": "string"
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "'loadBalancerClass' can only be set when service type is 'LoadBalancer'",
+                  "rule": "!(has(self.loadBalancerClass)) || self.type == 'LoadBalancer'"
+                }
+              ],
               "additionalProperties": false
             },
-            "externalTrafficPolicy": {
-              "type": "string"
-            },
-            "forceUnsafeBootstrap": {
-              "type": "boolean"
+            "extraPVCs": {
+              "items": {
+                "properties": {
+                  "claimName": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "mountPath": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "subPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimName",
+                  "mountPath",
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
             },
             "gracePeriod": {
               "format": "int64",
@@ -8330,6 +8693,9 @@
                   },
                   "type": "object",
                   "additionalProperties": false
+                },
+                "stopSignal": {
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -8470,15 +8836,6 @@
               },
               "type": "object",
               "additionalProperties": false
-            },
-            "loadBalancerIP": {
-              "type": "string"
-            },
-            "loadBalancerSourceRanges": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
             },
             "nodeSelector": {
               "additionalProperties": {
@@ -8777,24 +9134,6 @@
               "type": "object",
               "additionalProperties": false
             },
-            "replicasExternalTrafficPolicy": {
-              "type": "string"
-            },
-            "replicasServiceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "replicasServiceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "replicasServiceType": {
-              "type": "string"
-            },
             "resources": {
               "properties": {
                 "claims": {
@@ -8856,25 +9195,53 @@
             "runtimeClassName": {
               "type": "string"
             },
+            "scheduler": {
+              "properties": {
+                "checkTimeoutMilliseconds": {
+                  "default": 2000,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "failureThreshold": {
+                  "default": 3,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "maxConnections": {
+                  "default": 1000,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "nodeCheckIntervalMilliseconds": {
+                  "default": 2000,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "pingTimeoutMilliseconds": {
+                  "default": 1000,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "successThreshold": {
+                  "default": 1,
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "writerIsAlsoReader": {
+                  "default": true,
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "schedulerName": {
               "type": "string"
             },
             "serviceAccountName": {
-              "type": "string"
-            },
-            "serviceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceType": {
               "type": "string"
             },
             "sidecarPVCs": {
@@ -8887,7 +9254,34 @@
                     "type": "string"
                   },
                   "metadata": {
-                    "type": "object"
+                    "properties": {
+                      "annotations": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "finalizers": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "labels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "spec": {
                     "properties": {
@@ -9523,7 +9917,34 @@
                       "volumeClaimTemplate": {
                         "properties": {
                           "metadata": {
-                            "type": "object"
+                            "properties": {
+                              "annotations": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "finalizers": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "labels": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "spec": {
                             "properties": {
@@ -10148,6 +10569,41 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "podCertificate": {
+                              "properties": {
+                                "certificateChainPath": {
+                                  "type": "string"
+                                },
+                                "credentialBundlePath": {
+                                  "type": "string"
+                                },
+                                "keyPath": {
+                                  "type": "string"
+                                },
+                                "keyType": {
+                                  "type": "string"
+                                },
+                                "maxExpirationSeconds": {
+                                  "format": "int32",
+                                  "type": "integer"
+                                },
+                                "signerName": {
+                                  "type": "string"
+                                },
+                                "userAnnotations": {
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  },
+                                  "type": "object"
+                                }
+                              },
+                              "required": [
+                                "keyType",
+                                "signerName"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "secret": {
                               "properties": {
                                 "items": {
@@ -10507,6 +10963,31 @@
                               "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
+                            "fileKeyRef": {
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "optional": {
+                                  "default": false,
+                                  "type": "boolean"
+                                },
+                                "path": {
+                                  "type": "string"
+                                },
+                                "volumeName": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "path",
+                                "volumeName"
+                              ],
+                              "type": "object",
+                              "x-kubernetes-map-type": "atomic",
+                              "additionalProperties": false
+                            },
                             "resourceFieldRef": {
                               "properties": {
                                 "containerName": {
@@ -10828,6 +11309,9 @@
                         },
                         "type": "object",
                         "additionalProperties": false
+                      },
+                      "stopSignal": {
+                        "type": "string"
                       }
                     },
                     "type": "object",
@@ -11215,6 +11699,42 @@
                   },
                   "restartPolicy": {
                     "type": "string"
+                  },
+                  "restartPolicyRules": {
+                    "items": {
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "exitCodes": {
+                          "properties": {
+                            "operator": {
+                              "type": "string"
+                            },
+                            "values": {
+                              "items": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "set"
+                            }
+                          },
+                          "required": [
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "action"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
                   },
                   "securityContext": {
                     "properties": {
@@ -12700,6 +13220,9 @@
                   },
                   "type": "object"
                 },
+                "loadBalancerClass": {
+                  "type": "string"
+                },
                 "loadBalancerIP": {
                   "type": "string"
                 },
@@ -12709,21 +13232,50 @@
                   },
                   "type": "array"
                 },
-                "trafficPolicy": {
-                  "type": "string"
-                },
                 "type": {
                   "type": "string"
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "'loadBalancerClass' can only be set when service type is 'LoadBalancer'",
+                  "rule": "!(has(self.loadBalancerClass)) || self.type == 'LoadBalancer'"
+                }
+              ],
               "additionalProperties": false
             },
-            "externalTrafficPolicy": {
-              "type": "string"
-            },
-            "forceUnsafeBootstrap": {
-              "type": "boolean"
+            "extraPVCs": {
+              "items": {
+                "properties": {
+                  "claimName": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "mountPath": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "subPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "claimName",
+                  "mountPath",
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
             },
             "gracePeriod": {
               "format": "int64",
@@ -12967,6 +13519,9 @@
                   },
                   "type": "object",
                   "additionalProperties": false
+                },
+                "stopSignal": {
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -13108,14 +13663,12 @@
               "type": "object",
               "additionalProperties": false
             },
-            "loadBalancerIP": {
+            "mysqlAllocator": {
+              "enum": [
+                "jemalloc",
+                "tcmalloc"
+              ],
               "type": "string"
-            },
-            "loadBalancerSourceRanges": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
             },
             "nodeSelector": {
               "additionalProperties": {
@@ -13414,24 +13967,6 @@
               "type": "object",
               "additionalProperties": false
             },
-            "replicasExternalTrafficPolicy": {
-              "type": "string"
-            },
-            "replicasServiceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "replicasServiceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "replicasServiceType": {
-              "type": "string"
-            },
             "replicationChannels": {
               "items": {
                 "properties": {
@@ -13553,21 +14088,6 @@
             "serviceAccountName": {
               "type": "string"
             },
-            "serviceAnnotations": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceLabels": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
-            },
-            "serviceType": {
-              "type": "string"
-            },
             "sidecarPVCs": {
               "items": {
                 "properties": {
@@ -13578,7 +14098,34 @@
                     "type": "string"
                   },
                   "metadata": {
-                    "type": "object"
+                    "properties": {
+                      "annotations": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "finalizers": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "labels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "spec": {
                     "properties": {
@@ -14214,7 +14761,34 @@
                       "volumeClaimTemplate": {
                         "properties": {
                           "metadata": {
-                            "type": "object"
+                            "properties": {
+                              "annotations": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "finalizers": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "labels": {
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "type": "object"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
                           },
                           "spec": {
                             "properties": {
@@ -14839,6 +15413,41 @@
                               "type": "object",
                               "additionalProperties": false
                             },
+                            "podCertificate": {
+                              "properties": {
+                                "certificateChainPath": {
+                                  "type": "string"
+                                },
+                                "credentialBundlePath": {
+                                  "type": "string"
+                                },
+                                "keyPath": {
+                                  "type": "string"
+                                },
+                                "keyType": {
+                                  "type": "string"
+                                },
+                                "maxExpirationSeconds": {
+                                  "format": "int32",
+                                  "type": "integer"
+                                },
+                                "signerName": {
+                                  "type": "string"
+                                },
+                                "userAnnotations": {
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  },
+                                  "type": "object"
+                                }
+                              },
+                              "required": [
+                                "keyType",
+                                "signerName"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "secret": {
                               "properties": {
                                 "items": {
@@ -15198,6 +15807,31 @@
                               "x-kubernetes-map-type": "atomic",
                               "additionalProperties": false
                             },
+                            "fileKeyRef": {
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "optional": {
+                                  "default": false,
+                                  "type": "boolean"
+                                },
+                                "path": {
+                                  "type": "string"
+                                },
+                                "volumeName": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "path",
+                                "volumeName"
+                              ],
+                              "type": "object",
+                              "x-kubernetes-map-type": "atomic",
+                              "additionalProperties": false
+                            },
                             "resourceFieldRef": {
                               "properties": {
                                 "containerName": {
@@ -15519,6 +16153,9 @@
                         },
                         "type": "object",
                         "additionalProperties": false
+                      },
+                      "stopSignal": {
+                        "type": "string"
                       }
                     },
                     "type": "object",
@@ -15907,6 +16544,42 @@
                   "restartPolicy": {
                     "type": "string"
                   },
+                  "restartPolicyRules": {
+                    "items": {
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "exitCodes": {
+                          "properties": {
+                            "operator": {
+                              "type": "string"
+                            },
+                            "values": {
+                              "items": {
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "set"
+                            }
+                          },
+                          "required": [
+                            "operator"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "action"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
                   "securityContext": {
                     "properties": {
                       "allowPrivilegeEscalation": {
@@ -16252,6 +16925,11 @@
             "sslSecretName": {
               "type": "string"
             },
+            "sstRetryCount": {
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            },
             "tolerations": {
               "items": {
                 "properties": {
@@ -16559,6 +17237,64 @@
         "sslSecretName": {
           "type": "string"
         },
+        "storageScaling": {
+          "properties": {
+            "autoscaling": {
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "growthStep": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "default": "2Gi",
+                  "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                  "x-kubernetes-int-or-string": true
+                },
+                "maxSize": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ],
+                  "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                  "x-kubernetes-int-or-string": true
+                },
+                "triggerThresholdPercent": {
+                  "default": 80,
+                  "maximum": 95,
+                  "minimum": 50,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "enableExternalAutoscaling": {
+              "type": "boolean"
+            },
+            "enableVolumeScaling": {
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "autoscaling cannot be enabled when enableVolumeScaling is disabled",
+              "rule": "!has(self.autoscaling) || !has(self.autoscaling.enabled) || !self.autoscaling.enabled || self.enableVolumeScaling"
+            }
+          ],
+          "additionalProperties": false
+        },
         "tls": {
           "properties": {
             "SANs": {
@@ -16566,6 +17302,12 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            "caValidityDuration": {
+              "type": "string"
+            },
+            "certValidityDuration": {
+              "type": "string"
             },
             "enabled": {
               "type": "boolean"
@@ -16907,12 +17649,55 @@
           "format": "int32",
           "type": "integer"
         },
+        "recovery": {
+          "properties": {
+            "clusterUUID": {
+              "type": "string"
+            },
+            "lastRecoveryPod": {
+              "type": "string"
+            },
+            "lastRecoverySeqNo": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "lastRecoveryTime": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "size": {
           "format": "int32",
           "type": "integer"
         },
         "state": {
           "type": "string"
+        },
+        "storageAutoscaling": {
+          "additionalProperties": {
+            "properties": {
+              "currentSize": {
+                "type": "string"
+              },
+              "lastError": {
+                "type": "string"
+              },
+              "lastResizeTime": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "resizeCount": {
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "object"
         }
       },
       "type": "object",

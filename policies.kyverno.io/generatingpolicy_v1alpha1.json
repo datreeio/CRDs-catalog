@@ -14,6 +14,29 @@
     "spec": {
       "description": "GeneratingPolicySpec is the specification of the desired behavior of the GeneratingPolicy.",
       "properties": {
+        "auditAnnotations": {
+          "description": "AuditAnnotations contains CEL expressions which are used to produce audit annotations for the audit event of the\nAPI server. auditAnnotations are evaluated after the policy has been evaluated but before the decision is logged.\nThe results of evaluating the expressions are attached to the audit event as annotations with the key\n\"<policy name>/<key>\".\nIf the expression evaluates to an empty string or null the annotation will not be included in the audit event.",
+          "items": {
+            "description": "AuditAnnotation describes how to produce an audit annotation for an API request.",
+            "properties": {
+              "key": {
+                "description": "key specifies the audit annotation key. The audit annotation keys of\na ValidatingAdmissionPolicy must be unique. The key must be a qualified\nname ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.\n\nThe key is combined with the resource name of the\nValidatingAdmissionPolicy to construct an audit annotation key:\n\"{ValidatingAdmissionPolicy name}/{key}\".\n\nIf an admission webhook uses the same resource name as this ValidatingAdmissionPolicy\nand the same audit annotation key, the annotation key will be identical.\nIn this case, the first annotation written with the key will be included\nin the audit event and all subsequent annotations with the same key\nwill be discarded.\n\nRequired.",
+                "type": "string"
+              },
+              "valueExpression": {
+                "description": "valueExpression represents the expression which is evaluated by CEL to\nproduce an audit annotation value. The expression must evaluate to either\na string or null value. If the expression evaluates to a string, the\naudit annotation is included with the string value. If the expression\nevaluates to null or empty string the audit annotation will be omitted.\nThe valueExpression may be no longer than 5kb in length.\nIf the result of the valueExpression is more than 10kb in length, it\nwill be truncated to 10kb.\n\nIf multiple ValidatingAdmissionPolicyBinding resources match an\nAPI request, then the valueExpression will be evaluated for\neach binding. All unique values produced by the valueExpressions\nwill be joined together in a comma-separated list.\n\nRequired.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "valueExpression"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "evaluation": {
           "description": "EvaluationConfiguration defines the configuration for the policy evaluation.",
           "properties": {
@@ -53,6 +76,11 @@
               "type": "object",
               "additionalProperties": false
             },
+            "skipBackgroundRequests": {
+              "default": true,
+              "description": "SkipBackgroundRequests bypasses admission requests that are sent by the background controller.\nThe default value is set to \"true\", it must be set to \"false\" to apply generateExisting rules to those requests.",
+              "type": "boolean"
+            },
             "synchronize": {
               "description": "Synchronization defines the configuration for the synchronization of generated resources.",
               "properties": {
@@ -77,9 +105,39 @@
               "expression": {
                 "description": "Expression is a CEL expression that takes a list of resources to be generated.",
                 "type": "string"
+              },
+              "template": {
+                "description": "Template declares the resources to be generated as a YAML document,\nwith optional CEL interpolation.",
+                "properties": {
+                  "interpolate": {
+                    "default": "none",
+                    "description": "Interpolate controls placeholder evaluation in Value:\n\"none\" (default) treats Value as plain YAML;\n\"cel\" evaluates `(( ... ))` placeholders as CEL expressions before the YAML is parsed.",
+                    "enum": [
+                      "none",
+                      "cel"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "Value is a YAML string, single or multi-document, defining the resources to generate.\nThe namespace of each generated resource is taken from its rendered metadata.namespace,\nresources without a namespace are treated as cluster-scoped.",
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "value"
+                ],
+                "type": "object",
+                "additionalProperties": false
               }
             },
             "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "exactly one of expression or template must be set",
+                "rule": "(has(self.expression) && !has(self.template)) || (!has(self.expression) && has(self.template))"
+              }
+            ],
             "additionalProperties": false
           },
           "minItems": 1,
@@ -333,6 +391,10 @@
           "type": "object",
           "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
+        },
+        "useServerSideApply": {
+          "description": "UseServerSideApply controls whether to use server-side apply for generate rules.\nIf set to \"true\", create & update for generated resources will use apply instead of create/update.\nDefaults to \"false\" if not specified.",
+          "type": "boolean"
         },
         "variables": {
           "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy\nexcept MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",

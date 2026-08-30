@@ -14,6 +14,29 @@
     "spec": {
       "description": "MutatingPolicySpec is the specification of the desired behavior of the MutatingPolicy.",
       "properties": {
+        "auditAnnotations": {
+          "description": "AuditAnnotations contains CEL expressions which are used to produce audit annotations that are surfaced\nas properties in policy report results. auditAnnotations are evaluated after the mutations have been\napplied successfully. The results of evaluating the expressions are attached to the report result as\nproperties with the annotation key.\nIf the expression evaluates to an empty string or null the annotation will not be included.",
+          "items": {
+            "description": "AuditAnnotation describes how to produce an audit annotation for an API request.",
+            "properties": {
+              "key": {
+                "description": "key specifies the audit annotation key. The audit annotation keys of\na ValidatingAdmissionPolicy must be unique. The key must be a qualified\nname ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.\n\nThe key is combined with the resource name of the\nValidatingAdmissionPolicy to construct an audit annotation key:\n\"{ValidatingAdmissionPolicy name}/{key}\".\n\nIf an admission webhook uses the same resource name as this ValidatingAdmissionPolicy\nand the same audit annotation key, the annotation key will be identical.\nIn this case, the first annotation written with the key will be included\nin the audit event and all subsequent annotations with the same key\nwill be discarded.\n\nRequired.",
+                "type": "string"
+              },
+              "valueExpression": {
+                "description": "valueExpression represents the expression which is evaluated by CEL to\nproduce an audit annotation value. The expression must evaluate to either\na string or null value. If the expression evaluates to a string, the\naudit annotation is included with the string value. If the expression\nevaluates to null or empty string the audit annotation will be omitted.\nThe valueExpression may be no longer than 5kb in length.\nIf the result of the valueExpression is more than 10kb in length, it\nwill be truncated to 10kb.\n\nIf multiple ValidatingAdmissionPolicyBinding resources match an\nAPI request, then the valueExpression will be evaluated for\neach binding. All unique values produced by the valueExpressions\nwill be joined together in a comma-separated list.\n\nRequired.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "valueExpression"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
         "autogen": {
           "description": "AutogenConfiguration defines the configuration for the generation controller.",
           "properties": {
@@ -87,6 +110,15 @@
               },
               "type": "object",
               "additionalProperties": false
+            },
+            "skipBackgroundRequests": {
+              "default": true,
+              "description": "SkipBackgroundRequests bypasses admission requests that are sent by the background controller.\nThe default value is set to \"true\", it must be set to \"false\" to apply mutateExisting rules to those requests.",
+              "type": "boolean"
+            },
+            "useServerSideApply": {
+              "description": "UseServerSideApply applies ApplyConfiguration patches with Server-Side Apply semantics,\nwhich allows setting atomic fields (for example a container's args or a projected volume)\nthat the default MutatingAdmissionPolicy behaviour rejects. When true, an atomic value is\nreplaced as a whole, so any field the object owner set but the patch does not is dropped.\nThe default is false, which keeps parity with a native MutatingAdmissionPolicy.",
+              "type": "boolean"
             }
           },
           "type": "object",
@@ -128,7 +160,7 @@
           "x-kubernetes-list-type": "map"
         },
         "matchConstraints": {
-          "description": "MatchConstraints specifies what resources this policy is designed to evaluate.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nRequired.",
+          "description": "MatchConstraints specifies the trigger resources this policy is designed to evaluate.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nTrigger constraints and MatchConditions are evaluated before target resolution.\nRequired.",
           "properties": {
             "excludeResourceRules": {
               "description": "ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.\nThe exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
@@ -394,8 +426,35 @@
           "description": "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding\nas part of a single admission evaluation.\nAllowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of\norder with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only\nreinvoked when mutations change the object after this mutation is invoked.\nRequired.",
           "type": "string"
         },
+        "targetMatchConditions": {
+          "description": "TargetMatchConditions is a list of conditions that must be met for a resolved target resource.\nTarget match conditions are evaluated after variables and target resolution. They can reference\nvariables and use Object to refer to the target resource.",
+          "items": {
+            "description": "MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.",
+            "properties": {
+              "expression": {
+                "description": "Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.\nCEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:\n\n'object' - The object from the incoming request. The value is null for DELETE requests.\n'oldObject' - The existing object. The value is null for CREATE requests.\n'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).\n'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\nDocumentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/\n\nRequired.",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is an identifier for this match condition, used for strategic merging of MatchConditions,\nas well as providing an identifier for logging purposes. A good name should be descriptive of\nthe associated expression.\nName must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and\nmust start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or\n'123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an\noptional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')\n\nRequired.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "expression",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "targetMatchConstraints": {
-          "description": "TargetMatchConstraints specifies what target mutation resources this policy is designed to evaluate.",
+          "description": "TargetMatchConstraints resolves the resources to mutate after Variables are evaluated.",
           "properties": {
             "excludeResourceRules": {
               "description": "ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.\nThe exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
@@ -456,6 +515,7 @@
               "x-kubernetes-list-type": "atomic"
             },
             "expression": {
+              "description": "Expression resolves one target object or a list of target objects. The expression can use\nvariables computed from the trigger request.",
               "type": "string"
             },
             "matchPolicy": {
@@ -620,7 +680,7 @@
           "additionalProperties": false
         },
         "variables": {
-          "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy\nexcept MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",
+          "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy,\nincluding MatchConditions where they are evaluated lazily on first reference.\nNote that a native Kubernetes MutatingAdmissionPolicy does not support variables in match\nconditions; policies that generate a MutatingAdmissionPolicy through autogen should not\nreference variables in MatchConditions.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",
           "items": {
             "description": "Variable is the definition of a variable that is used for composition. A variable is defined as a named expression.",
             "properties": {
@@ -674,6 +734,29 @@
                   "spec": {
                     "description": "MutatingPolicySpec is the specification of the desired behavior of the MutatingPolicy.",
                     "properties": {
+                      "auditAnnotations": {
+                        "description": "AuditAnnotations contains CEL expressions which are used to produce audit annotations that are surfaced\nas properties in policy report results. auditAnnotations are evaluated after the mutations have been\napplied successfully. The results of evaluating the expressions are attached to the report result as\nproperties with the annotation key.\nIf the expression evaluates to an empty string or null the annotation will not be included.",
+                        "items": {
+                          "description": "AuditAnnotation describes how to produce an audit annotation for an API request.",
+                          "properties": {
+                            "key": {
+                              "description": "key specifies the audit annotation key. The audit annotation keys of\na ValidatingAdmissionPolicy must be unique. The key must be a qualified\nname ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.\n\nThe key is combined with the resource name of the\nValidatingAdmissionPolicy to construct an audit annotation key:\n\"{ValidatingAdmissionPolicy name}/{key}\".\n\nIf an admission webhook uses the same resource name as this ValidatingAdmissionPolicy\nand the same audit annotation key, the annotation key will be identical.\nIn this case, the first annotation written with the key will be included\nin the audit event and all subsequent annotations with the same key\nwill be discarded.\n\nRequired.",
+                              "type": "string"
+                            },
+                            "valueExpression": {
+                              "description": "valueExpression represents the expression which is evaluated by CEL to\nproduce an audit annotation value. The expression must evaluate to either\na string or null value. If the expression evaluates to a string, the\naudit annotation is included with the string value. If the expression\nevaluates to null or empty string the audit annotation will be omitted.\nThe valueExpression may be no longer than 5kb in length.\nIf the result of the valueExpression is more than 10kb in length, it\nwill be truncated to 10kb.\n\nIf multiple ValidatingAdmissionPolicyBinding resources match an\nAPI request, then the valueExpression will be evaluated for\neach binding. All unique values produced by the valueExpressions\nwill be joined together in a comma-separated list.\n\nRequired.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "valueExpression"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      },
                       "autogen": {
                         "description": "AutogenConfiguration defines the configuration for the generation controller.",
                         "properties": {
@@ -747,6 +830,15 @@
                             },
                             "type": "object",
                             "additionalProperties": false
+                          },
+                          "skipBackgroundRequests": {
+                            "default": true,
+                            "description": "SkipBackgroundRequests bypasses admission requests that are sent by the background controller.\nThe default value is set to \"true\", it must be set to \"false\" to apply mutateExisting rules to those requests.",
+                            "type": "boolean"
+                          },
+                          "useServerSideApply": {
+                            "description": "UseServerSideApply applies ApplyConfiguration patches with Server-Side Apply semantics,\nwhich allows setting atomic fields (for example a container's args or a projected volume)\nthat the default MutatingAdmissionPolicy behaviour rejects. When true, an atomic value is\nreplaced as a whole, so any field the object owner set but the patch does not is dropped.\nThe default is false, which keeps parity with a native MutatingAdmissionPolicy.",
+                            "type": "boolean"
                           }
                         },
                         "type": "object",
@@ -788,7 +880,7 @@
                         "x-kubernetes-list-type": "map"
                       },
                       "matchConstraints": {
-                        "description": "MatchConstraints specifies what resources this policy is designed to evaluate.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nRequired.",
+                        "description": "MatchConstraints specifies the trigger resources this policy is designed to evaluate.\nThe AdmissionPolicy cares about a request if it matches _all_ Constraints.\nTrigger constraints and MatchConditions are evaluated before target resolution.\nRequired.",
                         "properties": {
                           "excludeResourceRules": {
                             "description": "ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.\nThe exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
@@ -1054,8 +1146,35 @@
                         "description": "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding\nas part of a single admission evaluation.\nAllowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of\norder with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only\nreinvoked when mutations change the object after this mutation is invoked.\nRequired.",
                         "type": "string"
                       },
+                      "targetMatchConditions": {
+                        "description": "TargetMatchConditions is a list of conditions that must be met for a resolved target resource.\nTarget match conditions are evaluated after variables and target resolution. They can reference\nvariables and use Object to refer to the target resource.",
+                        "items": {
+                          "description": "MatchCondition represents a condition which must by fulfilled for a request to be sent to a webhook.",
+                          "properties": {
+                            "expression": {
+                              "description": "Expression represents the expression which will be evaluated by CEL. Must evaluate to bool.\nCEL expressions have access to the contents of the AdmissionRequest and Authorizer, organized into CEL variables:\n\n'object' - The object from the incoming request. The value is null for DELETE requests.\n'oldObject' - The existing object. The value is null for CREATE requests.\n'request' - Attributes of the admission request(/pkg/apis/admission/types.go#AdmissionRequest).\n'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\nDocumentation on CEL: https://kubernetes.io/docs/reference/using-api/cel/\n\nRequired.",
+                              "type": "string"
+                            },
+                            "name": {
+                              "description": "Name is an identifier for this match condition, used for strategic merging of MatchConditions,\nas well as providing an identifier for logging purposes. A good name should be descriptive of\nthe associated expression.\nName must be a qualified name consisting of alphanumeric characters, '-', '_' or '.', and\nmust start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or\n'123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]') with an\noptional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')\n\nRequired.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "expression",
+                            "name"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "name"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      },
                       "targetMatchConstraints": {
-                        "description": "TargetMatchConstraints specifies what target mutation resources this policy is designed to evaluate.",
+                        "description": "TargetMatchConstraints resolves the resources to mutate after Variables are evaluated.",
                         "properties": {
                           "excludeResourceRules": {
                             "description": "ExcludeResourceRules describes what operations on what resources/subresources the ValidatingAdmissionPolicy should not care about.\nThe exclude rules take precedence over include rules (if a resource matches both, it is excluded)",
@@ -1116,6 +1235,7 @@
                             "x-kubernetes-list-type": "atomic"
                           },
                           "expression": {
+                            "description": "Expression resolves one target object or a list of target objects. The expression can use\nvariables computed from the trigger request.",
                             "type": "string"
                           },
                           "matchPolicy": {
@@ -1280,7 +1400,7 @@
                         "additionalProperties": false
                       },
                       "variables": {
-                        "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy\nexcept MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",
+                        "description": "Variables contain definitions of variables that can be used in composition of other expressions.\nEach variable is defined as a named CEL expression.\nThe variables defined here will be available under `variables` in other expressions of the policy,\nincluding MatchConditions where they are evaluated lazily on first reference.\nNote that a native Kubernetes MutatingAdmissionPolicy does not support variables in match\nconditions; policies that generate a MutatingAdmissionPolicy through autogen should not\nreference variables in MatchConditions.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after.\nThus, Variables must be sorted by the order of first appearance and acyclic.",
                         "items": {
                           "description": "Variable is the definition of a variable that is used for composition. A variable is defined as a named expression.",
                           "properties": {

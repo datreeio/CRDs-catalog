@@ -18,7 +18,7 @@
           "description": "Aws is the AWS backend configuration.",
           "properties": {
             "accountId": {
-              "description": "AccountId is the AWS account ID to use for the backend.",
+              "description": "AccountId is the AWS account ID to use for the backend.\nDeprecated: Set accountId on spec.aws.lambda instead. This field is kept for backward compatibility.\nWhen both fields are set, spec.aws.lambda.accountId takes precedence.",
               "maxLength": 12,
               "minLength": 1,
               "pattern": "^[0-9]{12}$",
@@ -27,8 +27,25 @@
             "auth": {
               "description": "Auth specifies an explicit AWS authentication method for the backend.\nWhen omitted, the following credential providers are tried in order, stopping when one\nof them returns an access key ID and a secret access key (the session token is optional):\n1. Environment variables: when the environment variables AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_SESSION_TOKEN are set.\n2. AssumeRoleWithWebIdentity API call: when the environment variables AWS_WEB_IDENTITY_TOKEN_FILE and AWS_ROLE_ARN are set.\n3. EKS Pod Identity: when the environment variable AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE is set.\n\nSee the Envoy docs for more info:\nhttps://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_request_signing_filter#credentials",
               "properties": {
+                "assumeRole": {
+                  "description": "AssumeRole configures STS role chaining. The backend's ambient credentials\n(the gateway ServiceAccount's IRSA identity for Lambda request signing, or the\ncontroller's identity for EC2 discovery; more generally any credential resolved\nby the default provider chain) are used to assume the target role. The resulting\ntemporary credentials are then used to sign requests to the backend (Lambda) or\nto list instances (EC2). This enables per-backend, least-privilege roles without\ngranting the gateway/controller role direct access to every target.\nRequired when type is 'AssumeRole'.",
+                  "properties": {
+                    "roleArn": {
+                      "description": "RoleArn is the ARN of the IAM role to assume, e.g.\n\"arn:aws:iam::123456789012:role/my-invoke-role\".",
+                      "maxLength": 2048,
+                      "minLength": 1,
+                      "pattern": "^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "roleArn"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "secretRef": {
-                  "description": "SecretRef references a Kubernetes Secret containing the AWS credentials.\nThe Secret must have keys \"accessKey\", \"secretKey\", and optionally \"sessionToken\".",
+                  "description": "SecretRef references a Kubernetes Secret containing the AWS credentials.\nThe Secret must have keys \"accessKey\", \"secretKey\", and optionally \"sessionToken\".\nRequired when type is 'Secret'.",
                   "properties": {
                     "name": {
                       "default": "",
@@ -43,7 +60,8 @@
                 "type": {
                   "description": "Type specifies the authentication method to use for the backend.",
                   "enum": [
-                    "Secret"
+                    "Secret",
+                    "AssumeRole"
                   ],
                   "type": "string"
                 }
@@ -60,13 +78,97 @@
                 {
                   "message": "secretRef must be specified when type is 'Secret'",
                   "rule": "!(!has(self.secretRef) && self.type == 'Secret')"
+                },
+                {
+                  "message": "assumeRole must be nil if the type is not 'AssumeRole'",
+                  "rule": "!(has(self.assumeRole) && self.type != 'AssumeRole')"
+                },
+                {
+                  "message": "assumeRole must be specified when type is 'AssumeRole'",
+                  "rule": "!(!has(self.assumeRole) && self.type == 'AssumeRole')"
                 }
               ],
               "additionalProperties": false
             },
-            "lambda": {
-              "description": "Lambda configures the AWS lambda service.",
+            "ec2": {
+              "description": "Ec2 configures dynamic discovery of AWS EC2 instances.",
               "properties": {
+                "addressType": {
+                  "default": "PrivateIP",
+                  "description": "AddressType selects whether to route to the instance private or public IP.\nDefaults to PrivateIP.",
+                  "enum": [
+                    "PrivateIP",
+                    "PublicIP"
+                  ],
+                  "type": "string"
+                },
+                "filters": {
+                  "description": "Filters select which instances should be associated with this backend.\nWhen multiple filters are provided, an instance must match all of them.\nIf this list is omitted or empty, all running instances in the configured\nregion are selected. Be careful: an accidentally empty filter list broadens\nthe backend to the whole regional fleet rather than matching nothing.",
+                  "items": {
+                    "description": "AwsTagFilter matches EC2 instances by tag.",
+                    "properties": {
+                      "key": {
+                        "description": "Key matches instances that contain the given tag key, regardless of value.",
+                        "maxLength": 128,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "keyValue": {
+                        "description": "KeyValue matches instances that contain the given tag key/value pair.",
+                        "properties": {
+                          "key": {
+                            "description": "Key is the tag key to match.",
+                            "maxLength": 128,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "Value is the tag value to match.",
+                            "maxLength": 256,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "value"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "exactly one of the fields in [key keyValue] must be set",
+                        "rule": "[has(self.key),has(self.keyValue)].filter(x,x==true).size() == 1"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 16,
+                  "type": "array"
+                },
+                "port": {
+                  "default": 80,
+                  "description": "Port is the port to use for discovered instances.\nDefaults to 80.",
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "lambda": {
+              "description": "Lambda configures the AWS Lambda service.",
+              "properties": {
+                "accountId": {
+                  "description": "AccountId is the AWS account ID to use for the backend.\nThis is the preferred location for Lambda backends.",
+                  "maxLength": 12,
+                  "minLength": 1,
+                  "pattern": "^[0-9]{12}$",
+                  "type": "string"
+                },
                 "endpointURL": {
                   "description": "EndpointURL is the URL or domain for the Lambda service. This is primarily\nuseful for testing and development purposes. When omitted, the default\nlambda hostname will be used.",
                   "maxLength": 2048,
@@ -118,11 +220,17 @@
               "type": "string"
             }
           },
-          "required": [
-            "accountId",
-            "lambda"
-          ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "accountId must be specified on aws or aws.lambda for lambda backends",
+              "rule": "!has(self.lambda) || has(self.accountId) || has(self.lambda.accountId)"
+            },
+            {
+              "message": "exactly one of the fields in [lambda ec2] must be set",
+              "rule": "[has(self.lambda),has(self.ec2)].filter(x,x==true).size() == 1"
+            }
+          ],
           "additionalProperties": false
         },
         "dynamicForwardProxy": {
@@ -155,6 +263,51 @@
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "priorityGroups": {
+          "description": "PriorityGroups is an ordered list of backend groups used for failover.\nTraffic is sent to the backends of the first group; each subsequent\ngroup is only used when the backends of all preceding groups are\nunhealthy. The health check can be configured via the BackendConfigPolicy\nthat targets this Backend\n\nNote: This field is part of an experimental API and subject to breaking changes in future releases.",
+          "items": {
+            "description": "PriorityGroup defines one failover priority level of a priority groups backend.\n\nNote: This struct is part of an experimental API and subject to breaking changes in future releases.",
+            "properties": {
+              "backendRefs": {
+                "description": "BackendRefs references the Backends that make up this priority group.\nReferenced Backends must be in the same namespace and must not be\npriority groups backends themselves.",
+                "items": {
+                  "description": "LocalObjectReference contains enough information to let you locate the\nreferenced object inside the same namespace.",
+                  "properties": {
+                    "name": {
+                      "default": "",
+                      "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-map-type": "atomic",
+                  "additionalProperties": false
+                },
+                "maxItems": 16,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "backend reference name must not be empty",
+                    "rule": "self.all(r, size(r.name) > 0)"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "backendRefs"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array"
         },
         "static": {
           "description": "Static is the static backend configuration.",
@@ -209,7 +362,8 @@
             "AWS",
             "Static",
             "DynamicForwardProxy",
-            "GCP"
+            "GCP",
+            "PriorityGroups"
           ],
           "type": "string"
         }
@@ -218,23 +372,27 @@
       "x-kubernetes-validations": [
         {
           "message": "aws backend must be specified when type is 'AWS'",
-          "rule": "self.type == 'AWS' ? has(self.aws) : true"
+          "rule": "!has(self.type) || (self.type == 'AWS' ? has(self.aws) : true)"
         },
         {
           "message": "static backend must be specified when type is 'Static'",
-          "rule": "self.type == 'Static' ? has(self.static) : true"
+          "rule": "!has(self.type) || (self.type == 'Static' ? has(self.static) : true)"
         },
         {
           "message": "dynamicForwardProxy backend must be specified when type is 'DynamicForwardProxy'",
-          "rule": "self.type == 'DynamicForwardProxy' ? has(self.dynamicForwardProxy) : true"
+          "rule": "!has(self.type) || (self.type == 'DynamicForwardProxy' ? has(self.dynamicForwardProxy) : true)"
         },
         {
           "message": "gcp backend must be specified when type is 'GCP'",
-          "rule": "self.type == 'GCP' ? has(self.gcp) : true"
+          "rule": "!has(self.type) || (self.type == 'GCP' ? has(self.gcp) : true)"
         },
         {
-          "message": "exactly one of the fields in [aws static dynamicForwardProxy gcp] must be set",
-          "rule": "[has(self.aws),has(self.static),has(self.dynamicForwardProxy),has(self.gcp)].filter(x,x==true).size() == 1"
+          "message": "priorityGroups backend must be specified when type is 'PriorityGroups'",
+          "rule": "!has(self.type) || (self.type == 'PriorityGroups' ? has(self.priorityGroups) : true)"
+        },
+        {
+          "message": "exactly one of the fields in [aws static dynamicForwardProxy gcp priorityGroups] must be set",
+          "rule": "[has(self.aws),has(self.static),has(self.dynamicForwardProxy),has(self.gcp),has(self.priorityGroups)].filter(x,x==true).size() == 1"
         }
       ],
       "additionalProperties": false

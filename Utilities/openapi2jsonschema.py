@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copied from https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py commit hash 6ae8c45
+# Based on https://github.com/yannh/kubeconform/blob/master/scripts/openapi2jsonschema.py commit hash 6ae8c45
 # Direct link: https://raw.githubusercontent.com/yannh/kubeconform/6ae8c45bc156ceeb1d421e9b217cfc0c7ba5828d/scripts/openapi2jsonschema.py
 
 import yaml
@@ -14,18 +14,32 @@ if 'DISABLE_SSL_CERT_VALIDATION' in os.environ:
 
 def test_additional_properties():
     for test in iter([{
-        "input": {"something": {"properties": {}}},
-        "expect": {'something': {'properties': {}, "additionalProperties": False}}
+        "input": {"something": {"type": "object", "properties": {}}},
+        "expect": {"something": {"type": "object", "properties": {}, "additionalProperties": False}}
     },{
-        "input": {"something": {"somethingelse": {}}},
-        "expect": {'something': {'somethingelse': {}}}
+        "input": {"something": {"type": ["object", "array"], "properties": {}}},
+        "expect": {"something": {"type": "object", "properties": {}, "additionalProperties": False}}
+    },{
+        "input": {"something": {"properties": {}}},
+        "expect": {"something": {"properties": {}}}
+    },{
+        "input": {"something": {"type": "object", "somethingelse": {}}},
+        "expect": {"something": {"type": "object", "somethingelse": {}}}
     }]):
         assert additional_properties(test["input"]) == test["expect"]
 
 def additional_properties(data, skip=False):
     "This recreates the behaviour of kubectl at https://github.com/kubernetes/kubernetes/blob/225b9119d6a8f03fcbe3cc3d590c261965d928d0/pkg/kubectl/validation/schema.go#L312"
     if isinstance(data, dict):
-        if "properties" in data and not skip:
+        should_have_additional_properties = (
+            "properties" in data
+            and "type" in data
+            and (
+                data["type"] == "object"
+                or (isinstance(data["type"], list) and "object" in data["type"])
+            )
+        )
+        if should_have_additional_properties and not skip:
             if "additionalProperties" not in data:
                 data["additionalProperties"] = False
         for _, v in data.items():

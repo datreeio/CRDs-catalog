@@ -1,0 +1,255 @@
+{
+  "description": "A User represents the declarative state of a MySQL user.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "A UserSpec defines the desired state of a Database.",
+      "properties": {
+        "forProvider": {
+          "description": "UserParameters define the desired state of a MySQL user instance.",
+          "properties": {
+            "authenticationPlugin": {
+              "description": "AuthenticationPlugin selects a non-default MySQL authentication plugin\nfor the user. When set, the user is created with\nCREATE USER ... IDENTIFIED WITH <plugin> [AS '<authString>'] and no\npassword is generated or required.\n\nMost commonly used for AWS RDS IAM authentication, where the DB user\nhas no static password and clients authenticate via short-lived IAM\nauth tokens. Example:\n  authenticationPlugin:\n    name: AWSAuthenticationPlugin\n    authString: RDS\n\nWhen AuthenticationPlugin is set, PasswordSecretRef must not be set\nand the connection secret will not contain a password.",
+              "properties": {
+                "authString": {
+                  "description": "AuthString is the optional auth string passed to the plugin via the\nAS clause. For AWSAuthenticationPlugin set this to \"RDS\". For native\npassword plugins, leave empty and use PasswordSecretRef instead.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name is the auth plugin name. Examples: \"AWSAuthenticationPlugin\",\n\"mysql_native_password\", \"caching_sha2_password\", \"auth_socket\".",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "binlog": {
+              "description": "BinLog defines whether the create, delete, update operations of this user are propagated to replicas. Defaults to true",
+              "type": "boolean"
+            },
+            "passwordSecretRef": {
+              "description": "PasswordSecretRef references the secret that contains the password used\nfor this user. If no reference is given, a password will be auto-generated.\nCannot be set together with AuthenticationPlugin.",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name of the secret.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "resourceOptions": {
+              "description": "ResourceOptions sets account specific resource limits.\nSee https://dev.mysql.com/doc/refman/8.0/en/user-resources.html",
+              "properties": {
+                "maxConnectionsPerHour": {
+                  "description": "MaxConnectionsPerHour sets the number of times an account can connect to the server per hour",
+                  "type": "integer"
+                },
+                "maxQueriesPerHour": {
+                  "description": "MaxQueriesPerHour sets the number of queries an account can issue per hour",
+                  "type": "integer"
+                },
+                "maxUpdatesPerHour": {
+                  "description": "MaxUpdatesPerHour sets the number of updates an account can issue per hour",
+                  "type": "integer"
+                },
+                "maxUserConnections": {
+                  "description": "MaxUserConnections sets The number of simultaneous connections to the server by an account",
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "authenticationPlugin and passwordSecretRef are mutually exclusive",
+              "rule": "!(has(self.authenticationPlugin) && has(self.passwordSecretRef))"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "managementPolicies": {
+          "default": [
+            "*"
+          ],
+          "description": "THIS IS A BETA FIELD. It is on by default but can be opted out\nthrough a Crossplane feature flag.\nManagementPolicies specify the array of actions Crossplane is allowed to\ntake on the managed and external resources.\nSee the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223\nand this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md",
+          "items": {
+            "description": "A ManagementAction represents an action that the Crossplane controllers\ncan take on an external resource.",
+            "enum": [
+              "Observe",
+              "Create",
+              "Update",
+              "Delete",
+              "LateInitialize",
+              "*"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "providerConfigRef": {
+          "default": {
+            "kind": "ClusterProviderConfig",
+            "name": "default"
+          },
+          "description": "ProviderConfigReference specifies how the provider that will be used to\ncreate, observe, update, and delete this managed resource should be\nconfigured.",
+          "properties": {
+            "kind": {
+              "description": "Kind of the referenced object.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of the referenced object.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "writeConnectionSecretToRef": {
+          "description": "WriteConnectionSecretToReference specifies the namespace and name of a\nSecret to which any connection details for this managed resource should\nbe written. Connection details frequently include the endpoint, username,\nand password required to connect to the managed resource.",
+          "properties": {
+            "name": {
+              "description": "Name of the secret.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "forProvider"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "A UserStatus represents the observed state of a User.",
+      "properties": {
+        "atProvider": {
+          "description": "A UserObservation represents the observed state of a MySQL user.",
+          "properties": {
+            "authenticationPlugin": {
+              "description": "AuthenticationPlugin reflects the user's actual authentication plugin\nas read from mysql.user. Populated only when the observed plugin is a\nnon-default-password plugin (e.g., AWSAuthenticationPlugin). Used by\nthe reconciler to detect drift between the desired\nspec.forProvider.authenticationPlugin and what's actually configured\non the DB so plugin changes are not silently ignored.",
+              "properties": {
+                "authString": {
+                  "description": "AuthString is the optional auth string passed to the plugin via the\nAS clause. For AWSAuthenticationPlugin set this to \"RDS\". For native\npassword plugins, leave empty and use PasswordSecretRef instead.",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "Name is the auth plugin name. Examples: \"AWSAuthenticationPlugin\",\n\"mysql_native_password\", \"caching_sha2_password\", \"auth_socket\".",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "resourceOptionsAsClauses": {
+              "description": "ResourceOptionsAsClauses represents the applied resource options",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "conditions": {
+          "description": "Conditions of the resource.",
+          "items": {
+            "description": "A Condition that may apply to a resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "LastTransitionTime is the last time this condition transitioned from one\nstatus to another.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "A Message containing details about this condition's last transition from\none status to another, if any.",
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "ObservedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "reason": {
+                "description": "A Reason for this condition's last transition from one status to another.",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status of this condition; is it currently True, False, or Unknown?",
+                "type": "string"
+              },
+              "type": {
+                "description": "Type of this condition. At most one of each condition type may apply to\na resource at any point in time.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the latest metadata.generation\nwhich resulted in either a ready state, or stalled due to error\nit can not recover from without human intervention.",
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

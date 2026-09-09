@@ -83,6 +83,13 @@
               ],
               "type": "string"
             },
+            "minimumHashRingSize": {
+              "description": "MinimumHashRingSize is the minimum size of the hash ring.\nThis field is only used when LocalityLbAlgorithm is RING_HASH.\nWhen unset, the default value is 1024.",
+              "format": "int64",
+              "maximum": 2048,
+              "minimum": 1,
+              "type": "integer"
+            },
             "serviceLbAlgorithm": {
               "description": "The load balancing algorithm used to determine traffic distribution weighting at cluster/zone level. ServiceLbAlgorithm works together with LocalityLbAlgorithm. Refer to https://cloud.google.com/load-balancing/docs/service-lb-policy for a more detailed explanation of how they work together. Supported values: SPRAY_TO_REGION / WATERFALL_BY_ZONE / WATERFALL_BY_REGION Refer to https://cloud.google.com/load-balancing/docs/service-lb-policy#lb-algos explanation of the algorithms. Default to WATERFALL_BY_REGION.",
               "enum": [
@@ -91,9 +98,99 @@
                 "WATERFALL_BY_REGION"
               ],
               "type": "string"
+            },
+            "sessionAffinity": {
+              "description": "SessionAffinity contains configuration for stickiness parameters.",
+              "properties": {
+                "cookie": {
+                  "description": "Cookie contains configuration for cookie-based session affinity types.\nThis setting requires Type being one of GENERATED_COOKIE and HTTP_COOKIE.\nThis must be set for HTTP_COOKIE.",
+                  "properties": {
+                    "name": {
+                      "description": "Name specifies the name of the cookie. Required for sessionAffinity.type being HTTP_COOKIE.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "path": {
+                      "description": "Path to set for the cookie.\nOptional for sessionAffinity.type being HTTP_COOKIE.",
+                      "type": "string"
+                    },
+                    "ttl": {
+                      "description": "TTL specifies the lifetime of the cookie.\nOptional for sessionAffinity.type being GENERATED_COOKIE or HTTP_COOKIE,\nwith the maximum for GENERATED_COOKIE being 2 weeks (1 209 600 s).",
+                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "httpHeaderName": {
+                  "description": "HTTPHeaderName specifies the name of the HTTP header to use for session affinity.\nThis setting requires HEADER_FIELD type.",
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                  "type": "string"
+                },
+                "type": {
+                  "default": "NONE",
+                  "description": "Type specifies the type of session affinity to use. If not specified, this\ndefaults to NONE.",
+                  "enum": [
+                    "NONE",
+                    "CLIENT_IP",
+                    "GENERATED_COOKIE",
+                    "HEADER_FIELD",
+                    "HTTP_COOKIE"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "httpHeaderName is required for HEADER_FIELD type",
+                  "rule": "self.type == 'HEADER_FIELD' ? has(self.httpHeaderName) : true"
+                },
+                {
+                  "message": "httpHeaderName can only be set with type being HEADER_FIELD",
+                  "rule": "self.type != 'HEADER_FIELD' ? !has(self.httpHeaderName) : true"
+                },
+                {
+                  "message": "cookie can only be set for types GENERATED_COOKIE and HTTP_COOKIE",
+                  "rule": "has(self.cookie) ? self.type == 'GENERATED_COOKIE' || self.type == 'HTTP_COOKIE' || self.type == 'STRONG_COOKIE_AFFINITY' : true"
+                },
+                {
+                  "message": "cookie.name is required for HTTP_COOKIE type",
+                  "rule": "self.type == 'HTTP_COOKIE' || self.type == 'STRONG_COOKIE_AFFINITY' ? has(self.cookie) && has(self.cookie.name) : true"
+                },
+                {
+                  "message": "cookie.name and cookie.path must not be set for GENERATED_COOKIE",
+                  "rule": "self.type == 'GENERATED_COOKIE' && has(self.cookie) ? !has(self.cookie.name) && !has(self.cookie.path) : true"
+                },
+                {
+                  "message": "the maximum duration of cookie.ttl for GENERATED_COOKIE type is 2 weeks",
+                  "rule": "self.type == 'GENERATED_COOKIE' && has(self.cookie) && has(self.cookie.ttl) ? duration(self.cookie.ttl) <= duration('336h') : true"
+                },
+                {
+                  "message": "for GENERATED_COOKIE type, cookie.ttl must match the regex '^([0-9]{1,5}(h|m|s)){1,3}$'",
+                  "rule": "self.type == 'GENERATED_COOKIE' && has(self.cookie) && has(self.cookie.ttl) ? self.cookie.ttl.matches('^([0-9]{1,5}(h|m|s)){1,3}$') : true"
+                }
+              ],
+              "additionalProperties": false
             }
           },
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "minimumHashRingSize set requires localityLbAlgorithm set to RING_HASH",
+              "rule": "has(self.minimumHashRingSize) ? has(self.localityLbAlgorithm) && self.localityLbAlgorithm == 'RING_HASH' : true"
+            },
+            {
+              "message": "sessionAffinity.type other than NONE requires localityLbAlgorithm set to MAGLEV or RING_HASH",
+              "rule": "has(self.sessionAffinity) && has(self.sessionAffinity.type) && self.sessionAffinity.type != 'NONE' && self.sessionAffinity.type != 'STRONG_COOKIE_AFFINITY' ? has(self.localityLbAlgorithm) && (self.localityLbAlgorithm == 'MAGLEV' || self.localityLbAlgorithm == 'RING_HASH') : true"
+            }
+          ],
           "additionalProperties": false
         },
         "targetRefs": {

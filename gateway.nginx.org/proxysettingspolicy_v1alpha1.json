@@ -1,5 +1,5 @@
 {
-  "description": "ClientSettingsPolicy is an Inherited Attached Policy. It provides a way to configure the behavior of the connection\nbetween the client and NGINX Gateway Fabric.",
+  "description": "ProxySettingsPolicy is an Inherited Attached Policy. It provides a way to configure the behavior of the connection\nbetween NGINX Gateway Fabric and the upstream applications (backends).",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,121 +13,138 @@
       "type": "object"
     },
     "spec": {
-      "description": "Spec defines the desired state of the ClientSettingsPolicy.",
+      "description": "Spec defines the desired state of the ProxySettingsPolicy.",
       "properties": {
-        "body": {
-          "description": "Body defines the client request body settings.",
+        "buffering": {
+          "description": "Buffering configures the buffering of responses from the proxied server.",
           "properties": {
-            "maxSize": {
-              "description": "MaxSize sets the maximum allowed size of the client request body.\nIf the size in a request exceeds the configured value,\nthe 413 (Request Entity Too Large) error is returned to the client.\nSetting size to 0 disables checking of client request body size.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size.",
+            "bufferSize": {
+              "description": "BufferSize sets the size of the buffer used for reading the first part of the response received from\nthe proxied server. This part usually contains a small response header.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffer_size",
               "pattern": "^\\d{1,4}(k|m|g)?$",
               "type": "string"
             },
-            "timeout": {
-              "description": "Timeout defines a timeout for reading client request body. The timeout is set only for a period between\ntwo successive read operations, not for the transmission of the whole request body.\nIf a client does not transmit anything within this time, the request is terminated with the\n408 (Request Time-out) error.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_body_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "keepAlive": {
-          "description": "KeepAlive defines the keep-alive settings.",
-          "properties": {
-            "minTimeout": {
-              "description": "MinTimeout defines the timeout for which the keep-alive client connection\nwill not be closed on the server side for connection reuse or on\ngraceful shutdown of worker processes.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_min_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "requests": {
-              "description": "Requests sets the maximum number of requests that can be served through one keep-alive connection.\nAfter the maximum number of requests are made, the connection is closed. Closing connections periodically\nis necessary to free per-connection memory allocations. Therefore, using too high maximum number of requests\nis not recommended as it can lead to excessive memory usage.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_requests.",
-              "format": "int32",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "time": {
-              "description": "Time defines the maximum time during which requests can be processed through one keep-alive connection.\nAfter this time is reached, the connection is closed following the subsequent request processing.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_time.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "timeout": {
-              "description": "Timeout defines the keep-alive timeouts for clients.",
+            "buffers": {
+              "description": "Buffers sets the number and size of buffers used for reading a response from the proxied server,\nfor a single connection.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffers",
               "properties": {
-                "header": {
-                  "description": "Header sets the timeout in the \"Keep-Alive: timeout=time\" response header field.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-                  "type": "string"
+                "number": {
+                  "description": "Number sets the number of buffers.",
+                  "format": "int32",
+                  "maximum": 256,
+                  "minimum": 2,
+                  "type": "integer"
                 },
-                "server": {
-                  "description": "Server sets the timeout during which a keep-alive client connection will stay open on the server side.\nSetting this value to 0 disables keep-alive client connections.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
+                "size": {
+                  "description": "Size sets the size of each buffer.",
+                  "pattern": "^\\d{1,4}(k|m|g)?$",
                   "type": "string"
                 }
               },
-              "type": "object",
-              "x-kubernetes-validations": [
-                {
-                  "message": "header can only be specified if server is specified",
-                  "rule": "!(has(self.header) && !has(self.server))"
-                }
+              "required": [
+                "number",
+                "size"
               ],
+              "type": "object",
               "additionalProperties": false
+            },
+            "busyBuffersSize": {
+              "description": "BusyBuffersSize sets the total size of buffers that can be busy sending a response to the client,\nwhile the response is not yet fully read.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_busy_buffers_size",
+              "pattern": "^\\d{1,4}(k|m|g)?$",
+              "type": "string"
+            },
+            "disable": {
+              "description": "Disable enables or disables buffering of responses from the proxied server.\nIf Disable is true, buffering is disabled. If Disable is false, or if Disable is not set, buffering is enabled.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering",
+              "type": "boolean"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
-        "targetRef": {
-          "description": "TargetRef identifies an API object to apply the policy to.\nObject must be in the same namespace as the policy.\nSupport: Gateway, HTTPRoute, GRPCRoute.",
-          "properties": {
-            "group": {
-              "description": "Group is the group of the target resource.",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-              "type": "string"
+        "targetRefs": {
+          "description": "TargetRefs identifies the API object(s) to apply the policy to.\nObjects must be in the same namespace as the policy.\nSupport: Gateway, HTTPRoute, GRPCRoute",
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
             },
-            "kind": {
-              "description": "Kind is kind of the target resource.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
-              "type": "string"
-            },
-            "name": {
-              "description": "Name is the name of the target resource.",
-              "maxLength": 253,
-              "minLength": 1,
-              "type": "string"
-            }
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
           },
-          "required": [
-            "group",
-            "kind",
-            "name"
-          ],
-          "type": "object",
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
           "x-kubernetes-validations": [
             {
               "message": "TargetRef Kind must be one of: Gateway, HTTPRoute, or GRPCRoute",
-              "rule": "(self.kind=='Gateway' || self.kind=='HTTPRoute' || self.kind=='GRPCRoute')"
+              "rule": "self.all(t, t.kind == 'Gateway' || t.kind == 'HTTPRoute' || t.kind == 'GRPCRoute')"
             },
             {
-              "message": "TargetRef Group must be gateway.networking.k8s.io.",
-              "rule": "(self.group=='gateway.networking.k8s.io')"
+              "message": "TargetRef Group must be gateway.networking.k8s.io",
+              "rule": "self.all(t, t.group == 'gateway.networking.k8s.io')"
+            },
+            {
+              "message": "TargetRef Kind and Name combination must be unique",
+              "rule": "self.all(t1, self.exists_one(t2, t1.group == t2.group && t1.kind == t2.kind && t1.name == t2.name))"
+            },
+            {
+              "message": "Cannot mix Gateway kind with HTTPRoute or GRPCRoute kinds in targetRefs",
+              "rule": "!(self.exists(t, t.kind == 'Gateway') && self.exists(t, t.kind == 'HTTPRoute' || t.kind == 'GRPCRoute'))"
             }
-          ],
+          ]
+        },
+        "timeout": {
+          "description": "Timeout configures timeouts for the connection to the proxied server.",
+          "properties": {
+            "connect": {
+              "description": "Connect sets the timeout for establishing a connection with the proxied server.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_connect_timeout",
+              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
+              "type": "string"
+            },
+            "read": {
+              "description": "Read sets the timeout for reading a response from the proxied server.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_read_timeout",
+              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
+              "type": "string"
+            },
+            "send": {
+              "description": "Send sets the timeout for transmitting a request to the proxied server.\nDirective: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_send_timeout",
+              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
+              "type": "string"
+            }
+          },
+          "type": "object",
           "additionalProperties": false
         }
       },
       "required": [
-        "targetRef"
+        "targetRefs"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Status defines the state of the ClientSettingsPolicy.",
+      "description": "Status defines the state of the ProxySettingsPolicy.",
       "properties": {
         "ancestors": {
           "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",

@@ -1,5 +1,5 @@
 {
-  "description": "ClientSettingsPolicy is an Inherited Attached Policy. It provides a way to configure the behavior of the connection\nbetween the client and NGINX Gateway Fabric.",
+  "description": "RateLimitPolicy is an Inherited Attached Policy. It provides a way to set local rate limiting rules in NGINX.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,121 +13,157 @@
       "type": "object"
     },
     "spec": {
-      "description": "Spec defines the desired state of the ClientSettingsPolicy.",
+      "description": "Spec defines the desired state of the RateLimitPolicy.",
       "properties": {
-        "body": {
-          "description": "Body defines the client request body settings.",
+        "rateLimit": {
+          "description": "RateLimit defines the Rate Limit settings.",
           "properties": {
-            "maxSize": {
-              "description": "MaxSize sets the maximum allowed size of the client request body.\nIf the size in a request exceeds the configured value,\nthe 413 (Request Entity Too Large) error is returned to the client.\nSetting size to 0 disables checking of client request body size.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size.",
-              "pattern": "^\\d{1,4}(k|m|g)?$",
-              "type": "string"
+            "dryRun": {
+              "description": "DryRun enables the dry run mode. In this mode, the rate limit is not actually applied, but the number of excessive\nrequests is accounted as usual in the shared memory zone.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_dry_run",
+              "type": "boolean"
             },
-            "timeout": {
-              "description": "Timeout defines a timeout for reading client request body. The timeout is set only for a period between\ntwo successive read operations, not for the transmission of the whole request body.\nIf a client does not transmit anything within this time, the request is terminated with the\n408 (Request Time-out) error.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_body_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "keepAlive": {
-          "description": "KeepAlive defines the keep-alive settings.",
-          "properties": {
-            "minTimeout": {
-              "description": "MinTimeout defines the timeout for which the keep-alive client connection\nwill not be closed on the server side for connection reuse or on\ngraceful shutdown of worker processes.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_min_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "requests": {
-              "description": "Requests sets the maximum number of requests that can be served through one keep-alive connection.\nAfter the maximum number of requests are made, the connection is closed. Closing connections periodically\nis necessary to free per-connection memory allocations. Therefore, using too high maximum number of requests\nis not recommended as it can lead to excessive memory usage.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_requests.",
-              "format": "int32",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "time": {
-              "description": "Time defines the maximum time during which requests can be processed through one keep-alive connection.\nAfter this time is reached, the connection is closed following the subsequent request processing.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_time.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "timeout": {
-              "description": "Timeout defines the keep-alive timeouts for clients.",
+            "local": {
+              "description": "Local defines the local rate limit rules for this policy.",
               "properties": {
-                "header": {
-                  "description": "Header sets the timeout in the \"Keep-Alive: timeout=time\" response header field.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-                  "type": "string"
-                },
-                "server": {
-                  "description": "Server sets the timeout during which a keep-alive client connection will stay open on the server side.\nSetting this value to 0 disables keep-alive client connections.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-                  "type": "string"
+                "rules": {
+                  "description": "Rules contains the list of rate limit rules.",
+                  "items": {
+                    "description": "RateLimitRule contains settings for a RateLimit Rule.",
+                    "properties": {
+                      "burst": {
+                        "description": "Burst sets the maximum burst size of requests. If the requests rate exceeds the rate configured for a zone,\ntheir processing is delayed such that requests are processed at a defined rate. Excessive requests are delayed\nuntil their number exceeds the maximum burst size in which case the request is terminated with an error.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req",
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "delay": {
+                        "description": "Delay specifies a limit at which excessive requests become delayed.\nDefault value is zero, which means all excessive requests are delayed.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req",
+                        "format": "int32",
+                        "type": "integer"
+                      },
+                      "key": {
+                        "description": "Key represents the key to which the rate limit is applied. The key can contain text, variables,\nand their combination.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_zone",
+                        "pattern": "^(?:[^ \\t\\r\\n;{}#$]+|\\$\\w+)+$",
+                        "type": "string"
+                      },
+                      "noDelay": {
+                        "description": "NoDelay disables the delaying of excessive requests while requests are being limited.\nNoDelay cannot be true when Delay is also set.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req",
+                        "type": "boolean"
+                      },
+                      "rate": {
+                        "description": "Rate represents the rate of requests permitted. The rate is specified in requests per second (r/s)\nor requests per minute (r/m).\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_zone",
+                        "pattern": "^\\d+r/[sm]$",
+                        "type": "string"
+                      },
+                      "zoneSize": {
+                        "description": "ZoneSize is the size of the shared memory zone.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_zone",
+                        "pattern": "^\\d{1,4}(k|m|g)?$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "rate"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "NoDelay cannot be true when Delay is also set",
+                        "rule": "!(has(self.noDelay) && has(self.delay) && self.noDelay == true)"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "type": "array"
                 }
               },
               "type": "object",
-              "x-kubernetes-validations": [
-                {
-                  "message": "header can only be specified if server is specified",
-                  "rule": "!(has(self.header) && !has(self.server))"
-                }
-              ],
               "additionalProperties": false
+            },
+            "logLevel": {
+              "description": "LogLevel sets the desired logging level for cases when the server refuses to process requests due to rate exceeding,\nor delays request processing. Allowed values are info, notice, warn or error.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_log_level",
+              "enum": [
+                "info",
+                "notice",
+                "warn",
+                "error"
+              ],
+              "type": "string"
+            },
+            "rejectCode": {
+              "description": "RejectCode sets the status code to return in response to rejected requests. Must fall into the range 400-599.\n\nDirective: https://nginx.org/en/docs/http/ngx_http_limit_req_module.html#limit_req_status",
+              "format": "int32",
+              "maximum": 599,
+              "minimum": 400,
+              "type": "integer"
             }
           },
           "type": "object",
           "additionalProperties": false
         },
-        "targetRef": {
-          "description": "TargetRef identifies an API object to apply the policy to.\nObject must be in the same namespace as the policy.\nSupport: Gateway, HTTPRoute, GRPCRoute.",
-          "properties": {
-            "group": {
-              "description": "Group is the group of the target resource.",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-              "type": "string"
+        "targetRefs": {
+          "description": "TargetRefs identifies API object(s) to apply the policy to.\nObjects must be in the same namespace as the policy.\n\nSupport: Gateway, HTTPRoute, GRPCRoute",
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
             },
-            "kind": {
-              "description": "Kind is kind of the target resource.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
-              "type": "string"
-            },
-            "name": {
-              "description": "Name is the name of the target resource.",
-              "maxLength": 253,
-              "minLength": 1,
-              "type": "string"
-            }
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
           },
-          "required": [
-            "group",
-            "kind",
-            "name"
-          ],
-          "type": "object",
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
           "x-kubernetes-validations": [
             {
               "message": "TargetRef Kind must be one of: Gateway, HTTPRoute, or GRPCRoute",
-              "rule": "(self.kind=='Gateway' || self.kind=='HTTPRoute' || self.kind=='GRPCRoute')"
+              "rule": "self.all(t, t.kind == 'Gateway' || t.kind == 'HTTPRoute' || t.kind == 'GRPCRoute')"
             },
             {
-              "message": "TargetRef Group must be gateway.networking.k8s.io.",
-              "rule": "(self.group=='gateway.networking.k8s.io')"
+              "message": "TargetRef Group must be gateway.networking.k8s.io",
+              "rule": "self.all(t, t.group=='gateway.networking.k8s.io')"
+            },
+            {
+              "message": "TargetRef Kind and Name combination must be unique",
+              "rule": "self.all(p1, self.exists_one(p2, (p1.name == p2.name) && (p1.kind == p2.kind)))"
+            },
+            {
+              "message": "Cannot mix Gateway kind with HTTPRoute or GRPCRoute kinds in targetRefs",
+              "rule": "!(self.exists(t, t.kind == 'Gateway') && self.exists(t, t.kind == 'HTTPRoute' || t.kind == 'GRPCRoute'))"
             }
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       "required": [
-        "targetRef"
+        "targetRefs"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Status defines the state of the ClientSettingsPolicy.",
+      "description": "Status defines the state of the RateLimitPolicy.",
       "properties": {
         "ancestors": {
           "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",

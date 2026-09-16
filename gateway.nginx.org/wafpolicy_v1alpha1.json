@@ -1,0 +1,741 @@
+{
+  "description": "WAFPolicy is an Inherited Attached Policy. It provides a way to configure F5 WAF for NGINX\nfor Gateways and Routes by referencing compiled WAF policy bundles. Bundles can be fetched directly from an\nHTTP/HTTPS URL (type: HTTP), from an NGINX Instance Manager instance (type: NIM), or from an F5 NGINX One\nConsole instance (type: N1C).",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "Spec defines the desired state of the WAFPolicy.",
+      "properties": {
+        "policySource": {
+          "description": "PolicySource holds all policy bundle fetch configuration.",
+          "properties": {
+            "auth": {
+              "description": "Auth configures authentication credentials for fetching the bundle.",
+              "properties": {
+                "secretRef": {
+                  "description": "SecretRef references a Kubernetes Secret in the same namespace as the WAFPolicy.\nThe Secret may contain:\n  - \"username\" and \"password\" fields for HTTP Basic Authentication\n  - \"token\" field for Bearer Token Authentication (NIM) or APIToken Authentication (N1C)",
+                  "properties": {
+                    "name": {
+                      "description": "Name is the name of the referenced object.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "secretRef"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "httpSource": {
+              "description": "HTTPSource configures direct bundle fetching from an HTTP/HTTPS URL.\nRequired when type is HTTP; must not be set for other types.",
+              "properties": {
+                "url": {
+                  "description": "URL is the full URL of the compiled policy bundle (.tgz),\ne.g. \"https://storage.example.com/bundles/policy.tgz\".",
+                  "maxLength": 2083,
+                  "minLength": 1,
+                  "pattern": "^https?://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "insecureSkipVerify": {
+              "description": "InsecureSkipVerify disables TLS certificate verification when fetching the bundle.\nNot recommended for production use.",
+              "type": "boolean"
+            },
+            "n1cSource": {
+              "description": "N1CSource configures bundle fetching from F5 NGINX One Console.\nRequired when type is N1C; must not be set for other types.",
+              "properties": {
+                "namespace": {
+                  "description": "Namespace is the NGINX One Console namespace that owns the security policy.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "policyName": {
+                  "description": "PolicyName is the name of the security policy in N1C.\nMutually exclusive with policyObjectID.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "policyObjectID": {
+                  "description": "PolicyObjectID is the unique object identifier of the security policy in N1C\n(e.g. \"pol_-IUuEUN7ST63oRC7AlQPLw\").\nMutually exclusive with policyName.",
+                  "pattern": "^pol_[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                "policyVersionID": {
+                  "description": "PolicyVersionID pins a specific version of the policy bundle using its opaque version ID\n(e.g. \"pv_UJ2gL5fOQ3Gnb3OVuVo1XA\"). When omitted, the latest available version is used.",
+                  "pattern": "^pv_[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "URL is the base URL of the F5 NGINX One Console instance,\ne.g. \"https://<tenant>.volterra.us\".",
+                  "maxLength": 2083,
+                  "minLength": 1,
+                  "pattern": "^https?://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "namespace",
+                "url"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "exactly one of policyName or policyObjectID must be set",
+                  "rule": "(has(self.policyName) && !has(self.policyObjectID)) || (!has(self.policyName) && has(self.policyObjectID))"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "nimSource": {
+              "description": "NIMSource configures bundle fetching from NGINX Instance Manager.\nRequired when type is NIM; must not be set for other types.",
+              "properties": {
+                "policyName": {
+                  "description": "PolicyName is the name of the compiled policy bundle in NIM.\nMutually exclusive with policyUID.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "policyUID": {
+                  "description": "PolicyUID is the unique identifier of the compiled policy bundle in NIM.\nMutually exclusive with policyName.\nMust be a valid UUID (e.g. \"2bc1e3ac-7990-4ca4-910a-8634c444c804\").",
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "URL is the base URL of the NGINX Instance Manager instance,\ne.g. \"https://nim.example.com\".",
+                  "maxLength": 2083,
+                  "minLength": 1,
+                  "pattern": "^https?://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "exactly one of policyName or policyUID must be set",
+                  "rule": "(has(self.policyName) && !has(self.policyUID)) || (!has(self.policyName) && has(self.policyUID))"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "polling": {
+              "description": "Polling configures automatic periodic re-fetching of the bundle.",
+              "properties": {
+                "enabled": {
+                  "description": "Enabled activates periodic re-fetching of the bundle.\nWhen true, NGF fetches the bundle on each interval and deploys it only if\nits checksum differs from the last successfully fetched version.",
+                  "type": "boolean"
+                },
+                "interval": {
+                  "description": "Interval is the period between poll cycles.\nDefaults to 5m when polling is enabled but no interval is set.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "retryAttempts": {
+              "default": 3,
+              "description": "RetryAttempts is the maximum number of additional fetch attempts on transient failures\n(network errors, HTTP 5xx). Set to 0 to disable retries. Defaults to 3.\nNon-transient errors (HTTP 4xx, checksum mismatch) are never retried.",
+              "format": "int32",
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "timeout": {
+              "description": "Timeout is the maximum duration for a single bundle fetch attempt.\nDefaults to 30s when not set.",
+              "type": "string"
+            },
+            "tlsSecret": {
+              "description": "TLSSecretRef references a Secret containing a custom CA certificate (key: \"ca.crt\") for\nverifying the bundle server's TLS certificate.",
+              "properties": {
+                "name": {
+                  "description": "Name is the name of the referenced object.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "validation": {
+              "description": "Validation configures integrity verification for the downloaded bundle.",
+              "properties": {
+                "expectedChecksum": {
+                  "description": "ExpectedChecksum is the expected SHA256 checksum of the bundle.\nIf set, the downloaded bundle must match this checksum or it will be rejected.\nFor N1C sources, the checksum reported by the N1C API is verified automatically;\nset this field only if you want to enforce an additional, independently known value.",
+                  "maxLength": 64,
+                  "minLength": 64,
+                  "pattern": "^[0-9a-fA-F]{64}$",
+                  "type": "string"
+                },
+                "verifyChecksum": {
+                  "description": "VerifyChecksum enables automatic checksum verification by fetching a companion\nchecksum file at <url>.sha256 and comparing it against the downloaded bundle.\nOnly supported when the policy source type is HTTP (policySource.httpSource or\nlogSource.url); setting this for NIM or N1C sources is rejected at admission.\nNote: for N1C sources, bundle integrity is always verified automatically using\nthe checksum returned by the N1C compile API \u2014 this field is not needed.\nMutually exclusive with expectedChecksum.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "verifyChecksum and expectedChecksum are mutually exclusive",
+                  "rule": "!(has(self.verifyChecksum) && self.verifyChecksum && has(self.expectedChecksum))"
+                }
+              ],
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "securityLogs": {
+          "description": "SecurityLogs defines security logging configurations.",
+          "items": {
+            "description": "WAFSecurityLog defines security logging configuration for app_protect_security_log directives.\nExactly one of logSource.defaultProfile, logSource.httpSource, logSource.nimSource, or logSource.n1cSource must be set.",
+            "properties": {
+              "destination": {
+                "description": "Destination defines where security logs are sent.",
+                "properties": {
+                  "file": {
+                    "description": "File defines the file destination configuration.\nOnly valid when type is \"file\".",
+                    "properties": {
+                      "path": {
+                        "description": "Path is the file path where security logs will be written.\nMust be accessible to the waf-enforcer container.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^/.*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "syslog": {
+                    "description": "Syslog defines the syslog destination configuration.\nOnly valid when type is \"syslog\".",
+                    "properties": {
+                      "server": {
+                        "description": "Server is the syslog server address in the format \"host:port\".",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^[a-zA-Z0-9.-]+:[0-9]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "server"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": {
+                    "default": "stderr",
+                    "description": "Type identifies the type of security log destination.",
+                    "enum": [
+                      "stderr",
+                      "file",
+                      "syslog"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "destination.file must be set if and only if type is file",
+                    "rule": "(self.type == 'file') == has(self.file)"
+                  },
+                  {
+                    "message": "destination.syslog must be set if and only if type is syslog",
+                    "rule": "(self.type == 'syslog') == has(self.syslog)"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "logSource": {
+                "description": "LogSource configures the log profile bundle source for this log entry.\nExactly one of url or defaultProfile must be set.",
+                "properties": {
+                  "auth": {
+                    "description": "Auth configures authentication credentials for fetching the log bundle.\nOnly applicable when url is set.",
+                    "properties": {
+                      "secretRef": {
+                        "description": "SecretRef references a Kubernetes Secret in the same namespace as the WAFPolicy.\nThe Secret may contain:\n  - \"username\" and \"password\" fields for HTTP Basic Authentication\n  - \"token\" field for Bearer Token Authentication (NIM) or APIToken Authentication (N1C)",
+                        "properties": {
+                          "name": {
+                            "description": "Name is the name of the referenced object.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "secretRef"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "defaultProfile": {
+                    "description": "DefaultProfile selects one of the built-in WAF log profile bundles shipped with the WAF engine.\nMutually exclusive with HTTPSource, NIMSource, and N1CSource.",
+                    "enum": [
+                      "log_default",
+                      "log_all",
+                      "log_illegal",
+                      "log_blocked",
+                      "log_grpc_all",
+                      "log_grpc_blocked",
+                      "log_grpc_illegal"
+                    ],
+                    "type": "string"
+                  },
+                  "httpSource": {
+                    "description": "HTTPSource configures direct bundle fetching from an HTTP/HTTPS URL.\nMutually exclusive with DefaultProfile, NIMSource and N1CSource.",
+                    "properties": {
+                      "url": {
+                        "description": "URL is the full URL of the compiled policy bundle (.tgz),\ne.g. \"https://storage.example.com/bundles/policy.tgz\".",
+                        "maxLength": 2083,
+                        "minLength": 1,
+                        "pattern": "^https?://",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "insecureSkipVerify": {
+                    "description": "InsecureSkipVerify disables TLS certificate verification when fetching the bundle.\nNot recommended for production use.",
+                    "type": "boolean"
+                  },
+                  "n1cSource": {
+                    "description": "N1CSource configures bundle fetching from F5 NGINX One Console.\nMutually exclusive with DefaultProfile, HTTPSource, and NIMSource.",
+                    "properties": {
+                      "namespace": {
+                        "description": "Namespace is the NGINX One Console namespace that owns the log profile.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "profileName": {
+                        "description": "ProfileName is the name of the log profile in N1C that corresponds to the log profile bundle.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "profileObjectID": {
+                        "description": "ProfileObjectID is the unique object identifier of the log profile in N1C\n(e.g. \"lp_8s8uZxLpThWwEGF7LTn_rA\") that corresponds to the log profile bundle.",
+                        "pattern": "^lp_[A-Za-z0-9_-]+$",
+                        "type": "string"
+                      },
+                      "url": {
+                        "description": "URL is the base URL of the F5 NGINX One Console instance,\ne.g. \"https://<tenant>.volterra.us\".",
+                        "maxLength": 2083,
+                        "minLength": 1,
+                        "pattern": "^https?://",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "namespace",
+                      "url"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "exactly one of profileName or profileObjectID must be set",
+                        "rule": "(has(self.profileName) && !has(self.profileObjectID)) || (!has(self.profileName) && has(self.profileObjectID))"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "nimSource": {
+                    "description": "NIMSource configures bundle fetching from NGINX Instance Manager.\nMutually exclusive with DefaultProfile, HTTPSource and N1CSource.",
+                    "properties": {
+                      "profileName": {
+                        "description": "ProfileName is the name of the compiled log profile bundle in NIM.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "url": {
+                        "description": "URL is the base URL of the NGINX Instance Manager instance,\ne.g. \"https://nim.example.com\".",
+                        "maxLength": 2083,
+                        "minLength": 1,
+                        "pattern": "^https?://",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "profileName",
+                      "url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "polling": {
+                    "description": "Polling configures automatic periodic re-fetching of the log bundle.\nOnly applicable when url is set.",
+                    "properties": {
+                      "enabled": {
+                        "description": "Enabled activates periodic re-fetching of the bundle.\nWhen true, NGF fetches the bundle on each interval and deploys it only if\nits checksum differs from the last successfully fetched version.",
+                        "type": "boolean"
+                      },
+                      "interval": {
+                        "description": "Interval is the period between poll cycles.\nDefaults to 5m when polling is enabled but no interval is set.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "retryAttempts": {
+                    "default": 3,
+                    "description": "RetryAttempts is the maximum number of additional fetch attempts on transient failures\n(network errors, HTTP 5xx). Set to 0 to disable retries. Defaults to 3.\nNon-transient errors (HTTP 4xx, checksum mismatch) are never retried.\nOnly applicable when url is set.",
+                    "format": "int32",
+                    "maximum": 10,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "timeout": {
+                    "description": "Timeout is the maximum duration for a single log bundle fetch attempt.\nDefaults to 30s when not set. Only applicable when url is set.",
+                    "type": "string"
+                  },
+                  "tlsSecret": {
+                    "description": "TLSSecretRef references a Secret containing a custom CA certificate (key: \"ca.crt\").\nOnly applicable when url is set.",
+                    "properties": {
+                      "name": {
+                        "description": "Name is the name of the referenced object.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "validation": {
+                    "description": "Validation configures integrity verification for the downloaded log bundle.\nOnly applicable when url is set.",
+                    "properties": {
+                      "expectedChecksum": {
+                        "description": "ExpectedChecksum is the expected SHA256 checksum of the bundle.\nIf set, the downloaded bundle must match this checksum or it will be rejected.\nFor N1C sources, the checksum reported by the N1C API is verified automatically;\nset this field only if you want to enforce an additional, independently known value.",
+                        "maxLength": 64,
+                        "minLength": 64,
+                        "pattern": "^[0-9a-fA-F]{64}$",
+                        "type": "string"
+                      },
+                      "verifyChecksum": {
+                        "description": "VerifyChecksum enables automatic checksum verification by fetching a companion\nchecksum file at <url>.sha256 and comparing it against the downloaded bundle.\nOnly supported when the policy source type is HTTP (policySource.httpSource or\nlogSource.url); setting this for NIM or N1C sources is rejected at admission.\nNote: for N1C sources, bundle integrity is always verified automatically using\nthe checksum returned by the N1C compile API \u2014 this field is not needed.\nMutually exclusive with expectedChecksum.",
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "verifyChecksum and expectedChecksum are mutually exclusive",
+                        "rule": "!(has(self.verifyChecksum) && self.verifyChecksum && has(self.expectedChecksum))"
+                      }
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "exactly one of logSource.defaultProfile, logSource.httpSource, logSource.nimSource, or logSource.n1cSource must be set",
+                    "rule": "(has(self.defaultProfile) && !has(self.httpSource) && !has(self.nimSource) && !has(self.n1cSource)) || (!has(self.defaultProfile) && has(self.httpSource) && !has(self.nimSource) && !has(self.n1cSource)) || (!has(self.defaultProfile) && !has(self.httpSource) && has(self.nimSource) && !has(self.n1cSource)) || (!has(self.defaultProfile) && !has(self.httpSource) && !has(self.nimSource) && has(self.n1cSource))"
+                  }
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "destination",
+              "logSource"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "targetRefs": {
+          "description": "TargetRefs identifies API object(s) to apply the policy to.\nObjects must be in the same namespace as the policy.\nAll targets must be of the same Kind (all Gateways OR all HTTPRoutes OR all GRPCRoutes).\nSupport: Gateway, HTTPRoute, GRPCRoute.",
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "All TargetRefs must be the same Kind",
+              "rule": "self.all(t1, self.all(t2, t1.kind == t2.kind))"
+            },
+            {
+              "message": "TargetRef Kind must be one of: Gateway, HTTPRoute, or GRPCRoute",
+              "rule": "self.all(t, t.kind=='Gateway' || t.kind=='HTTPRoute' || t.kind=='GRPCRoute')"
+            },
+            {
+              "message": "TargetRef Group must be gateway.networking.k8s.io",
+              "rule": "self.all(t, t.group=='gateway.networking.k8s.io')"
+            },
+            {
+              "message": "TargetRef Name must be unique",
+              "rule": "self.all(t1, self.exists_one(t2, t1.name == t2.name))"
+            }
+          ]
+        },
+        "type": {
+          "description": "Type identifies the source type for the policy bundle.\nHTTP fetches directly from a URL; NIM uses the NGINX Instance Manager bundles API;\nN1C uses the F5 NGINX One Console security policies API.",
+          "enum": [
+            "HTTP",
+            "NIM",
+            "N1C"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "policySource",
+        "targetRefs",
+        "type"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "policySource.httpSource must be set if and only if type is HTTP",
+          "rule": "(self.type == 'HTTP') == (has(self.policySource) && has(self.policySource.httpSource))"
+        },
+        {
+          "message": "policySource.nimSource must be set if and only if type is NIM",
+          "rule": "(self.type == 'NIM') == (has(self.policySource) && has(self.policySource.nimSource))"
+        },
+        {
+          "message": "policySource.n1cSource must be set if and only if type is N1C",
+          "rule": "(self.type == 'N1C') == (has(self.policySource) && has(self.policySource.n1cSource))"
+        },
+        {
+          "message": "policySource.validation.verifyChecksum is only supported for type HTTP",
+          "rule": "!(self.type != 'HTTP' && has(self.policySource) && has(self.policySource.validation) && has(self.policySource.validation.verifyChecksum) && self.policySource.validation.verifyChecksum)"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "Status defines the state of the WAFPolicy.",
+      "properties": {
+        "ancestors": {
+          "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",
+          "items": {
+            "description": "PolicyAncestorStatus describes the status of a route with respect to an\nassociated Ancestor.\n\nAncestors refer to objects that are either the Target of a policy or above it\nin terms of object hierarchy. For example, if a policy targets a Service, the\nPolicy's Ancestors are, in order, the Service, the HTTPRoute, the Gateway, and\nthe GatewayClass. Almost always, in this hierarchy, the Gateway will be the most\nuseful object to place Policy status on, so we recommend that implementations\nSHOULD use Gateway as the PolicyAncestorStatus object unless the designers\nhave a _very_ good reason otherwise.\n\nIn the context of policy attachment, the Ancestor is used to distinguish which\nresource results in a distinct application of this policy. For example, if a policy\ntargets a Service, it may have a distinct result per attached Gateway.\n\nPolicies targeting the same resource may have different effects depending on the\nancestors of those resources. For example, different Gateways targeting the same\nService may have different capabilities, especially if they have different underlying\nimplementations.\n\nFor example, in BackendTLSPolicy, the Policy attaches to a Service that is\nused as a backend in a HTTPRoute that is itself attached to a Gateway.\nIn this case, the relevant object for status is the Gateway, and that is the\nancestor object referred to in this status.\n\nNote that a parent is also an ancestor, so for objects where the parent is the\nrelevant object for status, this struct SHOULD still be used.\n\nThis struct is intended to be used in a slice that's effectively a map,\nwith a composite key made up of the AncestorRef and the ControllerName.",
+            "properties": {
+              "ancestorRef": {
+                "description": "AncestorRef corresponds with a ParentRef in the spec that this\nPolicyAncestorStatus struct describes the status of.",
+                "properties": {
+                  "group": {
+                    "default": "gateway.networking.k8s.io",
+                    "description": "Group is the group of the referent.\nWhen unspecified, \"gateway.networking.k8s.io\" is inferred.\nTo set the core API group (such as for a \"Service\" kind referent),\nGroup must be explicitly set to \"\" (empty string).\n\nSupport: Core",
+                    "maxLength": 253,
+                    "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "default": "Gateway",
+                    "description": "Kind is kind of the referent.\n\nThere are two kinds of parent resources with \"Core\" support:\n\n* Gateway (Gateway conformance profile)\n* Service (Mesh conformance profile, ClusterIP Services only)\n\nSupport for other resources is Implementation-Specific.",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "Name is the name of the referent.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "description": "Namespace is the namespace of the referent. When unspecified, this refers\nto the local namespace of the Route.\n\nNote that there are specific rules for ParentRefs which cross namespace\nboundaries. Cross-namespace references are only valid if they are explicitly\nallowed by something in the namespace they are referring to. For example:\nGateway has the AllowedRoutes field, and ReferenceGrant provides a\ngeneric way to enable any other kind of cross-namespace reference.\n\n<gateway:experimental:description>\nParentRefs from a Route to a Service in the same namespace are \"producer\"\nroutes, which apply default routing rules to inbound connections from\nany namespace to the Service.\n\nParentRefs from a Route to a Service in a different namespace are\n\"consumer\" routes, and these routing rules are only applied to outbound\nconnections originating from the same namespace as the Route, for which\nthe intended destination of the connections are a Service targeted as a\nParentRef of the Route.\n</gateway:experimental:description>\n\nSupport: Core",
+                    "maxLength": 63,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                    "type": "string"
+                  },
+                  "port": {
+                    "description": "Port is the network port this Route targets. It can be interpreted\ndifferently based on the type of parent resource.\n\nWhen the parent resource is a Gateway, this targets all listeners\nlistening on the specified port that also support this kind of Route(and\nselect this Route). It's not recommended to set `Port` unless the\nnetworking behaviors specified in a Route must apply to a specific port\nas opposed to a listener(s) whose port(s) may be changed. When both Port\nand SectionName are specified, the name and port of the selected listener\nmust match both specified values.\n\n<gateway:experimental:description>\nWhen the parent resource is a Service, this targets a specific port in the\nService spec. When both Port (experimental) and SectionName are specified,\nthe name and port of the selected port must match both specified values.\n</gateway:experimental:description>\n\nImplementations MAY choose to support other parent resources.\nImplementations supporting other types of parent resources MUST clearly\ndocument how/if Port is interpreted.\n\nFor the purpose of status, an attachment is considered successful as\nlong as the parent resource accepts it partially. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment\nfrom the referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route,\nthe Route MUST be considered detached from the Gateway.\n\nSupport: Extended",
+                    "format": "int32",
+                    "maximum": 65535,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sectionName": {
+                    "description": "SectionName is the name of a section within the target resource. In the\nfollowing resources, SectionName is interpreted as the following:\n\n* Gateway: Listener name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n* Service: Port name. When both Port (experimental) and SectionName\nare specified, the name and port of the selected listener must match\nboth specified values.\n\nImplementations MAY choose to support attaching Routes to other resources.\nIf that is the case, they MUST clearly document how SectionName is\ninterpreted.\n\nWhen unspecified (empty string), this will reference the entire resource.\nFor the purpose of status, an attachment is considered successful if at\nleast one section in the parent resource accepts it. For example, Gateway\nlisteners can restrict which Routes can attach to them by Route kind,\nnamespace, or hostname. If 1 of 2 Gateway listeners accept attachment from\nthe referencing Route, the Route MUST be considered successfully\nattached. If no Gateway listeners accept attachment from this Route, the\nRoute MUST be considered detached from the Gateway.\n\nSupport: Core",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "conditions": {
+                "description": "Conditions describes the status of the Policy with respect to the given Ancestor.",
+                "items": {
+                  "description": "Condition contains details for one aspect of the current state of this API Resource.",
+                  "properties": {
+                    "lastTransitionTime": {
+                      "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "message": {
+                      "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                      "maxLength": 32768,
+                      "type": "string"
+                    },
+                    "observedGeneration": {
+                      "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                      "format": "int64",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "status of the condition, one of True, False, Unknown.",
+                      "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                      ],
+                      "type": "string"
+                    },
+                    "type": {
+                      "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                      "maxLength": 316,
+                      "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "lastTransitionTime",
+                    "message",
+                    "reason",
+                    "status",
+                    "type"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "type"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "controllerName": {
+                "description": "ControllerName is a domain/path string that indicates the name of the\ncontroller that wrote this status. This corresponds with the\ncontrollerName field on GatewayClass.\n\nExample: \"example.net/gateway-controller\".\n\nThe format of this field is DOMAIN \"/\" PATH, where DOMAIN and PATH are\nvalid Kubernetes names\n(https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names).\n\nControllers MUST populate this field when writing status. Controllers should ensure that\nentries to status populated with their ControllerName are cleaned up when they are no\nlonger necessary.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\/[A-Za-z0-9\\/\\-._~%!$&'()*+,;=:]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ancestorRef",
+              "conditions",
+              "controllerName"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "ancestors"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

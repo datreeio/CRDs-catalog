@@ -1,5 +1,5 @@
 {
-  "description": "ClientSettingsPolicy is an Inherited Attached Policy. It provides a way to configure the behavior of the connection\nbetween the client and NGINX Gateway Fabric.",
+  "description": "SnippetsPolicy provides a way to inject NGINX snippets into the configuration on Gateway level.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,121 +13,105 @@
       "type": "object"
     },
     "spec": {
-      "description": "Spec defines the desired state of the ClientSettingsPolicy.",
+      "description": "Spec defines the desired state of the SnippetsPolicy.",
       "properties": {
-        "body": {
-          "description": "Body defines the client request body settings.",
-          "properties": {
-            "maxSize": {
-              "description": "MaxSize sets the maximum allowed size of the client request body.\nIf the size in a request exceeds the configured value,\nthe 413 (Request Entity Too Large) error is returned to the client.\nSetting size to 0 disables checking of client request body size.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size.",
-              "pattern": "^\\d{1,4}(k|m|g)?$",
-              "type": "string"
-            },
-            "timeout": {
-              "description": "Timeout defines a timeout for reading client request body. The timeout is set only for a period between\ntwo successive read operations, not for the transmission of the whole request body.\nIf a client does not transmit anything within this time, the request is terminated with the\n408 (Request Time-out) error.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#client_body_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "keepAlive": {
-          "description": "KeepAlive defines the keep-alive settings.",
-          "properties": {
-            "minTimeout": {
-              "description": "MinTimeout defines the timeout for which the keep-alive client connection\nwill not be closed on the server side for connection reuse or on\ngraceful shutdown of worker processes.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_min_timeout.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "requests": {
-              "description": "Requests sets the maximum number of requests that can be served through one keep-alive connection.\nAfter the maximum number of requests are made, the connection is closed. Closing connections periodically\nis necessary to free per-connection memory allocations. Therefore, using too high maximum number of requests\nis not recommended as it can lead to excessive memory usage.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_requests.",
-              "format": "int32",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "time": {
-              "description": "Time defines the maximum time during which requests can be processed through one keep-alive connection.\nAfter this time is reached, the connection is closed following the subsequent request processing.\nDefault: https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_time.",
-              "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-              "type": "string"
-            },
-            "timeout": {
-              "description": "Timeout defines the keep-alive timeouts for clients.",
-              "properties": {
-                "header": {
-                  "description": "Header sets the timeout in the \"Keep-Alive: timeout=time\" response header field.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-                  "type": "string"
-                },
-                "server": {
-                  "description": "Server sets the timeout during which a keep-alive client connection will stay open on the server side.\nSetting this value to 0 disables keep-alive client connections.",
-                  "pattern": "^[0-9]{1,4}(ms|s|m|h)?$",
-                  "type": "string"
-                }
+        "snippets": {
+          "description": "Snippets is a list of snippets to be injected into the NGINX configuration.",
+          "items": {
+            "description": "Snippet represents an NGINX configuration snippet.",
+            "properties": {
+              "context": {
+                "description": "Context is the NGINX context to insert the snippet into.",
+                "enum": [
+                  "main",
+                  "http",
+                  "http.server",
+                  "http.server.location"
+                ],
+                "type": "string"
               },
-              "type": "object",
-              "x-kubernetes-validations": [
-                {
-                  "message": "header can only be specified if server is specified",
-                  "rule": "!(has(self.header) && !has(self.server))"
-                }
-              ],
-              "additionalProperties": false
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "targetRef": {
-          "description": "TargetRef identifies an API object to apply the policy to.\nObject must be in the same namespace as the policy.\nSupport: Gateway, HTTPRoute, GRPCRoute.",
-          "properties": {
-            "group": {
-              "description": "Group is the group of the target resource.",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-              "type": "string"
+              "value": {
+                "description": "Value is the NGINX configuration snippet.",
+                "minLength": 1,
+                "type": "string"
+              }
             },
-            "kind": {
-              "description": "Kind is kind of the target resource.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
-              "type": "string"
-            },
-            "name": {
-              "description": "Name is the name of the target resource.",
-              "maxLength": 253,
-              "minLength": 1,
-              "type": "string"
-            }
+            "required": [
+              "context",
+              "value"
+            ],
+            "type": "object",
+            "additionalProperties": false
           },
-          "required": [
-            "group",
-            "kind",
-            "name"
-          ],
-          "type": "object",
+          "maxItems": 4,
+          "type": "array",
           "x-kubernetes-validations": [
             {
-              "message": "TargetRef Kind must be one of: Gateway, HTTPRoute, or GRPCRoute",
-              "rule": "(self.kind=='Gateway' || self.kind=='HTTPRoute' || self.kind=='GRPCRoute')"
+              "message": "Only one snippet allowed per context",
+              "rule": "self.all(s1, self.exists_one(s2, s1.context == s2.context))"
+            }
+          ]
+        },
+        "targetRefs": {
+          "description": "TargetRefs identifies API object(s) to apply the policy to.",
+          "items": {
+            "description": "LocalPolicyTargetReference identifies an API object to apply a direct or\ninherited policy to. This should be used as part of Policy resources\nthat can target Gateway API resources. For more information on how this\npolicy attachment model works, and a sample Policy resource, refer to\nthe policy attachment documentation for Gateway API.",
+            "properties": {
+              "group": {
+                "description": "Group is the group of the target resource.",
+                "maxLength": 253,
+                "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind is kind of the target resource.",
+                "maxLength": 63,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the target resource.",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "group",
+              "kind",
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "TargetRef Kind must be: Gateway",
+              "rule": "self.all(t, t.kind == 'Gateway')"
             },
             {
-              "message": "TargetRef Group must be gateway.networking.k8s.io.",
-              "rule": "(self.group=='gateway.networking.k8s.io')"
+              "message": "TargetRef Name must be unique",
+              "rule": "self.all(p1, self.exists_one(p2, (p1.name == p2.name)))"
+            },
+            {
+              "message": "TargetRef Group must be gateway.networking.k8s.io",
+              "rule": "self.all(t, t.group == 'gateway.networking.k8s.io')"
             }
-          ],
-          "additionalProperties": false
+          ]
         }
       },
       "required": [
-        "targetRef"
+        "targetRefs"
       ],
       "type": "object",
       "additionalProperties": false
     },
     "status": {
-      "description": "Status defines the state of the ClientSettingsPolicy.",
+      "description": "Status defines the current state of the SnippetsPolicy.",
       "properties": {
         "ancestors": {
           "description": "Ancestors is a list of ancestor resources (usually Gateways) that are\nassociated with the policy, and the status of the policy with respect to\neach ancestor. When this policy attaches to a parent, the controller that\nmanages the parent and the ancestors MUST add an entry to this list when\nthe controller first sees the policy and SHOULD update the entry as\nappropriate when the relevant ancestor is modified.\n\nNote that choosing the relevant ancestor is left to the Policy designers;\nan important part of Policy design is designing the right object level at\nwhich to namespace this status.\n\nNote also that implementations MUST ONLY populate ancestor status for\nthe Ancestor resources they are responsible for. Implementations MUST\nuse the ControllerName field to uniquely identify the entries in this list\nthat they are responsible for.\n\nNote that to achieve this, the list of PolicyAncestorStatus structs\nMUST be treated as a map with a composite key, made up of the AncestorRef\nand ControllerName fields combined.\n\nA maximum of 16 ancestors will be represented in this list. An empty list\nmeans the Policy is not relevant for any ancestors.\n\nIf this slice is full, implementations MUST NOT add further entries.\nInstead they MUST consider the policy unimplementable and signal that\non any related resources such as the ancestor that would be referenced\nhere. For example, if this list was full on BackendTLSPolicy, no\nadditional Gateways would be able to reference the Service targeted by\nthe BackendTLSPolicy.",

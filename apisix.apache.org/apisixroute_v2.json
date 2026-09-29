@@ -1,5 +1,5 @@
 {
-  "description": "ApisixRoute is defines configuration for HTTP and stream routes.",
+  "description": "ApisixRoute defines configuration for HTTP and stream routes.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -158,19 +158,32 @@
                           "description": "Subject defines the left-hand side of the expression.\nIt can be any [APISIX variable](https://apisix.apache.org/docs/apisix/apisix-variable) or string literal.",
                           "properties": {
                             "name": {
-                              "description": "Name is the name of the header or query parameter.",
+                              "description": "Name is the name of the subject within the given scope: the header name, query\nparameter name, cookie name, Nginx variable name, or body field name (dot-notation\nJSON path supported for Body scope). Optional when Scope is Path.",
                               "type": "string"
                             },
                             "scope": {
-                              "description": "Scope specifies the subject scope and can be `Header`, `Query`, or `Path`.\nWhen Scope is `Path`, Name will be ignored.",
+                              "description": "Scope specifies the subject scope.\nSupported values: `Header`, `Query`, `Path`, `Cookie`, `Variable`, `Body`.\nWhen Scope is `Path`, Name will be ignored.\nWhen Scope is `Body`, Name supports dot-notation JSON path (e.g., \"model.version\",\n\"messages[*].role\") and maps to APISIX's `post_arg.<name>` variable, which works with\napplication/json, application/x-www-form-urlencoded, and multipart/form-data.",
+                              "enum": [
+                                "Header",
+                                "Query",
+                                "Path",
+                                "Cookie",
+                                "Variable",
+                                "Body"
+                              ],
                               "type": "string"
                             }
                           },
                           "required": [
-                            "name",
                             "scope"
                           ],
                           "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "name is required when scope is not Path",
+                              "rule": "self.scope == 'Path' || size(self.name) > 0"
+                            }
+                          ],
                           "additionalProperties": false
                         },
                         "value": {
@@ -336,7 +349,7 @@
         "stream": {
           "description": "Stream defines a list of stream route rules.\nEach rule specifies conditions to match TCP/UDP traffic and how to forward them.",
           "items": {
-            "description": "ApisixRouteStream defines the configuration for a Layer 4 (TCP/UDP) route. Currently not supported.",
+            "description": "ApisixRouteStream defines the configuration for a Layer 4 (TCP/UDP) route.",
             "properties": {
               "backend": {
                 "description": "Backend specifies the destination service to which traffic should be forwarded.",

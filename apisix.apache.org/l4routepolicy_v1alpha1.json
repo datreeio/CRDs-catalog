@@ -1,5 +1,5 @@
 {
-  "description": "HTTPRoutePolicy defines configuration of traffic policies.",
+  "description": "L4RoutePolicy defines plugin configuration for Gateway API L4 routes (TCPRoute, UDPRoute, TLSRoute).\nIt follows the Gateway API Policy Attachment pattern and attaches APISIX stream plugins\nto the targeted L4 route resources.",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -13,15 +13,31 @@
       "type": "object"
     },
     "spec": {
-      "description": "HTTPRoutePolicySpec defines configuration of a HTTPRoutePolicy,\nincluding route priority and request matching conditions.",
+      "description": "Spec defines the desired state of L4RoutePolicy.",
       "properties": {
-        "priority": {
-          "description": "Priority sets the priority for route. when multiple routes have the same URI path,\na higher value sets a higher priority in route matching.",
-          "format": "int64",
-          "type": "integer"
+        "plugins": {
+          "description": "Plugins is the list of APISIX stream plugins to attach to the targeted L4 routes.\nPlugin names should be valid APISIX stream plugin names (e.g., limit-conn, ip-restriction).",
+          "items": {
+            "properties": {
+              "config": {
+                "description": "Config is plugin configuration details.",
+                "x-kubernetes-preserve-unknown-fields": true
+              },
+              "name": {
+                "description": "Name is the name of the plugin.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         },
         "targetRefs": {
-          "description": "TargetRef identifies an API object (i.e. HTTPRoute, Ingress) to apply HTTPRoutePolicy to.",
+          "description": "TargetRefs identifies the L4 route resources (TCPRoute, UDPRoute, or TLSRoute)\nto which this policy applies. Only same-namespace targets are supported.",
           "items": {
             "description": "LocalPolicyTargetReferenceWithSectionName identifies an API object to apply a\ndirect policy to. This should be used as part of Policy resources that can\ntarget single resources. For more information on how this policy attachment\nmode works, and a sample Policy resource, refer to the policy attachment\ndocumentation for Gateway API.\n\nNote: This should only be used for direct policy attachment when references\nto SectionName are actually needed. In all other cases,\nLocalPolicyTargetReference should be used.",
             "properties": {
@@ -62,14 +78,17 @@
           },
           "maxItems": 16,
           "minItems": 1,
-          "type": "array"
-        },
-        "vars": {
-          "description": "Vars sets the request matching conditions.",
-          "items": {
-            "x-kubernetes-preserve-unknown-fields": true
-          },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "targetRefs kind must be TCPRoute, UDPRoute, or TLSRoute",
+              "rule": "self.all(r, r.kind == 'TCPRoute' || r.kind == 'UDPRoute' || r.kind == 'TLSRoute')"
+            },
+            {
+              "message": "targetRefs group must be gateway.networking.k8s.io",
+              "rule": "self.all(r, r.group == 'gateway.networking.k8s.io')"
+            }
+          ]
         }
       },
       "required": [

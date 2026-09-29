@@ -118,6 +118,8 @@ nix develop
 ---
 
 ## Contributing CRDs to the catalog
+Read the [contribution guide](CONTRIBUTING.md) for human instructions, a copyable agent prompt, and the automatic merge policy.
+
 If the catalog is missing public custom resources (CRs) that you would like to automatically validate using these tools, you can open an issue or use the **[CRD Extractor](#crd-extractor)** to add the schemas to this repository by creating a pull request.
 
 ## Resources

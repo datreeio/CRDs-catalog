@@ -1,0 +1,78 @@
+name: CRD contribution policy
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to recheck
+        required: true
+        type: string
+      dry_run:
+        description: Evaluate only; do not comment, approve, or merge
+        type: boolean
+        default: true
+  workflow_run:
+    workflows: [Yaml Lint, CRD policy tests]
+    types: [completed]
+permissions: {}
+concurrency:
+  group: crd-policy-${{ github.event.pull_request.number || inputs.pr_number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.prs.outputs.prs }}
+      trusted_sha: ${{ steps.prs.outputs.trusted_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - id: prs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_PR: ${{ inputs.pr_number }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          sys.path.insert(0, '.github/scripts')
+          from crd_policy import GitHub
+          event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          api = GitHub(os.environ['GITHUB_REPOSITORY'], os.environ['GH_TOKEN'])
+          if os.environ['GITHUB_EVENT_NAME'] == 'workflow_dispatch':
+              numbers = [int(os.environ['INPUT_PR'])]
+          elif 'pull_request' in event:
+              numbers = [event['pull_request']['number']]
+          else:
+              sha = event['workflow_run']['head_sha']
+              numbers = [p['number'] for p in api.pages('/repos/' + api.repository + '/pulls?state=open&base=main') if p['head']['sha'] == sha]
+          if any(type(n) is not int or n < 1 for n in numbers):
+              raise ValueError('Invalid pull request number')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('prs=' + json.dumps(numbers) + '\n')
+              f.write('trusted_sha=' + subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() + '\n')
+          PY
+  evaluate:
+    needs: prepare
+    if: needs.prepare.outputs.prs != '[]'
+    strategy:
+      max-parallel: 1
+      matrix:
+        number: ${{ fromJSON(needs.prepare.outputs.prs) }}
+    uses: ./.github/workflows/crd-policy-one.yml
+    with:
+      number: ${{ matrix.number }}
+      trusted_sha: ${{ needs.prepare.outputs.trusted_sha }}
+      dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: write

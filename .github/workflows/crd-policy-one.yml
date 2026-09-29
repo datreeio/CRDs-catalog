@@ -1,0 +1,63 @@
+name: Check one CRD contribution
+on:
+  workflow_call:
+    inputs:
+      number:
+        required: true
+        type: number
+      trusted_sha:
+        required: true
+        type: string
+      dry_run:
+        required: true
+        type: boolean
+permissions: {}
+# Serializes all trigger types for the same PR, including workflow_run retries.
+concurrency:
+  group: crd-policy-one-${{ inputs.number }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      report: ${{ steps.policy.outputs.report }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.trusted_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --require-hashes --only-binary=":all:" -r .github/scripts/requirements.txt
+      - id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.number }}
+        run: python .github/scripts/crd_policy.py
+  publish:
+    needs: validate
+    if: ${{ always() && !cancelled() && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      checks: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.trusted_sha }}
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          POLICY_REPORT: ${{ needs.validate.outputs.report }}
+          PR_NUMBER: ${{ inputs.number }}
+          TRUSTED_SHA: ${{ inputs.trusted_sha }}
+          MERGE_ENABLED: ${{ vars.CRD_AUTO_MERGE_ENABLED }}
+        run: python3 .github/scripts/crd_publish.py

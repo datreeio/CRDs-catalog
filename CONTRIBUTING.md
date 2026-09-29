@@ -4,22 +4,22 @@
 
 1. Add or update JSON schemas at `GROUP/kind_version.json`, for example `example.io/widget_v1.json`. You can use the [CRD Extractor](README.md#crd-extractor) or another generation method.
 2. Find the public upstream CRD YAML/JSON file containing the matching group, kind, and API version. On GitHub, press **y** while viewing that file to get a URL pinned to its full commit SHA. A project homepage, branch, tag, Helm template, or cluster export alone is not sufficient.
-3. Fill the `crd-sources` block in your PR description. Map **every added or modified schema** to its upstream CRD URL. Repeat a URL if one CRD file covers several schemas. Remove the example entry.
+3. Fill the source table in your PR description. Add one row for **every schema you added or updated**, with its path in this repository and the permanent link to the original CRD file. Repeat a URL if one CRD file covers several schemas. Replace the example row, keeping the column names below.
 
-````markdown
-```crd-sources
-{
-  "example.io/widget_v1.json": "https://github.com/OWNER/REPO/blob/FULL_40_CHARACTER_COMMIT/config/crd/widget.yaml"
-}
-```
-````
+| Schema file | Source CRD |
+| --- | --- |
+| `example.io/widget_v1.json` | Paste the permanent GitHub file link here |
+
+Use the full URL in the second column. A permanent link looks like `https://github.com/OWNER/REPO/blob/COMMIT/path/to/crd.yaml`, where `COMMIT` is the full 40-character commit ID. Pressing **y** on the GitHub file page creates this link for you.
+
+Existing PRs may still use a `crd-sources` JSON block mapping schema paths to source URLs. Use either the table or the JSON block, not both.
 
 You do not need to supply a separate project repository, project version, generation command, or generation-tool name.
 
 ### What happens next
 
 - **Automatic merge:** All checks pass, the PR is ready for review, and GitHub branch protections permit the merge.
-- **Contributor input needed:** The source block is missing/malformed, the source identity does not match, or a schema needs correction. Edit the PR description or push corrected files. The bot automatically rechecks it.
+- **Contributor input needed:** The source table is missing or incomplete, the source identity does not match, or a schema needs correction. Edit the PR description or push corrected files. The bot automatically rechecks it.
 - **Manual review:** A source repository is younger than 30 days or has fewer than five stars; a file/count/size limit is exceeded; or changes include deletions, renames, scripts, workflows, unusual file modes, or other non-schema files. The bot flags the PR immediately. It does not wait for a repository to become eligible.
 - **Check error:** GitHub or another dependency was unavailable. A maintainer can rerun the workflow. This never authorizes a merge.
 
@@ -55,9 +55,9 @@ references. Keep changes within 25 files, 2 MiB per resulting full file and
 10 MiB combined. If the requested contribution needs an exception, explain it
 and allow maintainer review instead of hiding or splitting changes to evade checks.
 
-Fill exactly one crd-sources JSON block in the PR description, mapping every
-changed schema path to its commit-pinned source CRD URL. Repeat URLs when one
-source covers multiple schemas. Do not invent source evidence. No separate
+Fill one source table in the PR description, with columns "Schema file" and
+"Source CRD". List every changed schema path and its full commit-pinned source
+CRD URL. Repeat URLs when one source covers multiple schemas. Do not invent source evidence. No separate
 repository, project version, or generation-tool fields are required.
 
 Check whether each source repository is at least 30 days old and has at least

@@ -160,10 +160,23 @@ def validate_schema(raw):
 
 def parse_sources(body, filenames):
     blocks = re.findall(r"^```crd-sources\s*\n(.*?)^```\s*$", body or "", re.M | re.S)
-    if len(blocks) != 1:
-        raise PolicyError("needs-contributor-input", "Add exactly one crd-sources JSON block to the PR description, mapping every changed schema path to a commit-pinned upstream CRD URL. See CONTRIBUTING.md.")
+    tables = re.findall(
+        r"^\|[ \t]*Schema file[ \t]*\|[ \t]*Source CRD[ \t]*\|[ \t]*\n"
+        r"\|[ \t]*:?-{3,}:?[ \t]*\|[ \t]*:?-{3,}:?[ \t]*\|[ \t]*\n"
+        r"((?:\|[^\n]*\|[ \t]*(?:\n|$))+)", body or "", re.M)
+    if len(blocks) + len(tables) != 1:
+        raise PolicyError("needs-contributor-input", "Fill one source table with columns Schema file and Source CRD, listing every changed schema and its permanent upstream CRD link. The older crd-sources JSON format is also supported; use only one format. See CONTRIBUTING.md.")
     try:
-        mapping = json.loads(blocks[0], object_pairs_hook=unique_object)
+        if blocks:
+            mapping = json.loads(blocks[0], object_pairs_hook=unique_object)
+        else:
+            pairs = []
+            for row in tables[0].splitlines():
+                cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+                if len(cells) != 2:
+                    raise ValueError()
+                pairs.append(tuple(cell[1:-1] if cell.startswith("`") and cell.endswith("`") else cell for cell in cells))
+            mapping = unique_object(pairs)
         if not isinstance(mapping, dict) or set(mapping) != set(filenames):
             raise ValueError()
         result = {}
@@ -176,7 +189,7 @@ def parse_sources(body, filenames):
             result[filename] = (match[1] + "/" + match[2], match[3], match[4])
         return result
     except (ValueError, TypeError):
-        raise PolicyError("needs-contributor-input", "The crd-sources block must map each changed schema exactly once to https://github.com/OWNER/REPO/blob/FULL_40_CHARACTER_COMMIT/path/to/crd.yaml. Branch and tag links do not qualify.") from None
+        raise PolicyError("needs-contributor-input", "List each changed schema exactly once with its permanent GitHub source CRD link. Open the original CRD file on GitHub, press y, and copy the resulting URL. Branch and tag links do not qualify.") from None
 
 
 def source_identities(raw):

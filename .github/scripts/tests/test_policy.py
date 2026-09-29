@@ -132,6 +132,18 @@ class PolicyTests(unittest.TestCase):
             self.expect_error('needs-contributor-input', p.parse_sources, body, [FILE])
         self.assertEqual(p.parse_sources(BODY, [FILE])[FILE], ('example/operator', SHA, 'config/crd.yaml'))
 
+    def test_human_source_table(self):
+        table = '| Schema file | Source CRD |\n| --- | --- |\n| `' + FILE + '` | ' + URL + ' |\n'
+        expected = p.parse_sources(BODY, [FILE])
+        self.assertEqual(p.parse_sources(table, [FILE]), expected)
+        for invalid in [table + table, table + BODY, table + '| `' + FILE + '` | ' + URL + ' |\n', table.replace(SHA, 'main'), table.replace(URL, 'Paste the permanent GitHub file link here')]:
+            self.expect_error('needs-contributor-input', p.parse_sources, invalid, [FILE])
+
+    def test_rendered_template_source_mapping(self):
+        template = (pathlib.Path(__file__).resolve().parents[2] / 'pull_request_template.md').read_text()
+        filled = template.replace('Paste the permanent GitHub file link here', URL)
+        self.assertEqual(p.parse_sources(filled, [FILE]), p.parse_sources(BODY, [FILE]))
+
     def test_crd_identity(self):
         self.assertEqual(p.source_identities(CRD), {('example.io', 'widget', 'v1')})
         self.assertEqual(p.source_identities(CRD.replace(b'CustomResourceDefinition', b'Deployment')), set())

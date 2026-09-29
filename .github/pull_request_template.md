@@ -1,37 +1,42 @@
-## Summary
+## What changed?
 
-<!-- Briefly describe the schemas added or updated. -->
+Briefly describe the schemas you added or updated.
 
-## Source CRDs
+## For humans: where did the schemas come from?
 
-<!-- Map EVERY added/modified schema to a public upstream CRD file pinned to a
-full 40-character Git commit. Replace the example below. Repeat a URL if one
-source file covers several schemas. Do not use branch/tag URLs or homepages.
-No separate repository, project version, or generation-tool field is needed. -->
+For each schema you changed, add a row below linking to the original CRD file.
 
-```crd-sources
-{
-  "example.io/widget_v1.json": "https://github.com/OWNER/REPO/blob/FULL_40_CHARACTER_COMMIT/config/crd/widget.yaml"
-}
-```
+**How to get the link:** Open the original CRD YAML or JSON file on GitHub, press **y**, then copy the address from your browser. This saves a link to that exact revision of the file.
 
-## For humans
+Replace the example row. If one CRD file covers several schemas, use the same link in each row.
 
-See [contribution instructions](https://github.com/datreeio/CRDs-catalog/blob/main/CONTRIBUTING.md#for-humans). Add the schemas and fill the source mapping above. Missing information can be corrected by editing this description; the bot rechecks automatically.
+| Schema file | Source CRD |
+| --- | --- |
+| `example.io/widget_v1.json` | Paste the permanent GitHub file link here |
 
-Auto-merge limits: 25 files, 2 MiB per file, 10 MiB total. Source repositories must be at least 30 days old and have at least five stars. Exceptions go directly to manual review.
+The bot will check your PR and tell you if anything needs fixing. Edit this description or push a fix to run the checks again.
 
-## For agents
+[Contribution guide and automatic merge limits](https://github.com/datreeio/CRDs-catalog/blob/main/CONTRIBUTING.md)
 
-Copy this prompt to your agent:
+<details>
+<summary>For agents: copy this prompt to your coding agent</summary>
 
 ```text
-Read https://github.com/datreeio/CRDs-catalog/blob/main/CONTRIBUTING.md and follow
-its agent instructions for this PR. Add or update only the requested JSON schemas.
-Find each actual upstream CRD file and pin its GitHub URL to a full commit SHA.
-Verify group, kind, and API version; fill the crd-sources mapping above for every
-changed schema. Check JSON Schema validity and the file/size and repository
-age/star limits. Do not invent sources or change unrelated files. If an exception
-is needed, explain it for manual review. Fix bot-reported missing information
-by updating the PR description or files so checks can rerun automatically.
+Help me finish this CRDs-catalog pull request.
+
+Read https://github.com/datreeio/CRDs-catalog/blob/main/CONTRIBUTING.md.
+Check the schemas I added or updated. Find their original upstream CRD files
+and get permanent GitHub links pinned to full commit SHAs. Confirm that the
+sources contain the matching group, kind, and API version.
+
+Fill the source table in this PR description, with one row per changed schema.
+Keep the column names "Schema file" and "Source CRD". Use the schema's path in
+this repository and the full source URL. Reuse a URL if it covers multiple files.
+Do not invent links. If a source is unavailable, tell me what is missing.
+
+Check the contribution requirements and fix any issues the bot reports.
+Explain any exceptions that need maintainer review. Only change the requested
+schemas and this PR description.
 ```
+
+</details>

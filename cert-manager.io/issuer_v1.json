@@ -2836,6 +2836,10 @@
                     },
                     "type": "object",
                     "additionalProperties": false
+                  },
+                  "waitInsteadOfSelfCheck": {
+                    "description": "WaitInsteadOfSelfCheck, if set, skips cert-manager's self-check and\ninstead waits this long after presentation before asking the ACME server\nto validate the challenge.\n\nThis is an advanced escape hatch for environments where cert-manager's\nself-check cannot succeed from its own network or DNS viewpoint even\nthough the ACME server can still validate successfully, for example due\nto split-horizon DNS or NAT hairpinning.\n\nA value of 0 skips the self-check and asks the ACME server to validate\nimmediately after presentation, relying on the ACME server's own\nvalidation retries (RFC 8555 section 8.2) to succeed once the challenge\nhas propagated. A negative duration is rejected.\nValue must be in units accepted by Go time.ParseDuration https://golang.org/pkg/time/#ParseDuration,\nfor example `30s` or `2m`.",
+                    "type": "string"
                   }
                 },
                 "type": "object",
@@ -2945,6 +2949,59 @@
                     "path",
                     "roleId",
                     "secretRef"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "aws": {
+                  "description": "AWS authenticates with Vault using AWS IAM authentication.\nThis allows authentication using IAM roles for service accounts (IRSA),\nEKS Pod Identity (PIA), or ambient credentials (EC2 instance profiles, ECS task role).",
+                  "properties": {
+                    "iamRoleArn": {
+                      "description": "The ARN of the AWS IAM role to assume using the Kubernetes service account\ntoken. Required when using IRSA (serviceAccountRef is set).\nThis role must have a trust policy that allows the OIDC provider to assume it.",
+                      "type": "string"
+                    },
+                    "mountPath": {
+                      "description": "The Vault mountPath here is the mount path to use when authenticating with\nVault. For example, setting a value to `/v1/auth/foo`, will use the path\n`/v1/auth/foo/login` to authenticate with Vault. If unspecified, the\ndefault value \"/v1/auth/aws\" will be used.",
+                      "type": "string"
+                    },
+                    "region": {
+                      "description": "The AWS region to use for authentication. If not specified, the region\nwill be determined from AWS_REGION or AWS_DEFAULT_REGION environment\nvariables, falling back to \"us-east-1\" if not set.",
+                      "type": "string"
+                    },
+                    "role": {
+                      "description": "A required field containing the Vault Role to assume when authenticating.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "serviceAccountRef": {
+                      "description": "A reference to a service account that will be used to request a web identity\ntoken for IRSA (IAM Roles for Service Accounts) authentication.",
+                      "properties": {
+                        "audiences": {
+                          "description": "TokenAudiences is an optional list of extra audiences to include in the token passed to Vault.\nThe default audiences are always included in the token.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        },
+                        "name": {
+                          "description": "Name of the ServiceAccount used to request a token.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "vaultHeaderValue": {
+                      "description": "The Vault header value to include in the STS signing request.\nThis is used to prevent replay attacks.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role"
                   ],
                   "type": "object",
                   "additionalProperties": false
@@ -3167,6 +3224,43 @@
               "type": "object",
               "additionalProperties": false
             },
+            "ngts": {
+              "description": "NGTS specifies Palo Alto Networks Next Generation Trust Services (NGTS) configuration\nusing OAuth 2.0 Client Credentials. Only one of tpp, cloud, or ngts may be specified.",
+              "properties": {
+                "credentialsRef": {
+                  "description": "CredentialsRef is a reference to a Kubernetes Secret containing the OAuth 2.0\nClient ID and Client Secret. The secret must contain the keys 'client-id' and\n'client-secret'.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the resource being referred to.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "tokenEndpoint": {
+                  "description": "TokenEndpoint is the OAuth 2.0 token endpoint URL used to obtain access tokens,\nfor example \"https://auth.apps.paloaltonetworks.com/oauth2/access_token\".\nDefaults to \"https://auth.apps.paloaltonetworks.com/oauth2/access_token\" if not set.",
+                  "type": "string"
+                },
+                "tsgID": {
+                  "description": "TSGID is the Tenant Service Group ID used to scope the OAuth 2.0 access token,\nfor example \"1234567890\". The tsg_id: prefix is added automatically.\nThis field is required.",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "URL is the base URL for the NGTS API endpoint.\nDefaults to \"https://api.strata.paloaltonetworks.com/ngts\" if not set.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "credentialsRef",
+                "tsgID"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
             "tpp": {
               "description": "TPP specifies CyberArk Certificate Manager Self-Hosted configuration settings.\nOnly one of CyberArk Certificate Manager may be specified.",
               "properties": {
@@ -3228,6 +3322,12 @@
             "zone"
           ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of tpp, cloud, or ngts must be configured",
+              "rule": "(has(self.tpp) ? 1 : 0) + (has(self.cloud) ? 1 : 0) + (has(self.ngts) ? 1 : 0) == 1"
+            }
+          ],
           "additionalProperties": false
         }
       },

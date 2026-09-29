@@ -15,13 +15,18 @@
     "spec": {
       "description": "Spec defines the desired state of the UpstreamSettingsPolicy.",
       "properties": {
+        "hashMethodKey": {
+          "description": "HashMethodKey defines the key used for hash-based load balancing methods.\nThis field is required when `LoadBalancingMethod` is set to `hash` or `hash consistent`.",
+          "pattern": "^\\$[a-z_]+$",
+          "type": "string"
+        },
         "keepAlive": {
           "description": "KeepAlive defines the keep-alive settings.",
           "properties": {
             "connections": {
-              "description": "Connections sets the maximum number of idle keep-alive connections to upstream servers that are preserved\nin the cache of each nginx worker process. When this number is exceeded, the least recently used\nconnections are closed.\nDirective: https://nginx.org/en/docs/http/ngx_http_upstream_module.html#keepalive",
+              "description": "Connections sets the maximum number of idle keep-alive connections to upstream servers that are preserved\nin the cache of each nginx worker process. When this number is exceeded, the least recently used\nconnections are closed.\nThe keepAlive directive for upstreams defaults to 16. To override this value, set the connections field.\nTo disable the keepAlive directive, set connections to 0.\nDirective: https://nginx.org/en/docs/http/ngx_http_upstream_module.html#keepalive",
               "format": "int32",
-              "minimum": 1,
+              "minimum": 0,
               "type": "integer"
             },
             "requests": {
@@ -43,6 +48,26 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "loadBalancingMethod": {
+          "description": "LoadBalancingMethod specifies the load balancing algorithm to be used for the upstream.\nIf not specified, NGINX Gateway Fabric defaults to `random two least_conn`,\nwhich differs from the standard NGINX default `round-robin`.",
+          "enum": [
+            "round_robin",
+            "least_conn",
+            "ip_hash",
+            "hash",
+            "hash consistent",
+            "random",
+            "random two",
+            "random two least_conn",
+            "random two least_time=header",
+            "random two least_time=last_byte",
+            "least_time header",
+            "least_time last_byte",
+            "least_time header inflight",
+            "least_time last_byte inflight"
+          ],
+          "type": "string"
         },
         "targetRefs": {
           "description": "TargetRefs identifies API object(s) to apply the policy to.\nObjects must be in the same namespace as the policy.\nSupport: Service\n\nTargetRefs must be _distinct_. The `name` field must be unique for all targetRef entries in the UpstreamSettingsPolicy.",
@@ -105,6 +130,12 @@
         "targetRefs"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "hashMethodKey is required when loadBalancingMethod is 'hash' or 'hash consistent'",
+          "rule": "!(has(self.loadBalancingMethod) && (self.loadBalancingMethod == 'hash' || self.loadBalancingMethod == 'hash consistent')) || has(self.hashMethodKey)"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
@@ -239,13 +270,15 @@
             },
             "required": [
               "ancestorRef",
+              "conditions",
               "controllerName"
             ],
             "type": "object",
             "additionalProperties": false
           },
           "maxItems": 16,
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "required": [

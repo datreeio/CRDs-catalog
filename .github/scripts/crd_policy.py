@@ -159,6 +159,8 @@ def validate_schema(raw):
 
 
 def parse_sources(body, filenames):
+    # GitHub descriptions commonly use CRLF, including browser-edited tables.
+    body = (body or "").replace("\r\n", "\n").replace("\r", "\n")
     blocks = re.findall(r"^```crd-sources\s*\n(.*?)^```\s*$", body or "", re.M | re.S)
     tables = re.findall(
         r"^\|[ \t]*Schema file[ \t]*\|[ \t]*Source CRD[ \t]*\|[ \t]*\n"
@@ -180,16 +182,30 @@ def parse_sources(body, filenames):
         if not isinstance(mapping, dict) or set(mapping) != set(filenames):
             raise ValueError()
         result = {}
+        manual_sources = False
         for filename, url in mapping.items():
+            if not isinstance(url, str) or not url.strip() or url.strip().lower() in (
+                "paste the permanent github file link here", "todo", "tbd", "n/a", "unknown"
+            ):
+                raise ValueError()
+            url = url.strip()
+            # A source explanation is evidence for human review, never auto-merge.
+            # Keep malformed/branch URLs contributor-fixable. Existing cluster
+            # extraction descriptions are accepted without requiring a new phrase.
+            if "://" not in url and len(url.split()) >= 3:
+                manual_sources = True
+                continue
             match = SOURCE.fullmatch(url) if isinstance(url, str) else None
             if not match or any(p in ("", ".", "..") for p in match[4].split("/")):
                 raise ValueError()
             if any(p in (".", "..") for p in match.group(1, 2)):
                 raise ValueError()
             result[filename] = (match[1] + "/" + match[2], match[3], match[4])
+        if manual_sources:
+            raise PolicyError("manual-review", "A source is described instead of linked to a public, commit-pinned CRD (for example, a live-cluster extraction). This contribution needs maintainer review; no upstream link is required to proceed with manual review.")
         return result
     except (ValueError, TypeError):
-        raise PolicyError("needs-contributor-input", "List each changed schema exactly once with its permanent GitHub source CRD link. Open the original CRD file on GitHub, press y, and copy the resulting URL. Branch and tag links do not qualify.") from None
+        raise PolicyError("needs-contributor-input", "List each changed schema exactly once with its permanent GitHub source CRD link. Open the original CRD file on GitHub, press y, and copy the resulting URL. Branch and tag links do not qualify. If no public source exists, write Live cluster only followed by the platform/version and extraction method for manual review.") from None
 
 
 def source_identities(raw):

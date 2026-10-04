@@ -14,13 +14,15 @@ Use the full URL in the second column. A permanent link looks like `https://gith
 
 Existing PRs may still use a `crd-sources` JSON block mapping schema paths to source URLs. Use either the table or the JSON block, not both.
 
+**No public upstream CRD?** Put `Live cluster only: <platform/version>; extracted with <tool or command>` in that schema's Source CRD cell. For other unavailable sources, describe where the schema came from and why no public link is available. Source explanations go to manual review, never automatic merging. Existing descriptions of cluster extraction are supported; the exact phrase is not mandatory. Blank cells and unfinished template placeholders still need contributor input.
+
 You do not need to supply a separate project repository, project version, generation command, or generation-tool name.
 
 ### What happens next
 
 - **Automatic merge:** All checks pass, the PR is ready for review, and GitHub branch protections permit the merge.
 - **Contributor input needed:** The source table is missing or incomplete, the source identity does not match, or a schema needs correction. Edit the PR description or push corrected files. The bot automatically rechecks it.
-- **Manual review:** A source repository is younger than 30 days or has fewer than five stars; a file/count/size limit is exceeded; or changes include deletions, renames, scripts, workflows, unusual file modes, or other non-schema files. The bot flags the PR immediately. It does not wait for a repository to become eligible.
+- **Manual review:** A source is described instead of linked to a public commit-pinned CRD, or a source repository is younger than 30 days or has fewer than five stars; a file/count/size limit is exceeded; or changes include deletions, renames, scripts, workflows, unusual file modes, or other non-schema files. The bot flags the PR immediately. It does not wait for a repository to become eligible.
 - **Check error:** GitHub or another dependency was unavailable. A maintainer can rerun the workflow. This never authorizes a merge.
 
 Automatic merge allows at most **25 added/modified schemas**, **2 MiB per resulting full file**, and **10 MiB combined**. Each source repository must be public, at least **30 days old**, and have at least **five stars**. New groups and changes to schema constraints are welcome.
@@ -57,7 +59,9 @@ and allow maintainer review instead of hiding or splitting changes to evade chec
 
 Fill one source table in the PR description, with columns "Schema file" and
 "Source CRD". List every changed schema path and its full commit-pinned source
-CRD URL. Repeat URLs when one source covers multiple schemas. Do not invent source evidence. No separate
+CRD URL. Repeat URLs when one source covers multiple schemas. Do not invent source evidence. If only a live-cluster source exists, put
+"Live cluster only: <platform/version>; extracted with <tool or command>"
+in the Source CRD cell so the PR goes directly to manual review. No separate
 repository, project version, or generation-tool fields are required.
 
 Check whether each source repository is at least 30 days old and has at least

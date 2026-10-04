@@ -14,6 +14,8 @@ Replace the example row. If one CRD file covers several schemas, use the same li
 | --- | --- |
 | `example.io/widget_v1.json` | Paste the permanent GitHub file link here |
 
+**No public CRD file?** In the Source CRD column, write `Live cluster only: <platform/version>; extracted with <tool or command>`. This sends the PR to manual review. You do not need to find a public link that does not exist.
+
 The bot will check your PR and tell you if anything needs fixing. Edit this description or push a fix to run the checks again.
 
 [Contribution guide and automatic merge limits](https://github.com/datreeio/CRDs-catalog/blob/main/CONTRIBUTING.md)
@@ -32,7 +34,9 @@ sources contain the matching group, kind, and API version.
 Fill the source table in this PR description, with one row per changed schema.
 Keep the column names "Schema file" and "Source CRD". Use the schema's path in
 this repository and the full source URL. Reuse a URL if it covers multiple files.
-Do not invent links. If a source is unavailable, tell me what is missing.
+Do not invent links. If the CRD is only available from a cluster, write
+"Live cluster only: <platform/version>; extracted with <tool or command>"
+in its Source CRD cell. This is a manual-review exception, not missing input.
 
 Check the contribution requirements and fix any issues the bot reports.
 Explain any exceptions that need maintainer review. Only change the requested

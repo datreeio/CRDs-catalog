@@ -144,6 +144,31 @@ class PolicyTests(unittest.TestCase):
         filled = template.replace('Paste the permanent GitHub file link here', URL)
         self.assertEqual(p.parse_sources(filled, [FILE]), p.parse_sources(BODY, [FILE]))
 
+    def test_source_line_endings(self):
+        table = '| Schema file | Source CRD |\n| --- | --- |\n| `' + FILE + '` | ' + URL + ' |\n'
+        expected = p.parse_sources(BODY, [FILE])
+        for body in (BODY, table):
+            for ending in ('\n', '\r\n', '\r'):
+                self.assertEqual(p.parse_sources(body.replace('\n', ending), [FILE]), expected)
+
+    def test_cluster_sources_require_manual_review(self):
+        for source in (
+            'Live cluster only: GKE 1.36; extracted with crd-extractor.sh',
+            '`computeclasses.cloud.google.com` on GKE `1.36.4-gke.1247000`, extracted with `Utilities/crd-extractor.sh`',
+        ):
+            table = '| Schema file | Source CRD |\r\n| --- | --- |\r\n| `' + FILE + '` | ' + source + ' |\r\n'
+            self.expect_error('manual-review', p.parse_sources, table, [FILE])
+            api = FakeAPI(); api.pr['body'] = table
+            self.assertEqual(p.evaluate(api, 1, NOW)['decision'], 'manual-review')
+            self.expect_error('manual-review', p.parse_sources, BODY.replace(URL, source), [FILE])
+
+    def test_source_exceptions_do_not_hide_missing_or_invalid_entries(self):
+        source = 'Live cluster only: GKE 1.36; extracted with tool'
+        for other in ('', 'TODO', URL.replace(SHA, 'main')):
+            body = '```crd-sources\n' + json.dumps({FILE: source, 'example.io/other_v1.json': other}) + '\n```'
+            self.expect_error('needs-contributor-input', p.parse_sources, body, [FILE, 'example.io/other_v1.json'])
+        self.expect_error('needs-contributor-input', p.parse_sources, BODY.replace(URL, source), [FILE, 'example.io/other_v1.json'])
+
     def test_crd_identity(self):
         self.assertEqual(p.source_identities(CRD), {('example.io', 'widget', 'v1')})
         self.assertEqual(p.source_identities(CRD.replace(b'CustomResourceDefinition', b'Deployment')), set())

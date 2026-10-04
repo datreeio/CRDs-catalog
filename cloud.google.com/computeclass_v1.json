@@ -34,6 +34,37 @@
           "type": "object",
           "additionalProperties": false
         },
+        "allocationStrategyDefaults": {
+          "description": "AllocationStrategyDefaults define the default allocation strategies for different provisioning models.",
+          "properties": {
+            "flexStart": {
+              "description": "FlexStart defines the default allocation strategy for flex start provisioning model.",
+              "enum": [
+                "lowest-cost",
+                "fleet-efficiency"
+              ],
+              "type": "string"
+            },
+            "onDemand": {
+              "description": "OnDemand defines the default allocation strategy for on-demand provisioning model.",
+              "enum": [
+                "lowest-cost",
+                "fleet-efficiency"
+              ],
+              "type": "string"
+            },
+            "spot": {
+              "description": "Spot defines the default allocation strategy for spot provisioning model.",
+              "enum": [
+                "lowest-cost",
+                "fleet-efficiency"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "autopilot": {
           "description": "Autopilot describes the autopilot settings for a given ComputeClass.",
           "properties": {
@@ -90,6 +121,17 @@
           "description": "Description is an arbitrary string that usually provides guidelines on\nwhen this compute class should be used.",
           "type": "string"
         },
+        "minimumCapacity": {
+          "description": "MinimumCapacity defines declarative minimum node preprovisioning requirements\nfor the entire ComputeClass.",
+          "properties": {
+            "targetNodeCount": {
+              "description": "TargetNodeCount defines a minimum number of nodes that should be present in the cluster.\nIf the active node count falls below the defined threshold,\nCluster Autoscaler will proactively provision capacity to satisfy the requirement.",
+              "type": "integer"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "nodePoolAutoCreation": {
           "default": {
             "enabled": false
@@ -100,6 +142,23 @@
               "default": false,
               "description": "Enabled indicates whether NodePoolAutoCreation is enabled for a given ComputeClass.",
               "type": "boolean"
+            },
+            "shieldedInstanceConfig": {
+              "description": "ShieldedInstanceConfig defines the shielded instance configuration for auto-created node pools.",
+              "properties": {
+                "enableIntegrityMonitoring": {
+                  "default": true,
+                  "description": "EnableIntegrityMonitoring defines whether integrity monitoring is enabled.",
+                  "type": "boolean"
+                },
+                "enableSecureBoot": {
+                  "default": false,
+                  "description": "EnableSecureBoot defines whether secure boot is enabled.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "required": [
@@ -184,6 +243,28 @@
               ],
               "type": "string"
             },
+            "instanceMetadata": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "InstanceMetadata is a map of custom key-value pairs to be injected into the underlying Compute Engine instances.",
+              "maxProperties": 32,
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Metadata keys must be alphanumeric with dashes/underscores and less than 128 characters",
+                  "rule": "self.all(k, k.matches('^[a-zA-Z0-9_-]+$') && size(k) < 128)"
+                },
+                {
+                  "message": "Metadata values cannot exceed 32768 characters",
+                  "rule": "self.all(k, size(self[k]) <= 32768)"
+                },
+                {
+                  "message": "Reserved metadata keys are not allowed",
+                  "rule": "self.all(k, !(k in ['cluster-location', 'cluster-name', 'cluster-uid', 'configure-sh', 'containerd-configure-sh', 'enable-os-login', 'gci-ensure-gke-docker', 'gci-metrics-enabled', 'gci-update-strategy', 'instance-template', 'kube-env', 'startup-script', 'user-data', 'disable-address-manager', 'windows-startup-script-ps1', 'common-psm1', 'k8s-node-setup-psm1', 'install-ssh-psm1', 'user-profile-psm1']))"
+                }
+              ]
+            },
             "ipType": {
               "description": "IPType specifies whether the nodes in the node pool use public or private IP addresses.\nPossible values are \"public\" or \"private\".\nAn empty string indicates the default IP type.\nThis setting corresponds to the presence and value of the cloud.google.com/private-node node selector.",
               "enum": [
@@ -213,6 +294,10 @@
               },
               "type": "object",
               "additionalProperties": false
+            },
+            "maintenanceExclusion": {
+              "description": "MaintenanceExclusion defines the type of exclusion policy applied to node pools.\nUNTIL_END_OF_SUPPORT - will not be upgraded until end of support of the nodepool's minor version",
+              "type": "string"
             },
             "nodeLabels": {
               "additionalProperties": {
@@ -244,9 +329,39 @@
               "maxItems": 5,
               "type": "array"
             },
+            "sandbox": {
+              "description": "Sandbox contains sandbox configuration.",
+              "properties": {
+                "type": {
+                  "description": "Type defines the sandbox type (e.g., gvisor) for all nodes managed by this class.",
+                  "enum": [
+                    "gvisor",
+                    "microvm"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "serviceAccount": {
               "description": "ServiceAccount used by the node pool.",
               "type": "string"
+            },
+            "taintConfig": {
+              "description": "TaintConfig contains node pool taint configuration.",
+              "properties": {
+                "architectureTaintBehavior": {
+                  "description": "ArchitectureTaintBehavior specifies the behavior of architecture taint.\nIf set to NONE, architecture taint will not be applied to the nodes.\nIf set to ARM, it will be applied to ARM64 nodes.\nDefault is ARM if unspecified.",
+                  "enum": [
+                    "NONE",
+                    "ARM"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             },
             "taints": {
               "description": "Taints is used to add user defined Kubernetes taints to all nodes in the new node pool.\nThese taints are applied to the Kubernetes API node object and can be used in tolerations for pod scheduling.",
@@ -284,6 +399,14 @@
               "maxItems": 100,
               "type": "array"
             },
+            "workloadMetadata": {
+              "description": "WorkloadMetadata specifies how node metadata is exposed to the workload.\nPossible values are \"GCE_METADATA\" or \"GKE_METADATA\".",
+              "enum": [
+                "GCE_METADATA",
+                "GKE_METADATA"
+              ],
+              "type": "string"
+            },
             "workloadType": {
               "description": "WorkloadType defines Collection or Goodput SLO for the workload. Currently\nsupported values:\n* HIGH_AVAILABILITY - for Collection SLO\n* HIGH_THROUGHPUT - for Goodput SLO\nHIGH_AVAILABILITY is desired for running serving workloads which require\nmost of the infrastructure (slices) running all the time to achieve high\navailability.\nHIGH_THROUGHPUT is desired for running batch/training jobs\nwhich require all underlying infrastructure (slices) running for most of\nthe time to make progress. HIGH_THROUGHPUT can be only set for a multi-host\nscenario, that is, when NodePoolGroup is set.",
               "enum": [
@@ -319,14 +442,23 @@
             "minProperties": 1,
             "properties": {
               "acceleratorNetworkProfile": {
-                "description": "AcceleratorNetworkProfile defines the type of automated accelerator network provisioning to use.\nPossible values:\n\"auto\": Enables automatic ANP configuration based on the machine type.\n\"auto-<suffix>\": Enables automatic ANP with a custom network profile suffix.",
+                "description": "AcceleratorNetworkProfile defines the type of automated accelerator network provisioning to use.\nPossible values:\n\"auto\": Enables automatic ANP configuration based on the machine type.\n\"auto-<suffix>\": Enables automatic ANP with a custom network profile suffix.\n\"<profile-name>\": References a user-managed AcceleratorNetworkProfile resource name.",
+                "maxLength": 63,
                 "type": "string",
                 "x-kubernetes-validations": [
                   {
-                    "message": "acceleratorNetworkProfile must be 'auto' or start with 'auto-'",
-                    "rule": "self == 'auto' || self.startsWith('auto-')"
+                    "message": "acceleratorNetworkProfile must be a valid resource ID up to 63 characters (lowercase letters, numbers, hyphens)",
+                    "rule": "self.matches('^[a-z]([a-z0-9-]*[a-z0-9])?$') && size(self) <= 63"
                   }
                 ]
+              },
+              "allocationStrategy": {
+                "description": "AllocationStrategy defines the allocation strategy for a node pool.",
+                "enum": [
+                  "lowest-cost",
+                  "fleet-efficiency"
+                ],
+                "type": "string"
               },
               "capacityCheckWaitTimeSeconds": {
                 "description": "CapacityCheckWaitTimeSeconds defines for how long will this priority be attempted to scale up before moving on to the next priority.",
@@ -379,7 +511,8 @@
                     "description": "DriverVersion describes version of GPU driver for a node.",
                     "enum": [
                       "default",
-                      "latest"
+                      "latest",
+                      "autoinstall-disabled"
                     ],
                     "type": "string"
                   },
@@ -415,6 +548,38 @@
                 },
                 "type": "object",
                 "additionalProperties": false
+              },
+              "gpuDirect": {
+                "description": "GpuDirect defines the gpu direct strategy.\nPossible values:\n\"rdma\"",
+                "type": "string",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "gpuDirect must be 'rdma'",
+                    "rule": "self == 'rdma'"
+                  }
+                ]
+              },
+              "instanceMetadata": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "InstanceMetadata is a map of custom key-value pairs to be injected into the underlying Compute Engine instances.\nOverrides conflicting keys defined in NodePoolConfig.InstanceMetadata.",
+                "maxProperties": 32,
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "Metadata keys must be alphanumeric with dashes/underscores and less than 128 characters",
+                    "rule": "self.all(k, k.matches('^[a-zA-Z0-9_-]+$') && size(k) < 128)"
+                  },
+                  {
+                    "message": "Metadata values cannot exceed 32768 characters",
+                    "rule": "self.all(k, size(self[k]) <= 32768)"
+                  },
+                  {
+                    "message": "Reserved metadata keys are not allowed",
+                    "rule": "self.all(k, !(k in ['cluster-location', 'cluster-name', 'cluster-uid', 'configure-sh', 'containerd-configure-sh', 'enable-os-login', 'gci-ensure-gke-docker', 'gci-metrics-enabled', 'gci-update-strategy', 'instance-template', 'kube-env', 'startup-script', 'user-data', 'disable-address-manager', 'windows-startup-script-ps1', 'common-psm1', 'k8s-node-setup-psm1', 'install-ssh-psm1', 'user-profile-psm1']))"
+                  }
+                ]
               },
               "location": {
                 "description": "Location describes CCC zonal preferences config.",
@@ -507,6 +672,17 @@
                 "minimum": 0,
                 "type": "integer"
               },
+              "minimumCapacity": {
+                "description": "MinimumCapacity defines declarative minimum node preprovisioning requirements\nfor this specific priority.",
+                "properties": {
+                  "targetNodeCount": {
+                    "description": "TargetNodeCount defines a minimum number of nodes that should be present in the cluster.\nIf the active node count falls below the defined threshold,\nCluster Autoscaler will proactively provision capacity to satisfy the requirement.",
+                    "type": "integer"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "nodeLabels": {
                 "additionalProperties": {
                   "type": "string"
@@ -560,6 +736,18 @@
                           "static"
                         ],
                         "type": "string"
+                      },
+                      "crashLoopBackOff": {
+                        "description": "CrashLoopBackOff contains the configuration to modify node level parameters\nfor container restart behavior.",
+                        "properties": {
+                          "maxContainerRestartPeriod": {
+                            "description": "MaxContainerRestartPeriod is the maximum duration the backoff delay can\naccrue to for container restarts. If not set, defaults to the internal\ncrashloopbackoff maximum.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                            "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
                       },
                       "evictionMaxPodGracePeriodSeconds": {
                         "description": "EvictionMaxPodGracePeriodSeconds is the maximum allowed grace period\n(in seconds) to use when terminating pods in response to a soft eviction\nthreshold being met.",
@@ -710,6 +898,21 @@
                         "minimum": 2,
                         "type": "integer"
                       },
+                      "memoryManager": {
+                        "description": "MemoryManager contains the configuration for the Kubelet Memory Manager.",
+                        "properties": {
+                          "policy": {
+                            "description": "Policy controls the Kubelet's Memory Manager policy.\nThe Static policy is required for the Memory Manager to perform memory affinity alignment.\nPolicies:\n* None: (default) The Kubelet does not perform any memory alignment.\n* Static: The Kubelet allows pods in the Guaranteed QoS class to be granted memory from a single NUMA node.",
+                            "enum": [
+                              "None",
+                              "Static"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "podPidsLimit": {
                         "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
                         "format": "int64",
@@ -717,9 +920,51 @@
                         "minimum": 1024,
                         "type": "integer"
                       },
+                      "shutdownGracePeriodCriticalPodsSeconds": {
+                        "description": "ShutdownGracePeriodCriticalPodsSeconds is the maximum allowed grace period\n(in seconds) that is used to terminate critical pods during a node shutdown.\nThis value should be <= ShutdownGracePeriodSeconds, and is only valid if ShutdownGracePeriodSeconds is set.",
+                        "format": "int32",
+                        "maximum": 120,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "shutdownGracePeriodSeconds": {
+                        "description": "ShutdownGracePeriodSeconds is the maximum allowed grace period\n(in seconds) that the node should delay the shutdown during a graceful shutdown.",
+                        "enum": [
+                          0,
+                          30,
+                          120
+                        ],
+                        "format": "int32",
+                        "type": "integer"
+                      },
                       "singleProcessOOMKill": {
                         "description": "This setting sets whether to enable single process OOM killer.\nIf set to true, the processes in a container will be OOM killed individually instead of as a group.",
                         "type": "boolean"
+                      },
+                      "topologyManager": {
+                        "description": "TopologyManager contains the configuration for the Kubelet Topology Manager.",
+                        "properties": {
+                          "policy": {
+                            "description": "Policy controls the Kubelet's Topology Manager policy.\nPolicies:\n* none: (default) The Kubelet does not perform any topology alignment.\n* best-effort: The Kubelet will attempt to align resources but will not fail pod admission.\n* restricted: The Kubelet will reject pods that do not align to the minimal number of NUMA domains.\n* single-numa-node: The Kubelet will reject pods that do not align to a single NUMA domain.",
+                            "enum": [
+                              "none",
+                              "best-effort",
+                              "restricted",
+                              "single-numa-node"
+                            ],
+                            "type": "string"
+                          },
+                          "scope": {
+                            "description": "Scope controls the Kubelet's Topology Manager scope.\nScopes:\n* container: (default) The Kubelet performs topology alignment for each container in a pod.\n* pod: The Kubelet performs topology alignment for the pod as a whole. This setting ensures pod-level topology alignment, where the Topology Manager treats all containers as a single unit to place them on a common set of NUMA nodes.",
+                            "enum": [
+                              "container",
+                              "pod"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
                       }
                     },
                     "type": "object",
@@ -731,6 +976,10 @@
                       {
                         "message": "ImageGcHighThresholdPercent must be higher than 80 which is default value of imageGcLowThresholdPercent",
                         "rule": "has(self.imageGcHighThresholdPercent)&&!has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>80 : true"
+                      },
+                      {
+                        "message": "ShutdownGracePeriodCriticalPodsSeconds must be less than or equal to ShutdownGracePeriodSeconds and requires ShutdownGracePeriodSeconds to be set",
+                        "rule": "!has(self.shutdownGracePeriodCriticalPodsSeconds) || (has(self.shutdownGracePeriodSeconds) && self.shutdownGracePeriodCriticalPodsSeconds <= self.shutdownGracePeriodSeconds)"
                       }
                     ],
                     "additionalProperties": false
@@ -738,6 +987,33 @@
                   "linuxNodeConfig": {
                     "description": "LinuxNodeConfig defines linux node config for a node.",
                     "properties": {
+                      "diskIoScheduler": {
+                        "description": "Controls the configuration for the disk IO scheduler.",
+                        "properties": {
+                          "nodeAttachedDiskIoScheduler": {
+                            "description": "Configures the IO scheduler for the attached disks.",
+                            "enum": [
+                              "mq-deadline",
+                              "bfq",
+                              "kyber",
+                              "none"
+                            ],
+                            "type": "string"
+                          },
+                          "nodeSystemIoScheduler": {
+                            "description": "Configures the IO scheduler for the boot disk or ephemeral lssd that runs\nnode system workloads.",
+                            "enum": [
+                              "mq-deadline",
+                              "bfq",
+                              "kyber",
+                              "none"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "hugepageConfig": {
                         "description": "HugepagesConfig defines hugepages config for a node.",
                         "properties": {
@@ -751,6 +1027,20 @@
                             "description": "Number of 2-megabyte-sized huge pages to allocate.",
                             "format": "int64",
                             "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "nodeVfioConfig": {
+                        "description": "Contains VFIO-related configurations for this node.",
+                        "properties": {
+                          "dmaEntryLimit": {
+                            "description": "Specifies the maximum number of DMA entries (pages) that can be mapped\nby the VFIO IOMMU type 1 driver for a container. This limit affects the\ntotal amount of host memory that can be pinned for direct device access,\nwhich is often critical for high-performance devices like TPUs and GPUs.\nThis setting corresponds to the kernel parameter at:\n/sys/module/vfio_iommu_type1/parameters/dma_entry_limit\nThe default value in the kernel is 65535. Higher values may be\nneeded for workloads mapping large memory regions.",
+                            "format": "int32",
+                            "maximum": 4194304,
+                            "minimum": 65535,
                             "type": "integer"
                           }
                         },
@@ -888,6 +1178,16 @@
                             "minimum": 1048576,
                             "type": "integer"
                           },
+                          "kernel.core_pattern": {
+                            "description": "Defines the core dump pattern for the kernel.\nOnly absolute paths are supported. Piping and relative paths are not allowed.",
+                            "maxLength": 128,
+                            "pattern": "^/[a-zA-Z0-9/._%-]+$",
+                            "type": "string"
+                          },
+                          "kernel.dmesg_restrict": {
+                            "description": "Indicates whether unprivileged users are prevented from using dmesg(8) to view messages from the kernel\u2019s log buffer.",
+                            "type": "boolean"
+                          },
                           "kernel.keys.maxbytes": {
                             "description": "Represents the maximum number of bytes that a nonroot user can hold in the payload section of all their keys.",
                             "format": "int64",
@@ -900,6 +1200,27 @@
                             "format": "int64",
                             "maximum": 1048576,
                             "minimum": 200,
+                            "type": "integer"
+                          },
+                          "kernel.kptr_restrict": {
+                            "description": "Indicates whether restrictions are placed on exposing kernel addresses via /proc and other interfaces.",
+                            "format": "int64",
+                            "maximum": 2,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "kernel.perf_event_paranoid": {
+                            "description": "Controls use of the performance events system by unprivileged users (without CAP_PERFMON). The default value is 2 in kernel.",
+                            "format": "int64",
+                            "maximum": 3,
+                            "minimum": -1,
+                            "type": "integer"
+                          },
+                          "kernel.sched_rt_runtime_us": {
+                            "description": "A global limit on how much time real-time scheduling may use.",
+                            "format": "int64",
+                            "maximum": 1000000,
+                            "minimum": -1,
                             "type": "integer"
                           },
                           "kernel.shmall": {
@@ -921,6 +1242,24 @@
                             "format": "int64",
                             "maximum": 32768,
                             "minimum": 4096,
+                            "type": "integer"
+                          },
+                          "kernel.softlockup_panic": {
+                            "description": "Control whether the kernel panics when a soft lockup is detected.",
+                            "type": "boolean"
+                          },
+                          "kernel.sysrq": {
+                            "description": "Controls the functions allowed to be invoked via the SysRq key. List of possible values:\n0: Disables sysrq completely.\n1: Enables all sysrq functions.\n>1 - bitmask of allowed sysrq functions. More details in https://docs.kernel.org/admin-guide/sysrq.html.",
+                            "format": "int64",
+                            "maximum": 511,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "kernel.yama.ptrace_scope": {
+                            "description": "Defines the scope and restrictions for the ptrace() system call, impacting process debugging and tracing. Supported values:\n0: Classic ptrace permissions.\n1: Restricted ptrace (default in many distributions) - only child processes or CAP_SYS_PTRACE.\n2: Admin-only ptrace - only processes with CAP_SYS_PTRACE.\n3: No ptrace - ptrace calls are disallowed.",
+                            "format": "int64",
+                            "maximum": 3,
+                            "minimum": 0,
                             "type": "integer"
                           },
                           "net.core.busy_poll": {
@@ -1007,15 +1346,49 @@
                             "minimum": 1024,
                             "type": "integer"
                           },
+                          "net.ipv4.tcp_congestion_control": {
+                            "description": "Set the congestion control algorithm to be used for new connections. The algorithm \u201creno\u201d is always available, but additional choices may be available based on kernel configuration. Default is set as part of kernel configuration. For passive connections, the listener congestion control choice is inherited.",
+                            "maxLength": 10,
+                            "pattern": "^[a-zA-Z0-9_]+$",
+                            "type": "string"
+                          },
+                          "net.ipv4.tcp_ecn": {
+                            "description": "Control use of Explicit Congestion Notification (ECN) by TCP. ECN is used only when both ends of the TCP connection indicate support for it.",
+                            "format": "int64",
+                            "maximum": 2,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
                           "net.ipv4.tcp_max_orphans": {
                             "format": "int64",
                             "maximum": 262144,
                             "minimum": 16384,
                             "type": "integer"
                           },
+                          "net.ipv4.tcp_max_tw_buckets": {
+                            "description": "Maximal number of timewait sockets held by system simultaneously. If this number is exceeded time-wait socket is immediately destroyed and warning is printed.",
+                            "format": "int64",
+                            "maximum": 2147483647,
+                            "minimum": 4096,
+                            "type": "integer"
+                          },
+                          "net.ipv4.tcp_mtu_probing": {
+                            "description": "Controls TCP Packetization-Layer Path MTU Discovery. Supported values:\n0: Disabled\n1: Disabled by default, enabled when an ICMP black hole detected\n2: Always enabled, use initial MSS of tcp_base_mss.",
+                            "format": "int64",
+                            "maximum": 2,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
                           "net.ipv4.tcp_rmem": {
                             "description": "Minimal size of receive buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for receiving data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
                             "type": "string"
+                          },
+                          "net.ipv4.tcp_syn_retries": {
+                            "description": "Number of times initial SYNs for an active TCP connection attempt will be retransmitted.",
+                            "format": "int64",
+                            "maximum": 127,
+                            "minimum": 1,
+                            "type": "integer"
                           },
                           "net.ipv4.tcp_tw_reuse": {
                             "description": "Allow to reuse TIME-WAIT sockets for new connections when it is safe from protocol viewpoint. It should not be changed without advice/request of technical experts.",
@@ -1075,11 +1448,25 @@
                             "minimum": 1,
                             "type": "integer"
                           },
+                          "vm.dirty_background_bytes": {
+                            "description": "Contains the amount of dirty memory at which the background kernel flusher threads will start writeback.\nNote: Vm_dirty_background_bytes is the counterpart of Vm_dirty_background_ratio. Only one of them may be specified at a time.",
+                            "format": "int64",
+                            "maximum": 68719476736,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
                           "vm.dirty_background_ratio": {
                             "description": "Percentage of system memory that can be filled with dirty pages (modified but not yet written to disk) before background kernel flusher threads begin writeback.\nThis value should be less than 'vm.dirty_ratio'.",
                             "format": "int64",
                             "maximum": 100,
                             "minimum": 1,
+                            "type": "integer"
+                          },
+                          "vm.dirty_bytes": {
+                            "description": "Contains the amount of dirty memory at which a process generating disk writes will itself start writeback.\nNote: Vm_dirty_bytes is the counterpart of Vm_dirty_ratio. Only one of them may be specified at a time.\nNote: the minimum value allowed for Vm_dirty_bytes is two pages (in bytes); any value lower than this limit will be ignored and the old configuration will be retained.",
+                            "format": "int64",
+                            "maximum": 68719476736,
+                            "minimum": 0,
                             "type": "integer"
                           },
                           "vm.dirty_expire_centisecs": {
@@ -1226,11 +1613,12 @@
                 "description": "Reservations defines reservations config for a node.",
                 "properties": {
                   "affinity": {
-                    "description": "ReservationAffinity affects reservations considered and the way how they are consumed.\n\"Specific\" means that only specific reservations are considered with no fallback possible.\n\"AnyBestEffort\" affinity would consider any non-specific reservation available\nto be claimed with a fallback to on-demand nodes in case of none claimable.\n\"None\" affinity would prevent reservations from being used",
+                    "description": "ReservationAffinity affects reservations considered and the way how they are consumed.\n\"Specific\" means that only specific reservations are considered with no fallback possible.\n\"AnyBestEffort\" affinity would consider any non-specific reservation available\nto be claimed with a fallback to on-demand nodes in case of none claimable.\n\"None\" affinity would prevent reservations from being used.\n\"AnyThenFail\" affinity would consider any non-specific reservation available\nto be claimed without a fallback to on-demand nodes in case of none claimable,\nthat means, node creation will fail if no reservation is available.",
                     "enum": [
                       "Specific",
                       "AnyBestEffort",
-                      "None"
+                      "None",
+                      "AnyThenFail"
                     ],
                     "type": "string"
                   },
@@ -1436,8 +1824,8 @@
             "type": "object",
             "x-kubernetes-validations": [
               {
-                "message": "Nodepool field cannot be set along with other fields",
-                "rule": "has(self.nodepools) ? (size(dyn(self)) == 1) : true"
+                "message": "Nodepool field cannot be set along with other nodepool configuration fields",
+                "rule": "has(self.nodepools) ? (size(dyn(self)) == 1 + (has(self.allocationStrategy) ? 1 : 0) + (has(self.priorityScore) ? 1 : 0)) : true"
               },
               {
                 "message": "MachineFamily and MachineType cannot be set together",
@@ -1456,20 +1844,24 @@
                 "rule": "!(has(self.machineType) && self.machineType.startsWith('ek'))"
               },
               {
-                "message": "MachineFamily cannot be equal to 'e4a'",
-                "rule": "!(has(self.machineFamily) && self.machineFamily == 'e4a')"
-              },
-              {
-                "message": "MachineType cannot start with 'e4a' prefix",
-                "rule": "!(has(self.machineType) && self.machineType.startsWith('e4a'))"
-              },
-              {
                 "message": "Flex Start provisioning model is incompatible with Spot",
                 "rule": "!(has(self.flexStart) && has(self.spot) && self.spot == true && self.flexStart.enabled == true)"
               },
               {
                 "message": "capacityCheckWaitTimeSeconds is only supported for Flex Start and for multi-host TPUs",
                 "rule": "!has(self.capacityCheckWaitTimeSeconds) || has(self.tpu) || (has(self.flexStart) && self.flexStart.enabled)"
+              },
+              {
+                "message": "shutdownGracePeriodSeconds is only supported for Spot",
+                "rule": "(has(self.spot) && self.spot) || !has(self.nodeSystemConfig) || !has(self.nodeSystemConfig.kubeletConfig) || !has(self.nodeSystemConfig.kubeletConfig.shutdownGracePeriodSeconds)"
+              },
+              {
+                "message": "acceleratorNetworkProfile must be specified when gpuDirect is 'rdma'",
+                "rule": "!(has(self.gpuDirect) && self.gpuDirect == 'rdma') || has(self.acceleratorNetworkProfile)"
+              },
+              {
+                "message": "Priority-level MinimumCapacity requires a machineType, gpu, tpu, or specific reservation",
+                "rule": "has(self.minimumCapacity) && has(self.minimumCapacity.targetNodeCount) ? (has(self.machineType) || has(self.gpu) || has(self.tpu) || (has(self.reservations) && self.reservations.affinity == 'Specific')) : true"
               }
             ],
             "additionalProperties": false
@@ -1564,6 +1956,18 @@
                         "static"
                       ],
                       "type": "string"
+                    },
+                    "crashLoopBackOff": {
+                      "description": "CrashLoopBackOff contains the configuration to modify node level parameters\nfor container restart behavior.",
+                      "properties": {
+                        "maxContainerRestartPeriod": {
+                          "description": "MaxContainerRestartPeriod is the maximum duration the backoff delay can\naccrue to for container restarts. If not set, defaults to the internal\ncrashloopbackoff maximum.\nThe value must be a duration string. Eg. \"30s\", \"1m30s\".\nThe value must be positive and less than '5m'.",
+                          "pattern": "^([0-9]+([.][0-9]+)?(ns|us|\u00b5s|ms|s|m|h))+$",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
                     },
                     "evictionMaxPodGracePeriodSeconds": {
                       "description": "EvictionMaxPodGracePeriodSeconds is the maximum allowed grace period\n(in seconds) to use when terminating pods in response to a soft eviction\nthreshold being met.",
@@ -1714,6 +2118,21 @@
                       "minimum": 2,
                       "type": "integer"
                     },
+                    "memoryManager": {
+                      "description": "MemoryManager contains the configuration for the Kubelet Memory Manager.",
+                      "properties": {
+                        "policy": {
+                          "description": "Policy controls the Kubelet's Memory Manager policy.\nThe Static policy is required for the Memory Manager to perform memory affinity alignment.\nPolicies:\n* None: (default) The Kubelet does not perform any memory alignment.\n* Static: The Kubelet allows pods in the Guaranteed QoS class to be granted memory from a single NUMA node.",
+                          "enum": [
+                            "None",
+                            "Static"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
                     "podPidsLimit": {
                       "description": "This setting sets the maximum number of process IDs (PIDs) that each Pod can use.",
                       "format": "int64",
@@ -1721,9 +2140,51 @@
                       "minimum": 1024,
                       "type": "integer"
                     },
+                    "shutdownGracePeriodCriticalPodsSeconds": {
+                      "description": "ShutdownGracePeriodCriticalPodsSeconds is the maximum allowed grace period\n(in seconds) that is used to terminate critical pods during a node shutdown.\nThis value should be <= ShutdownGracePeriodSeconds, and is only valid if ShutdownGracePeriodSeconds is set.",
+                      "format": "int32",
+                      "maximum": 120,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "shutdownGracePeriodSeconds": {
+                      "description": "ShutdownGracePeriodSeconds is the maximum allowed grace period\n(in seconds) that the node should delay the shutdown during a graceful shutdown.",
+                      "enum": [
+                        0,
+                        30,
+                        120
+                      ],
+                      "format": "int32",
+                      "type": "integer"
+                    },
                     "singleProcessOOMKill": {
                       "description": "This setting sets whether to enable single process OOM killer.\nIf set to true, the processes in a container will be OOM killed individually instead of as a group.",
                       "type": "boolean"
+                    },
+                    "topologyManager": {
+                      "description": "TopologyManager contains the configuration for the Kubelet Topology Manager.",
+                      "properties": {
+                        "policy": {
+                          "description": "Policy controls the Kubelet's Topology Manager policy.\nPolicies:\n* none: (default) The Kubelet does not perform any topology alignment.\n* best-effort: The Kubelet will attempt to align resources but will not fail pod admission.\n* restricted: The Kubelet will reject pods that do not align to the minimal number of NUMA domains.\n* single-numa-node: The Kubelet will reject pods that do not align to a single NUMA domain.",
+                          "enum": [
+                            "none",
+                            "best-effort",
+                            "restricted",
+                            "single-numa-node"
+                          ],
+                          "type": "string"
+                        },
+                        "scope": {
+                          "description": "Scope controls the Kubelet's Topology Manager scope.\nScopes:\n* container: (default) The Kubelet performs topology alignment for each container in a pod.\n* pod: The Kubelet performs topology alignment for the pod as a whole. This setting ensures pod-level topology alignment, where the Topology Manager treats all containers as a single unit to place them on a common set of NUMA nodes.",
+                          "enum": [
+                            "container",
+                            "pod"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
                     }
                   },
                   "type": "object",
@@ -1735,6 +2196,10 @@
                     {
                       "message": "ImageGcHighThresholdPercent must be higher than 80 which is default value of imageGcLowThresholdPercent",
                       "rule": "has(self.imageGcHighThresholdPercent)&&!has(self.imageGcLowThresholdPercent) ? self.imageGcHighThresholdPercent>80 : true"
+                    },
+                    {
+                      "message": "ShutdownGracePeriodCriticalPodsSeconds must be less than or equal to ShutdownGracePeriodSeconds and requires ShutdownGracePeriodSeconds to be set",
+                      "rule": "!has(self.shutdownGracePeriodCriticalPodsSeconds) || (has(self.shutdownGracePeriodSeconds) && self.shutdownGracePeriodCriticalPodsSeconds <= self.shutdownGracePeriodSeconds)"
                     }
                   ],
                   "additionalProperties": false
@@ -1742,6 +2207,33 @@
                 "linuxNodeConfig": {
                   "description": "LinuxNodeConfig defines linux node config for a node.",
                   "properties": {
+                    "diskIoScheduler": {
+                      "description": "Controls the configuration for the disk IO scheduler.",
+                      "properties": {
+                        "nodeAttachedDiskIoScheduler": {
+                          "description": "Configures the IO scheduler for the attached disks.",
+                          "enum": [
+                            "mq-deadline",
+                            "bfq",
+                            "kyber",
+                            "none"
+                          ],
+                          "type": "string"
+                        },
+                        "nodeSystemIoScheduler": {
+                          "description": "Configures the IO scheduler for the boot disk or ephemeral lssd that runs\nnode system workloads.",
+                          "enum": [
+                            "mq-deadline",
+                            "bfq",
+                            "kyber",
+                            "none"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
                     "hugepageConfig": {
                       "description": "HugepagesConfig defines hugepages config for a node.",
                       "properties": {
@@ -1755,6 +2247,20 @@
                           "description": "Number of 2-megabyte-sized huge pages to allocate.",
                           "format": "int64",
                           "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "nodeVfioConfig": {
+                      "description": "Contains VFIO-related configurations for this node.",
+                      "properties": {
+                        "dmaEntryLimit": {
+                          "description": "Specifies the maximum number of DMA entries (pages) that can be mapped\nby the VFIO IOMMU type 1 driver for a container. This limit affects the\ntotal amount of host memory that can be pinned for direct device access,\nwhich is often critical for high-performance devices like TPUs and GPUs.\nThis setting corresponds to the kernel parameter at:\n/sys/module/vfio_iommu_type1/parameters/dma_entry_limit\nThe default value in the kernel is 65535. Higher values may be\nneeded for workloads mapping large memory regions.",
+                          "format": "int32",
+                          "maximum": 4194304,
+                          "minimum": 65535,
                           "type": "integer"
                         }
                       },
@@ -1892,6 +2398,16 @@
                           "minimum": 1048576,
                           "type": "integer"
                         },
+                        "kernel.core_pattern": {
+                          "description": "Defines the core dump pattern for the kernel.\nOnly absolute paths are supported. Piping and relative paths are not allowed.",
+                          "maxLength": 128,
+                          "pattern": "^/[a-zA-Z0-9/._%-]+$",
+                          "type": "string"
+                        },
+                        "kernel.dmesg_restrict": {
+                          "description": "Indicates whether unprivileged users are prevented from using dmesg(8) to view messages from the kernel\u2019s log buffer.",
+                          "type": "boolean"
+                        },
                         "kernel.keys.maxbytes": {
                           "description": "Represents the maximum number of bytes that a nonroot user can hold in the payload section of all their keys.",
                           "format": "int64",
@@ -1904,6 +2420,27 @@
                           "format": "int64",
                           "maximum": 1048576,
                           "minimum": 200,
+                          "type": "integer"
+                        },
+                        "kernel.kptr_restrict": {
+                          "description": "Indicates whether restrictions are placed on exposing kernel addresses via /proc and other interfaces.",
+                          "format": "int64",
+                          "maximum": 2,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "kernel.perf_event_paranoid": {
+                          "description": "Controls use of the performance events system by unprivileged users (without CAP_PERFMON). The default value is 2 in kernel.",
+                          "format": "int64",
+                          "maximum": 3,
+                          "minimum": -1,
+                          "type": "integer"
+                        },
+                        "kernel.sched_rt_runtime_us": {
+                          "description": "A global limit on how much time real-time scheduling may use.",
+                          "format": "int64",
+                          "maximum": 1000000,
+                          "minimum": -1,
                           "type": "integer"
                         },
                         "kernel.shmall": {
@@ -1925,6 +2462,24 @@
                           "format": "int64",
                           "maximum": 32768,
                           "minimum": 4096,
+                          "type": "integer"
+                        },
+                        "kernel.softlockup_panic": {
+                          "description": "Control whether the kernel panics when a soft lockup is detected.",
+                          "type": "boolean"
+                        },
+                        "kernel.sysrq": {
+                          "description": "Controls the functions allowed to be invoked via the SysRq key. List of possible values:\n0: Disables sysrq completely.\n1: Enables all sysrq functions.\n>1 - bitmask of allowed sysrq functions. More details in https://docs.kernel.org/admin-guide/sysrq.html.",
+                          "format": "int64",
+                          "maximum": 511,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "kernel.yama.ptrace_scope": {
+                          "description": "Defines the scope and restrictions for the ptrace() system call, impacting process debugging and tracing. Supported values:\n0: Classic ptrace permissions.\n1: Restricted ptrace (default in many distributions) - only child processes or CAP_SYS_PTRACE.\n2: Admin-only ptrace - only processes with CAP_SYS_PTRACE.\n3: No ptrace - ptrace calls are disallowed.",
+                          "format": "int64",
+                          "maximum": 3,
+                          "minimum": 0,
                           "type": "integer"
                         },
                         "net.core.busy_poll": {
@@ -2011,15 +2566,49 @@
                           "minimum": 1024,
                           "type": "integer"
                         },
+                        "net.ipv4.tcp_congestion_control": {
+                          "description": "Set the congestion control algorithm to be used for new connections. The algorithm \u201creno\u201d is always available, but additional choices may be available based on kernel configuration. Default is set as part of kernel configuration. For passive connections, the listener congestion control choice is inherited.",
+                          "maxLength": 10,
+                          "pattern": "^[a-zA-Z0-9_]+$",
+                          "type": "string"
+                        },
+                        "net.ipv4.tcp_ecn": {
+                          "description": "Control use of Explicit Congestion Notification (ECN) by TCP. ECN is used only when both ends of the TCP connection indicate support for it.",
+                          "format": "int64",
+                          "maximum": 2,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
                         "net.ipv4.tcp_max_orphans": {
                           "format": "int64",
                           "maximum": 262144,
                           "minimum": 16384,
                           "type": "integer"
                         },
+                        "net.ipv4.tcp_max_tw_buckets": {
+                          "description": "Maximal number of timewait sockets held by system simultaneously. If this number is exceeded time-wait socket is immediately destroyed and warning is printed.",
+                          "format": "int64",
+                          "maximum": 2147483647,
+                          "minimum": 4096,
+                          "type": "integer"
+                        },
+                        "net.ipv4.tcp_mtu_probing": {
+                          "description": "Controls TCP Packetization-Layer Path MTU Discovery. Supported values:\n0: Disabled\n1: Disabled by default, enabled when an ICMP black hole detected\n2: Always enabled, use initial MSS of tcp_base_mss.",
+                          "format": "int64",
+                          "maximum": 2,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
                         "net.ipv4.tcp_rmem": {
                           "description": "Minimal size of receive buffer used by UDP sockets in moderation. Each UDP socket is able to use the size for receiving data, even if total pages of UDP sockets exceed udp_mem pressure. The unit is byte. Default: 1 page. The three values are: min, default, max. Eg. '4096 87380 6291456'.",
                           "type": "string"
+                        },
+                        "net.ipv4.tcp_syn_retries": {
+                          "description": "Number of times initial SYNs for an active TCP connection attempt will be retransmitted.",
+                          "format": "int64",
+                          "maximum": 127,
+                          "minimum": 1,
+                          "type": "integer"
                         },
                         "net.ipv4.tcp_tw_reuse": {
                           "description": "Allow to reuse TIME-WAIT sockets for new connections when it is safe from protocol viewpoint. It should not be changed without advice/request of technical experts.",
@@ -2079,11 +2668,25 @@
                           "minimum": 1,
                           "type": "integer"
                         },
+                        "vm.dirty_background_bytes": {
+                          "description": "Contains the amount of dirty memory at which the background kernel flusher threads will start writeback.\nNote: Vm_dirty_background_bytes is the counterpart of Vm_dirty_background_ratio. Only one of them may be specified at a time.",
+                          "format": "int64",
+                          "maximum": 68719476736,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
                         "vm.dirty_background_ratio": {
                           "description": "Percentage of system memory that can be filled with dirty pages (modified but not yet written to disk) before background kernel flusher threads begin writeback.\nThis value should be less than 'vm.dirty_ratio'.",
                           "format": "int64",
                           "maximum": 100,
                           "minimum": 1,
+                          "type": "integer"
+                        },
+                        "vm.dirty_bytes": {
+                          "description": "Contains the amount of dirty memory at which a process generating disk writes will itself start writeback.\nNote: Vm_dirty_bytes is the counterpart of Vm_dirty_ratio. Only one of them may be specified at a time.\nNote: the minimum value allowed for Vm_dirty_bytes is two pages (in bytes); any value lower than this limit will be ignored and the old configuration will be retained.",
+                          "format": "int64",
+                          "maximum": 68719476736,
+                          "minimum": 0,
                           "type": "integer"
                         },
                         "vm.dirty_expire_centisecs": {
@@ -2242,8 +2845,12 @@
           "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType)) ? self.priorities.all(priority, has(priority.machineFamily) || has(priority.machineType)) : true"
         },
         {
-          "message": "ConfidentialNodeType SEV only supports N2D, C2D, C3D, C4D",
-          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['n2d', 'c2d', 'c3d', 'c4d']) || (has(priority.machineType) && priority.machineType.split('-')[0] in ['n2d', 'c2d', 'c3d', 'c4d']))) : true"
+          "message": "ConfidentialNodeType SEV only supports N2D, C2D, C3D, C4D, G4",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV\") ? self.priorities.all(priority, ((has(priority.machineFamily) && priority.machineFamily in ['n2d', 'c2d', 'c3d', 'c4d', 'g4']) || (has(priority.machineType) && priority.machineType.split('-')[0] in ['n2d', 'c2d', 'c3d', 'c4d', 'g4']))) : true"
+        },
+        {
+          "message": "ConfidentialNodeType SEV on G4 only supports g4-standard-48 machine type and nvidia-rtx-pro-6000 GPU type",
+          "rule": "(has(self.nodePoolConfig) && has(self.nodePoolConfig.confidentialNodeType) && self.nodePoolConfig.confidentialNodeType == \"SEV\") ? self.priorities.all(priority, (has(priority.machineFamily) && priority.machineFamily == 'g4') ? false : (has(priority.machineType) && priority.machineType.startsWith('g4-')) ? (priority.machineType == 'g4-standard-48' && (!has(priority.gpu) || has(priority.gpu) && (!has(priority.gpu.type) || priority.gpu.type == 'nvidia-rtx-pro-6000'))) : true) : true"
         },
         {
           "message": "ConfidentialNodeType SEV_SNP only supports N2D",
@@ -2272,6 +2879,18 @@
         {
           "message": "PriorityScore must be set for all priorities or for none of them",
           "rule": "self.priorities.all(p, has(p.priorityScore)) || self.priorities.all(p, !has(p.priorityScore))"
+        },
+        {
+          "message": "shutdownGracePeriodSeconds is only supported for Spot",
+          "rule": "self.priorities.all(p, (has(p.spot) && p.spot)) || !has(self.priorityDefaults) || !has(self.priorityDefaults.nodeSystemConfig) || !has(self.priorityDefaults.nodeSystemConfig.kubeletConfig) || !has(self.priorityDefaults.nodeSystemConfig.kubeletConfig.shutdownGracePeriodSeconds)"
+        },
+        {
+          "message": "Spec-level MinimumCapacity requires all priorities to have machine specifications (machineType, gpu, tpu, or specific reservation)",
+          "rule": "has(self.minimumCapacity) && has(self.minimumCapacity.targetNodeCount) ? self.priorities.all(p, has(p.machineType) || has(p.gpu) || has(p.tpu) || (has(p.reservations) && p.reservations.affinity == 'Specific')) : true"
+        },
+        {
+          "message": "Sysctl config net.ipv4.tcp_congestion_control cannot be set when Autopilot is enabled",
+          "rule": "(has(self.autopilot) && self.autopilot.enabled) ? ((!has(self.priorityDefaults) || !has(self.priorityDefaults.nodeSystemConfig) || !has(self.priorityDefaults.nodeSystemConfig.linuxNodeConfig) || !has(self.priorityDefaults.nodeSystemConfig.linuxNodeConfig.sysctls) || !has(self.priorityDefaults.nodeSystemConfig.linuxNodeConfig.sysctls.net__dot__ipv4__dot__tcp_congestion_control)) && self.priorities.all(p, !has(p.nodeSystemConfig) || !has(p.nodeSystemConfig.linuxNodeConfig) || !has(p.nodeSystemConfig.linuxNodeConfig.sysctls) || !has(p.nodeSystemConfig.linuxNodeConfig.sysctls.net__dot__ipv4__dot__tcp_congestion_control))) : true"
         }
       ],
       "additionalProperties": false

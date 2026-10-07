@@ -45,6 +45,21 @@
                   "description": "Root certificate authority that clients use when verifying server certificates. Used for https connection to ClickHouse",
                   "type": "string"
                 },
+                "rootCASecretRef": {
+                  "description": "Reference to a k8s Secret (in the operator namespace) holding the PEM root certificate authority used when verifying ClickHouse server certificates over https. Alternate source for rootCA; mutually exclusive with the inline rootCA above (inline wins).",
+                  "properties": {
+                    "key": {
+                      "description": "Key within the Secret whose value is the PEM CA bundle. When empty, the operator tries 'ca.crt' then 'tls.crt'",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Name of the k8s Secret holding the PEM CA bundle. Empty name = not used",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "scheme": {
                   "description": "The scheme to user for connecting to ClickHouse. Possible values: http, https, auto",
                   "type": "string"
@@ -257,6 +272,17 @@
             "metrics": {
               "description": "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator",
               "properties": {
+                "excludeRegexp": {
+                  "description": "List of regexps to match ClickHouse metrics to exclude from collection/export.\nRegexps match internal metric names before Prometheus normalization and prefixing.\n",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "tablesRegexp": {
+                  "description": "Regexp to match tables in system database to fetch metrics from.\nMultiple tables can be matched using regexp. Matched tables are merged using merge() table function.\nDefault is \"^(metrics|custom_metrics)$\".\n",
+                  "type": "string"
+                },
                 "timeouts": {
                   "description": "Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances\nSpecified in seconds.\n",
                   "properties": {
@@ -278,37 +304,17 @@
           "type": "object",
           "additionalProperties": false
         },
+        "keeper": {
+          "description": "Keeper-side counterparts of the `clickhouse` section - config-file paths and the\ndefault Keeper user/network settings the operator generates for\nClickHouseKeeperInstallation resources.\nDeclared preserve-unknown-fields rather than fully modelled: without this the API\nserver PRUNES the whole section from a ClickHouseOperatorConfiguration CR and the\noperator silently falls back to built-in defaults. The ConfigMap path was never\naffected. Modelling the leaves properly would also buy validation - see the\ncoverage test in pkg/apis/clickhouse.altinity.com/v1.\n",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
         "label": {
           "description": "defines which metadata.labels will include or exclude during render StatefulSet, Pod, PVC resources",
           "properties": {
             "appendScope": {
               "description": "Whether to append *Scope* labels to StatefulSet and Pod\n- \"LabelShardScopeIndex\"\n- \"LabelReplicaScopeIndex\"\n- \"LabelCHIScopeIndex\"\n- \"LabelCHIScopeCycleSize\"\n- \"LabelCHIScopeCycleIndex\"\n- \"LabelCHIScopeCycleOffset\"\n- \"LabelClusterScopeIndex\"\n- \"LabelClusterScopeCycleSize\"\n- \"LabelClusterScopeCycleIndex\"\n- \"LabelClusterScopeCycleOffset\"\n",
-              "enum": [
-                "",
-                "0",
-                "1",
-                "False",
-                "false",
-                "True",
-                "true",
-                "No",
-                "no",
-                "Yes",
-                "yes",
-                "Off",
-                "off",
-                "On",
-                "on",
-                "Disable",
-                "disable",
-                "Enable",
-                "enable",
-                "Disabled",
-                "disabled",
-                "Enabled",
-                "enabled"
-              ],
-              "type": "string"
+              "x-kubernetes-preserve-unknown-fields": true
             },
             "exclude": {
               "description": "When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,\nexclude labels from the following list\n",
@@ -393,129 +399,312 @@
         "reconcile": {
           "description": "allow tuning reconciling process",
           "properties": {
+            "coordination": {
+              "description": "Coordination with external systems during reconcile",
+              "properties": {
+                "keeper": {
+                  "description": "Keeper-related coordination settings",
+                  "properties": {
+                    "onKeeperResourceUpdate": {
+                      "description": "Reaction when a referenced CHK resource changes.\n  none (default) \u2014 do nothing\n  reconcile \u2014 trigger CHI reconcile\n",
+                      "enum": [
+                        "",
+                        "None",
+                        "none",
+                        "Reconcile",
+                        "reconcile"
+                      ],
+                      "type": "string"
+                    },
+                    "readyTimeout": {
+                      "description": "How long the operator waits for a referenced ClickHouseKeeper to become ready\nbefore aborting CHI reconcile. In seconds. Default is 120.\n",
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "host": {
               "description": "Whether the operator during reconcile procedure should wait for a ClickHouse host:\n  - to be excluded from a ClickHouse cluster\n  - to complete all running queries\n  - to be included into a ClickHouse cluster\nrespectfully before moving forward\n",
               "properties": {
+                "drop": {
+                  "properties": {
+                    "replicas": {
+                      "description": "Whether the operator during reconcile procedure should drop replicas when replica is deleted or recreated\n",
+                      "properties": {
+                        "active": {
+                          "description": "Whether the operator during reconcile procedure should drop active replicas when replica is deleted or recreated\n",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        },
+                        "onDelete": {
+                          "description": "Whether the operator during reconcile procedure should drop replicas when replica is deleted\n",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        },
+                        "onLostVolume": {
+                          "description": "Whether the operator during reconcile procedure should drop replicas when replica volume is lost\n",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "hooks": {
+                  "description": "default host-level hooks to execute before and after host reconcile",
+                  "properties": {
+                    "post": {
+                      "description": "actions to execute after host reconcile",
+                      "items": {
+                        "properties": {
+                          "events": {
+                            "description": "Reconcile lifecycle events that trigger this hook. Required, must be non-empty.\nThe hook is skipped on any reconcile whose classifier does not emit at least one\nof the listed events. Supported values:\n  Any               - wildcard match: fires on every hook-evaluation point,\n                      including the pre-delete sweep on the dying host\n  HostCreate        - first reconcile that creates a host (no ancestor); best\n                      paired with POST hooks because PRE hooks on first creation\n                      are skipped (no live pod yet)\n  HostUpdate        - reconcile that has prior state for the host; catch-all\n                      for ongoing reconciles\n  HostStart         - host transitions from stopped to running\n  HostStop          - host is being stopped (current spec marks it stopped)\n  HostConfigRestart - in-place software restart for a configuration change\n  HostRollout       - pod-template change forces a StatefulSet rollout\n  HostShutdown      - aggregate: fires whenever the pod is going down for any\n                      reason (Stop, ConfigRestart, Rollout, or Delete)\n  HostDelete        - host is being removed from the cluster (downsize); fires\n                      on the dying host before tear-down. Always emitted\n                      alongside HostShutdown.\n",
+                            "items": {
+                              "enum": [
+                                "Any",
+                                "any",
+                                "HostCreate",
+                                "hostcreate",
+                                "HostDelete",
+                                "hostdelete",
+                                "HostUpdate",
+                                "hostupdate",
+                                "HostStart",
+                                "hoststart",
+                                "HostStop",
+                                "hoststop",
+                                "HostConfigRestart",
+                                "hostconfigrestart",
+                                "HostRollout",
+                                "hostrollout",
+                                "HostShutdown",
+                                "hostshutdown"
+                              ],
+                              "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                          },
+                          "failurePolicy": {
+                            "description": "Controls what happens when this hook returns an error.\nFail (default): error propagates \u2014 pre-hook aborts reconcile / host deletion.\nIgnore: error is logged and the reconcile continues.\n",
+                            "enum": [
+                              "Fail",
+                              "fail",
+                              "Ignore",
+                              "ignore"
+                            ],
+                            "type": "string"
+                          },
+                          "http": {
+                            "properties": {
+                              "method": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "shell": {
+                            "properties": {
+                              "command": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "nullable": true,
+                                "type": "array"
+                              },
+                              "container": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "sql": {
+                            "properties": {
+                              "queries": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "nullable": true,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "target": {
+                            "description": "where to execute hook: FirstHost (default), AllHosts, AllShards",
+                            "enum": [
+                              "",
+                              "FirstHost",
+                              "firsthost",
+                              "AllHosts",
+                              "allhosts",
+                              "AllShards",
+                              "allshards"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "nullable": true,
+                      "type": "array"
+                    },
+                    "pre": {
+                      "description": "actions to execute before host reconcile",
+                      "items": {
+                        "properties": {
+                          "events": {
+                            "description": "Reconcile lifecycle events that trigger this hook. Required, must be non-empty.\nThe hook is skipped on any reconcile whose classifier does not emit at least one\nof the listed events. Supported values:\n  Any               - wildcard match: fires on every hook-evaluation point,\n                      including the pre-delete sweep on the dying host\n  HostCreate        - first reconcile that creates a host (no ancestor); best\n                      paired with POST hooks because PRE hooks on first creation\n                      are skipped (no live pod yet)\n  HostUpdate        - reconcile that has prior state for the host; catch-all\n                      for ongoing reconciles\n  HostStart         - host transitions from stopped to running\n  HostStop          - host is being stopped (current spec marks it stopped)\n  HostConfigRestart - in-place software restart for a configuration change\n  HostRollout       - pod-template change forces a StatefulSet rollout\n  HostShutdown      - aggregate: fires whenever the pod is going down for any\n                      reason (Stop, ConfigRestart, Rollout, or Delete)\n  HostDelete        - host is being removed from the cluster (downsize); fires\n                      on the dying host before tear-down. Always emitted\n                      alongside HostShutdown.\n",
+                            "items": {
+                              "enum": [
+                                "Any",
+                                "any",
+                                "HostCreate",
+                                "hostcreate",
+                                "HostDelete",
+                                "hostdelete",
+                                "HostUpdate",
+                                "hostupdate",
+                                "HostStart",
+                                "hoststart",
+                                "HostStop",
+                                "hoststop",
+                                "HostConfigRestart",
+                                "hostconfigrestart",
+                                "HostRollout",
+                                "hostrollout",
+                                "HostShutdown",
+                                "hostshutdown"
+                              ],
+                              "type": "string"
+                            },
+                            "minItems": 1,
+                            "type": "array"
+                          },
+                          "failurePolicy": {
+                            "description": "Controls what happens when this hook returns an error.\nFail (default): error propagates \u2014 pre-hook aborts reconcile / host deletion.\nIgnore: error is logged and the reconcile continues.\n",
+                            "enum": [
+                              "Fail",
+                              "fail",
+                              "Ignore",
+                              "ignore"
+                            ],
+                            "type": "string"
+                          },
+                          "http": {
+                            "properties": {
+                              "method": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "shell": {
+                            "properties": {
+                              "command": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "nullable": true,
+                                "type": "array"
+                              },
+                              "container": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "sql": {
+                            "properties": {
+                              "queries": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "nullable": true,
+                                "type": "array"
+                              }
+                            },
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "target": {
+                            "description": "where to execute hook: FirstHost (default), AllHosts, AllShards",
+                            "enum": [
+                              "",
+                              "FirstHost",
+                              "firsthost",
+                              "AllHosts",
+                              "allhosts",
+                              "AllShards",
+                              "allshards"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "nullable": true,
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "wait": {
                   "properties": {
                     "exclude": {
                       "description": "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster",
-                      "enum": [
-                        "",
-                        "0",
-                        "1",
-                        "False",
-                        "false",
-                        "True",
-                        "true",
-                        "No",
-                        "no",
-                        "Yes",
-                        "yes",
-                        "Off",
-                        "off",
-                        "On",
-                        "on",
-                        "Disable",
-                        "disable",
-                        "Enable",
-                        "enable",
-                        "Disabled",
-                        "disabled",
-                        "Enabled",
-                        "enabled"
-                      ],
-                      "type": "string"
+                      "x-kubernetes-preserve-unknown-fields": true
                     },
                     "include": {
                       "description": "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster",
-                      "enum": [
-                        "",
-                        "0",
-                        "1",
-                        "False",
-                        "false",
-                        "True",
-                        "true",
-                        "No",
-                        "no",
-                        "Yes",
-                        "yes",
-                        "Off",
-                        "off",
-                        "On",
-                        "on",
-                        "Disable",
-                        "disable",
-                        "Enable",
-                        "enable",
-                        "Disabled",
-                        "disabled",
-                        "Enabled",
-                        "enabled"
-                      ],
-                      "type": "string"
+                      "x-kubernetes-preserve-unknown-fields": true
+                    },
+                    "probes": {
+                      "description": "What probes the operator should wait during host launch procedure",
+                      "properties": {
+                        "readiness": {
+                          "description": "Whether the operator during host launch procedure should wait for readiness probe to succeed.\nIn case probe is unspecified wait is assumed to be completed successfully.\nDefault option value is to wait.\n",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        },
+                        "startup": {
+                          "description": "Whether the operator during host launch procedure should wait for startup probe to succeed.\nIn case probe is unspecified wait is assumed to be completed successfully.\nDefault option value is to do not wait.\n",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
                     },
                     "queries": {
                       "description": "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries",
-                      "enum": [
-                        "",
-                        "0",
-                        "1",
-                        "False",
-                        "false",
-                        "True",
-                        "true",
-                        "No",
-                        "no",
-                        "Yes",
-                        "yes",
-                        "Off",
-                        "off",
-                        "On",
-                        "on",
-                        "Disable",
-                        "disable",
-                        "Enable",
-                        "enable",
-                        "Disabled",
-                        "disabled",
-                        "Enabled",
-                        "enabled"
-                      ],
-                      "type": "string"
+                      "x-kubernetes-preserve-unknown-fields": true
                     },
                     "replicas": {
                       "description": "Whether the operator during reconcile procedure should wait for replicas to catch-up",
                       "properties": {
                         "all": {
                           "description": "Whether the operator during reconcile procedure should wait for all replicas to catch-up",
-                          "enum": [
-                            "",
-                            "0",
-                            "1",
-                            "False",
-                            "false",
-                            "True",
-                            "true",
-                            "No",
-                            "no",
-                            "Yes",
-                            "yes",
-                            "Off",
-                            "off",
-                            "On",
-                            "on",
-                            "Disable",
-                            "disable",
-                            "Enable",
-                            "enable",
-                            "Disabled",
-                            "disabled",
-                            "Enabled",
-                            "enabled"
-                          ],
-                          "type": "string"
+                          "x-kubernetes-preserve-unknown-fields": true
                         },
                         "delay": {
                           "description": "replication max absolute delay to consider replica is not delayed",
@@ -523,31 +712,60 @@
                         },
                         "new": {
                           "description": "Whether the operator during reconcile procedure should wait for new replicas to catch-up",
+                          "x-kubernetes-preserve-unknown-fields": true
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "recovery": {
+              "description": "Auto-recovery from reconcile failures, scoped by CHI status",
+              "properties": {
+                "onStatus": {
+                  "description": "Recovery scopes keyed by the CHI .status.status they apply to",
+                  "properties": {
+                    "aborted": {
+                      "description": "Recovery while Status=Aborted",
+                      "properties": {
+                        "onPodReady": {
+                          "description": "Reaction when a pod belonging to an Aborted CHI transitions to Ready.\n  retry (default) \u2014 re-enqueue the CHI for reconcile\n  none \u2014 do nothing, CHI stays Aborted\n",
                           "enum": [
                             "",
-                            "0",
-                            "1",
-                            "False",
-                            "false",
-                            "True",
-                            "true",
-                            "No",
-                            "no",
-                            "Yes",
-                            "yes",
-                            "Off",
-                            "off",
-                            "On",
-                            "on",
-                            "Disable",
-                            "disable",
-                            "Enable",
-                            "enable",
-                            "Disabled",
-                            "disabled",
-                            "Enabled",
-                            "enabled"
+                            "None",
+                            "none",
+                            "Retry",
+                            "retry"
                           ],
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "completed": {
+                      "description": "Recovery while Status=Completed when a child pod regresses to Ready=False and stays NotReady",
+                      "properties": {
+                        "onPodNotReady": {
+                          "description": "Reaction when a pod belonging to a Completed CHI flips Ready=True -> Ready=False\nand stays NotReady for at least onPodNotReadyThreshold. OFF by default \u2014 opt-in only,\nbecause force-recreating the pod is destructive (can interrupt replica recovery;\nhard downtime for a single-replica shard).\n  none (default) \u2014 do nothing\n  retry \u2014 re-enqueue the CHI for reconcile (force-restart the stuck host)\n",
+                          "enum": [
+                            "",
+                            "None",
+                            "none",
+                            "Retry",
+                            "retry"
+                          ],
+                          "type": "string"
+                        },
+                        "onPodNotReadyThreshold": {
+                          "description": "Minimum duration a pod must stay Ready=False before recovery fires (Go duration string, e.g. '5m'; default 5m)",
                           "type": "string"
                         }
                       },
@@ -567,6 +785,12 @@
               "properties": {
                 "reconcileCHIsThreadsNumber": {
                   "description": "How many goroutines will be used to reconcile CHIs in parallel, 10 by default",
+                  "maximum": 65535,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "reconcileCHKsThreadsNumber": {
+                  "description": "How many goroutines will be used to reconcile CHKs in parallel, 1 by default",
                   "maximum": 65535,
                   "minimum": 1,
                   "type": "integer"
@@ -601,6 +825,21 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "recreate": {
+                  "description": "Behavior during recreate StatefulSet",
+                  "properties": {
+                    "onDataLoss": {
+                      "description": "What to do in case operator needs to recreate StatefulSet due to PVC data loss or missing volumes.\nPossible options:\n1. abort - abort the process, do nothing with the problematic StatefulSet.\n2. recreate (default) - proceed and recreate StatefulSet.\n",
+                      "type": "string"
+                    },
+                    "onUpdateFailure": {
+                      "description": "What to do in case operator needs to recreate StatefulSet due to update failure or StatefulSet not ready.\nPossible options:\n1. abort - abort the process, do nothing with the problematic StatefulSet.\n2. recreate (default) - proceed and recreate StatefulSet.\n",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "update": {
                   "description": "Behavior during update StatefulSet",
                   "properties": {
@@ -628,6 +867,11 @@
           "type": "object",
           "additionalProperties": false
         },
+        "security": {
+          "description": "Per-component security toggles for outbound connections the operator establishes:\nClickHouse-client TLS (clickhouse.tls.verify, clickhouse.tls.minVersion, clickhouse.tls.serverName, clickhouse.tls.rootCA, clickhouse.tls.rootCASecretRef),\nZooKeeper/Keeper-client TLS (zookeeper.tls.verify, zookeeper.tls.minVersion),\nKubernetes-client TLS (kubernetes.tls.verify=Strict refuses an insecure kubeconfig at startup; kubernetes.tls.minVersion floors the K8s API client transport, coerced to 1.3 under FIPS/Enforced),\noperator\u2194metrics-exporter IPC channel hardening (ipc.mode, ipc.bindHost, ipc.tokenPath).\nOperator-wide master switch (security.policy): Permissive (default) preserves 0.27.0\nbehavior; Enforced coerces all per-component knobs above to their Strict positions\nat startup (clickhouse.tls.verify=Strict, clickhouse.tls.minVersion=1.3,\nzookeeper.tls.verify=Strict, zookeeper.tls.minVersion=1.3,\nkubernetes.tls.verify=Strict, kubernetes.tls.minVersion=1.3, ipc.mode=Secure) and\nrejects CHIs that cannot be served in a FIPS-compatible posture (e.g. CHIs\nreferencing plain-text external ZooKeeper). Independent of the Go runtime FIPS\ntoolchain \u2014 when this operator binary is built with GOFIPS140=v1.0.0 (the Go FIPS\nmodule currently in CMVP review, not yet a completed validation) the startup gate\nORs runtime detection with this knob.\nFIPS image policy (security.images.policy): orthogonal to security.policy.\nPermissive (default) accepts any image; Required refuses CRs whose CH/Keeper\nimages lack the \"fips\" tag substring (admission) AND aborts running CRs whose\n`SELECT version()` lacks \"fips\" (post-Ready confirmation).\nAll fields default to nil \u2014 current behavior preserved on upgrade.\nSee docs/security_hardening.md for details.\n",
+          "type": "object",
+          "x-kubernetes-preserve-unknown-fields": true
+        },
         "statefulSet": {
           "description": "define StatefulSet-specific parameters",
           "properties": {
@@ -647,119 +891,19 @@
               "properties": {
                 "action": {
                   "description": "Whether the operator should fill status field 'action'",
-                  "enum": [
-                    "",
-                    "0",
-                    "1",
-                    "False",
-                    "false",
-                    "True",
-                    "true",
-                    "No",
-                    "no",
-                    "Yes",
-                    "yes",
-                    "Off",
-                    "off",
-                    "On",
-                    "on",
-                    "Disable",
-                    "disable",
-                    "Enable",
-                    "enable",
-                    "Disabled",
-                    "disabled",
-                    "Enabled",
-                    "enabled"
-                  ],
-                  "type": "string"
+                  "x-kubernetes-preserve-unknown-fields": true
                 },
                 "actions": {
                   "description": "Whether the operator should fill status field 'actions'",
-                  "enum": [
-                    "",
-                    "0",
-                    "1",
-                    "False",
-                    "false",
-                    "True",
-                    "true",
-                    "No",
-                    "no",
-                    "Yes",
-                    "yes",
-                    "Off",
-                    "off",
-                    "On",
-                    "on",
-                    "Disable",
-                    "disable",
-                    "Enable",
-                    "enable",
-                    "Disabled",
-                    "disabled",
-                    "Enabled",
-                    "enabled"
-                  ],
-                  "type": "string"
+                  "x-kubernetes-preserve-unknown-fields": true
                 },
                 "error": {
                   "description": "Whether the operator should fill status field 'error'",
-                  "enum": [
-                    "",
-                    "0",
-                    "1",
-                    "False",
-                    "false",
-                    "True",
-                    "true",
-                    "No",
-                    "no",
-                    "Yes",
-                    "yes",
-                    "Off",
-                    "off",
-                    "On",
-                    "on",
-                    "Disable",
-                    "disable",
-                    "Enable",
-                    "enable",
-                    "Disabled",
-                    "disabled",
-                    "Enabled",
-                    "enabled"
-                  ],
-                  "type": "string"
+                  "x-kubernetes-preserve-unknown-fields": true
                 },
                 "errors": {
                   "description": "Whether the operator should fill status field 'errors'",
-                  "enum": [
-                    "",
-                    "0",
-                    "1",
-                    "False",
-                    "false",
-                    "True",
-                    "true",
-                    "No",
-                    "no",
-                    "Yes",
-                    "yes",
-                    "Off",
-                    "off",
-                    "On",
-                    "on",
-                    "Disable",
-                    "disable",
-                    "Enable",
-                    "enable",
-                    "Disabled",
-                    "disabled",
-                    "Enabled",
-                    "enabled"
-                  ],
-                  "type": "string"
+                  "x-kubernetes-preserve-unknown-fields": true
                 }
               },
               "type": "object",
@@ -783,7 +927,9 @@
                   "enum": [
                     "",
                     "ReadOnStart",
-                    "ApplyOnNextReconcile"
+                    "readonstart",
+                    "ApplyOnNextReconcile",
+                    "applyonnextreconcile"
                   ],
                   "type": "string"
                 }
@@ -798,6 +944,25 @@
         "watch": {
           "description": "Parameters for watch kubernetes resources which used by clickhouse-operator deployment",
           "properties": {
+            "configuration": {
+              "description": "Behavior when ClickHouseOperatorConfiguration resources change",
+              "properties": {
+                "onChange": {
+                  "description": "none/ignore \u2014 do nothing; restart \u2014 exit process so the operator pod restarts",
+                  "enum": [
+                    "none",
+                    "None",
+                    "ignore",
+                    "Ignore",
+                    "restart",
+                    "Restart"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "namespaces": {
               "description": "List of namespaces where clickhouse-operator watches for events.",
               "type": "object",

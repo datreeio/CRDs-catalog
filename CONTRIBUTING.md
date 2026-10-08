@@ -29,7 +29,7 @@ Automatic merge allows at most **25 added/modified schemas**, **2 MiB per result
 
 Schemas must be valid JSON objects with `type: object`, valid JSON Schema, no duplicate keys, and no external schema references or non-local identifiers. Without `$schema`, the validator uses Draft 7. Explicit Draft 4, 6, 7, 2019-09, and 2020-12 dialects are supported.
 
-For bounded processing, source CRDs are limited to 10 MiB each / 50 MiB combined, with no YAML aliases. Very deep or complex documents need manual review. Sources must be plain CRD YAML/JSON, including multi-document YAML or Kubernetes Lists.
+For bounded processing, source CRDs are limited to 10 MiB each / 50 MiB combined, with a 15-second processing limit per source. Ordinary YAML anchors, aliases, and merge keys (`<<`) are supported. Cyclic aliases and documents exceeding the nesting, node, or merge-expansion limits go to manual review. Sources must be plain CRD YAML/JSON, including multi-document YAML or Kubernetes Lists.
 
 The bot checks source group/kind/API version against the catalog filename. It does not independently regenerate schemas or prove that their complete contents match upstream. Repository age and stars are abuse filters, not proof of project authenticity.
 

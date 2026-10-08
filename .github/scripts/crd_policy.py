@@ -208,17 +208,74 @@ def parse_sources(body, filenames):
         raise PolicyError("needs-contributor-input", "List each changed schema exactly once with its permanent GitHub source CRD link. Open the original CRD file on GitHub, press y, and copy the resulting URL. Branch and tag links do not qualify. If no public source exists, write Live cluster only followed by the platform/version and extraction method for manual review.") from None
 
 
-def source_identities(raw):
+def check_yaml_graph(root, budget):
+    """Bound the composed graph before construction; aliases share node objects."""
     import yaml
+    active, heights, mapping_sizes = set(), {}, {}
+
+    def visit(node, depth):
+        budget[0] += 1
+        if budget[0] > 500000 or depth > 100:
+            raise PolicyError("manual-review", "Source YAML exceeds the node or nesting limit.")
+        key = id(node)
+        if key in active:
+            raise PolicyError("manual-review", "Source YAML contains a cyclic alias; maintainer review is required.")
+        if key in heights:
+            if depth + heights[key] > 100:
+                raise PolicyError("manual-review", "Source YAML exceeds the nesting limit.")
+            return heights[key]
+        active.add(key)
+        children = []
+        if isinstance(node, yaml.MappingNode):
+            for k, v in node.value:
+                children.extend((k, v))
+        elif isinstance(node, yaml.SequenceNode):
+            children = node.value
+        height = max((1 + visit(child, depth + 1) for child in children), default=0)
+        if isinstance(node, yaml.MappingNode):
+            size = 0
+            for k, v in node.value:
+                if k.tag == "tag:yaml.org,2002:merge":
+                    sources = v.value if isinstance(v, yaml.SequenceNode) else [v]
+                    for source in sources:
+                        if not isinstance(source, yaml.MappingNode):
+                            raise ValueError("Invalid YAML merge source")
+                        size += mapping_sizes[id(source)]
+                else:
+                    size += 1
+            # Count every expanded mapping before SafeLoader allocates it.
+            budget[0] += size
+            if budget[0] > 500000:
+                raise PolicyError("manual-review", "Source YAML merge expansion exceeds the safe processing limit.")
+            mapping_sizes[key] = size
+        active.remove(key)
+        heights[key] = height
+        return height
+
+    visit(root, 0)
+
+
+def source_identities(raw):
+    import signal
+    import yaml
+
+    def timeout(signum, frame):
+        raise PolicyError("manual-review", "Source YAML exceeded the 15-second processing limit.")
+
+    if len(raw) > MAX_SOURCE:
+        raise PolicyError("manual-review", "Source CRD exceeds the file-size limit.")
+    # Runs in the main thread on the Linux Actions runner. Bound scanning,
+    # composition, graph checks, and construction together, not just traversal.
+    previous = signal.signal(signal.SIGALRM, timeout)
+    signal.alarm(15)
+    loader = None
     try:
-        # Disable aliases entirely to prevent alias expansion/cycles and limit work.
-        if any(isinstance(t, yaml.tokens.AliasToken) for t in yaml.scan(raw)):
-            raise ValueError("YAML aliases")
-        documents = list(yaml.safe_load_all(raw))
-        identities = set()
-        for document in documents:
-            for _ in walk(document):
-                pass
+        loader = yaml.SafeLoader(raw)
+        identities, budget = set(), [0]
+        while loader.check_data():
+            node = loader.get_node()
+            check_yaml_graph(node, budget)
+            document = loader.construct_document(node)
             if not isinstance(document, dict):
                 continue
             candidates = document.get("items", []) if document.get("kind") == "List" else [document]
@@ -234,8 +291,15 @@ def source_identities(raw):
                 for version in versions:
                     identities.add((spec["group"], spec["names"]["kind"].lower(), version))
         return identities
-    except (yaml.YAMLError, ValueError, TypeError, KeyError, RecursionError, UnicodeError):
-        raise PolicyError("needs-contributor-input", "A supplied source is not a supported plain CRD YAML/JSON document. Link the CRD file, not a Helm template or project homepage.") from None
+    except RecursionError:
+        raise PolicyError("manual-review", "Source YAML exceeds the safe nesting limit.") from None
+    except (yaml.YAMLError, ValueError, TypeError, KeyError, AttributeError, UnicodeError):
+        raise PolicyError("needs-contributor-input", "A supplied source is invalid or unsupported CRD YAML/JSON. Link a plain CRD file with group, kind, and API version, not a Helm template or project homepage.") from None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+        if loader is not None:
+            loader.dispose()
 
 
 def repository_eligible(metadata, now):

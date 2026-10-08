@@ -174,8 +174,40 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(p.source_identities(CRD.replace(b'CustomResourceDefinition', b'Deployment')), set())
 
     def test_yaml_no_objects_or_aliases(self):
-        for raw in [b'!!python/object/apply:os.system [echo nope]', b'a: &a [*a]']:
+        for raw in [b'!!python/object/apply:os.system [echo nope]', b'a: *undefined']:
             self.expect_error('needs-contributor-input', p.source_identities, raw)
+
+    def test_yaml_shared_aliases(self):
+        raw = CRD + b'definition: &TypeStringBool {type: string}\nuses: [*TypeStringBool, *TypeStringBool]\n'
+        self.assertEqual(p.source_identities(raw), {('example.io', 'widget', 'v1')})
+        merged = CRD + b'a: &a {type: string}\nb: {<<: *a, description: reused}\n'
+        self.assertEqual(p.source_identities(merged), {('example.io', 'widget', 'v1')})
+        # Exponentially many logical paths, but only a small shared node graph.
+        raw = CRD + b'a0: &a0 [x]\n'
+        for n in range(1, 25):
+            raw += f'a{n}: &a{n} [*a{n-1}, *a{n-1}]\n'.encode()
+        self.assertEqual(p.source_identities(raw), {('example.io', 'widget', 'v1')})
+
+    def test_yaml_complexity_routes_to_review(self):
+        for raw in [b'a: &a [*a]', b'a: &a {self: *a}',
+                    b'a: ' + b'[' * 105 + b'0' + b']' * 105]:
+            self.expect_error('manual-review', p.source_identities, raw)
+
+    def test_yaml_merge_expansion_is_bounded(self):
+        raw = b'a0: &a0 {x: 1}\n'
+        for n in range(1, 25):
+            raw += f'a{n}: &a{n} {{<<: [*a{n-1}, *a{n-1}]}}\n'.encode()
+        self.expect_error('manual-review', p.source_identities, raw)
+
+    def test_yaml_timeout_routes_to_review(self):
+        import signal
+        import yaml
+        def interrupt(*args):
+            signal.raise_signal(signal.SIGALRM)
+        previous = signal.getsignal(signal.SIGALRM)
+        with patch.object(yaml.SafeLoader, 'get_node', side_effect=interrupt):
+            self.expect_error('manual-review', p.source_identities, CRD)
+        self.assertEqual(signal.getsignal(signal.SIGALRM), previous)
 
     def test_wrong_source_identity(self):
         api = FakeAPI(); api.pr['body'] = BODY.replace(FILE, 'example.io/other_v1.json'); api.files[0]['filename'] = 'example.io/other_v1.json'

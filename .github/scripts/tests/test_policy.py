@@ -169,6 +169,16 @@ class PolicyTests(unittest.TestCase):
             self.expect_error('needs-contributor-input', p.parse_sources, body, [FILE, 'example.io/other_v1.json'])
         self.expect_error('needs-contributor-input', p.parse_sources, BODY.replace(URL, source), [FILE, 'example.io/other_v1.json'])
 
+    def test_source_errors_name_the_file(self):
+        duplicate = '| Schema file | Source CRD |\n| --- | --- |\n' + (f'| {FILE} | {URL} |\n' * 2)
+        for body, phrase in [(duplicate, 'Duplicate source entry'),
+                             ('```crd-sources\n{}\n```', 'Missing source entries'),
+                             (BODY.replace(URL, URL.replace(SHA, 'main')), 'Invalid source link')]:
+            with self.assertRaises(p.PolicyError) as cm:
+                p.parse_sources(body, [FILE])
+            self.assertIn(phrase, cm.exception.reason)
+            self.assertIn(FILE, cm.exception.reason)
+
     def test_crd_identity(self):
         self.assertEqual(p.source_identities(CRD), {('example.io', 'widget', 'v1')})
         self.assertEqual(p.source_identities(CRD.replace(b'CustomResourceDefinition', b'Deployment')), set())
@@ -286,6 +296,14 @@ class PublisherTests(unittest.TestCase):
         api.request = blocked
         publisher.publish(api, self.report(api), 'b'*40, True)
         self.assertFalse(api.reviews)
+
+    def test_published_check_conclusions(self):
+        for decision, expected in [('eligible', 'success'), ('manual-review', 'action_required'),
+                                   ('needs-contributor-input', 'failure'), ('error', 'failure')]:
+            api = FakeAPI()
+            publisher.announce(api, self.report(api, decision))
+            checks = [data for path, data, method in api.calls if path.endswith('/check-runs')]
+            self.assertEqual(checks[-1]['conclusion'], expected)
 
     def test_does_not_dismiss_human_review(self):
         api = FakeAPI(); api.reviews = [{'id':2,'user':{'login':'human'},'state':'APPROVED','body':publisher.REVIEW_MARKER}]

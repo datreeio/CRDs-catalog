@@ -61,7 +61,7 @@ def announce(api, report):
             api.request(prefix + f"/issues/comments/{owned[-1]['id']}", {"body": body}, "PATCH")
     else:
         api.request(prefix + f"/issues/{number}/comments", {"body": body})
-    api.request(prefix + "/check-runs", {"name": "CRD auto-merge policy", "head_sha": report["head"], "status": "completed", "conclusion": "success" if decision == "eligible" else "action_required", "output": {"title": decision, "summary": report["reason"]}})
+    api.request(prefix + "/check-runs", {"name": "CRD auto-merge policy", "head_sha": report["head"], "status": "completed", "conclusion": {"eligible": "success", "manual-review": "action_required", "needs-contributor-input": "failure", "error": "failure"}[decision], "output": {"title": decision, "summary": report["reason"]}})
 
 
 def publish(api, report, trusted_sha, enabled):

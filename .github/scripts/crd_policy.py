@@ -169,8 +169,16 @@ def parse_sources(body, filenames):
     if len(blocks) + len(tables) != 1:
         raise PolicyError("needs-contributor-input", "Fill one source table with columns Schema file and Source CRD, listing every changed schema and its permanent upstream CRD link. The older crd-sources JSON format is also supported; use only one format. See CONTRIBUTING.md.")
     try:
+        def source_object(pairs):
+            mapping = {}
+            for key, value in pairs:
+                if key in mapping:
+                    raise PolicyError("needs-contributor-input", f"Duplicate source entry: {key!r}. Remove the duplicate row or JSON key; each changed schema must appear exactly once.")
+                mapping[key] = value
+            return mapping
+
         if blocks:
-            mapping = json.loads(blocks[0], object_pairs_hook=unique_object)
+            mapping = json.loads(blocks[0], object_pairs_hook=source_object)
         else:
             pairs = []
             for row in tables[0].splitlines():
@@ -178,16 +186,25 @@ def parse_sources(body, filenames):
                 if len(cells) != 2:
                     raise ValueError()
                 pairs.append(tuple(cell[1:-1] if cell.startswith("`") and cell.endswith("`") else cell for cell in cells))
-            mapping = unique_object(pairs)
-        if not isinstance(mapping, dict) or set(mapping) != set(filenames):
+            mapping = source_object(pairs)
+        if not isinstance(mapping, dict):
             raise ValueError()
+        missing = sorted(set(filenames) - set(mapping))
+        extra = sorted(set(mapping) - set(filenames))
+        if missing or extra:
+            details = []
+            if missing:
+                details.append("Missing source entries: " + ", ".join(repr(p) for p in missing))
+            if extra:
+                details.append("Entries without a changed schema: " + ", ".join(repr(p) for p in extra))
+            raise PolicyError("needs-contributor-input", "; ".join(details) + ". Update the source mapping to match the changed files exactly.")
         result = {}
         manual_sources = False
         for filename, url in mapping.items():
             if not isinstance(url, str) or not url.strip() or url.strip().lower() in (
                 "paste the permanent github file link here", "todo", "tbd", "n/a", "unknown"
             ):
-                raise ValueError()
+                raise PolicyError("needs-contributor-input", f"Missing source for {filename!r}. Replace the placeholder with a permanent CRD link or explain the unavailable source for manual review.")
             url = url.strip()
             # A source explanation is evidence for human review, never auto-merge.
             # Keep malformed/branch URLs contributor-fixable. Existing cluster
@@ -197,7 +214,7 @@ def parse_sources(body, filenames):
                 continue
             match = SOURCE.fullmatch(url) if isinstance(url, str) else None
             if not match or any(p in ("", ".", "..") for p in match[4].split("/")):
-                raise ValueError()
+                raise PolicyError("needs-contributor-input", f"Invalid source link for {filename!r}. Use a GitHub CRD file URL pinned to a full 40-character commit SHA (press y on its GitHub file page).")
             if any(p in (".", "..") for p in match.group(1, 2)):
                 raise ValueError()
             result[filename] = (match[1] + "/" + match[2], match[3], match[4])

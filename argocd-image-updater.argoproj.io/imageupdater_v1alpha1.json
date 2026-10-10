@@ -16,12 +16,12 @@
       "description": "ImageUpdaterSpec defines the desired state of ImageUpdater\nIt specifies which applications to target, default update strategies,\nand a list of images to manage.",
       "properties": {
         "applicationRefs": {
-          "description": "ApplicationRefs indicates the set of applications to be managed.\nApplicationRefs is a list of rules to select Argo CD Applications within the `spec.namespace`.\nEach reference can also provide specific overrides for the global settings defined above.",
+          "description": "ApplicationRefs indicates the set of applications to be managed.\nApplicationRefs is a list of rules to select Argo CD Applications within the ImageUpdater CR's namespace.\nEach reference can also provide specific overrides for the global settings defined above.",
           "items": {
             "description": "ApplicationRef contains various criteria by which to include applications for managing by image updater",
             "properties": {
               "commonUpdateSettings": {
-                "description": "CommonUpdateSettings overrides the global CommonUpdateSettings for applications\nmatched by this selector.",
+                "description": "CommonUpdateSettings overrides the global CommonUpdateSettings for applications\nmatched by this selector.\nThis field is ignored when UseAnnotations is true.",
                 "properties": {
                   "allowTags": {
                     "description": "AllowTags is a regex pattern for tags to allow.\nThis acts as the default if not overridden.",
@@ -62,7 +62,7 @@
                 "additionalProperties": false
               },
               "images": {
-                "description": "Images contains a list of configurations that how images should be updated.\nThese rules apply to applications selected by namePattern in ApplicationRefs, and each\nimage can override global/ApplicationRef settings.",
+                "description": "Images contains a list of configurations that how images should be updated.\nThese rules apply to applications selected by namePattern in ApplicationRefs, and each\nimage can override global/ApplicationRef settings.\nThis field is ignored when UseAnnotations is true.",
                 "items": {
                   "description": "ImageConfig defines how a specific container image should be discovered, updated,\nand how those updates should be reflected in application manifests.",
                   "properties": {
@@ -116,29 +116,62 @@
                       "description": "ImageName is the full identifier of the image to be tracked,\nincluding the registry (if not Docker Hub), the image name, and an initial/current tag or version.\nThis is the string used to query the container registry and also as a base for finding updates.\nExample: \"docker.io/library/nginx:1.17.10\", \"quay.io/prometheus/node-exporter:v1.5.0\".\nThis field is mandatory.",
                       "type": "string"
                     },
+                    "imagesVerification": {
+                      "description": "ImagesVerification overrides the signature verification policy for this specific image.\nWhen set, it takes precedence over both the spec-level and ApplicationRef-level\nImagesVerification.",
+                      "properties": {
+                        "cosignKey": {
+                          "description": "CosignKey references a Kubernetes Secret in the same namespace as the\nImageUpdater CR that holds the PEM-encoded ECDSA public key used to verify\ncosign signatures. Providing this field selects cosign key-based verification.",
+                          "properties": {
+                            "key": {
+                              "description": "Key is the key within the Secret's data map whose value contains the credential material\n(e.g. \"cosign.pub\" for a PEM-encoded public key).",
+                              "type": "string"
+                            },
+                            "secretName": {
+                              "description": "SecretName is the name of the Kubernetes Secret.",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "secretName"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "enabled": {
+                          "default": true,
+                          "description": "Enabled controls whether signature verification is active at this scope.\nDefaults to true when the ImagesVerification block is present.\nSet to false to explicitly opt out of verification for this image or group.",
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "at least one verification method (cosignKey) is required when verification is enabled",
+                          "rule": "self.enabled == false || has(self.cosignKey)"
+                        }
+                      ],
+                      "additionalProperties": false
+                    },
                     "manifestTargets": {
-                      "description": "ManifestTarget defines how and where to update this image in Kubernetes manifests.\nOnly one of Helm or Kustomize should be specified within this block.\nThis whole block is optional if the image update isn't written to a manifest in a structured way.",
+                      "description": "ManifestTarget defines how and where to update this image in Kubernetes manifests.\nExactly one of Helm, Kustomize, or Plugin should be specified within this block.\nThis whole block is optional if the image update isn't written to a manifest in a structured way.",
                       "properties": {
                         "helm": {
                           "description": "Helm specifies update parameters if the target manifest is managed by Helm\nand updates are to be made to Helm values files.",
                           "properties": {
                             "name": {
-                              "description": "Name is the dot-separated path to the Helm key for the image repository/name part.\nExample: \"image.repository\", \"frontend.deployment.image.name\".\nThis field is required if the Helm target is used.",
+                              "description": "Name is the dot-separated path to the Helm key for the image repository/name part.\nExample: \"image.repository\", \"frontend.deployment.image.name\".\nIf neither spec nor name/tag are set, defaults to \"image.name\".\nIf spec is set, this field is ignored.",
                               "type": "string"
                             },
                             "spec": {
-                              "description": "Spec is an optional dot-separated path to a Helm key where the full image string\n(e.g., \"image/name:1.0\") should be written.\nUse this if your Helm chart expects the entire image reference in a single field,\nrather than separate name/tag fields. If this is set, other Helm parameter-related\noptions will be ignored.",
+                              "description": "Spec is the dot-separated path to a Helm key where the full image string\n(e.g., \"image/name:1.0\") should be written.\nUse this if your Helm chart expects the entire image reference in a single field,\nrather than separate name/tag fields. If this is set, name and tag will be ignored.",
                               "type": "string"
                             },
                             "tag": {
-                              "description": "Tag is the dot-separated path to the Helm key for the image tag part.\nExample: \"image.tag\", \"frontend.deployment.image.version\".\nThis field is required if the Helm target is used.",
+                              "description": "Tag is the dot-separated path to the Helm key for the image tag part.\nExample: \"image.tag\", \"frontend.deployment.image.version\".\nIf neither spec nor name/tag are set, defaults to \"image.tag\".\nIf spec is set, this field is ignored.",
                               "type": "string"
                             }
                           },
-                          "required": [
-                            "name",
-                            "tag"
-                          ],
                           "type": "object",
                           "additionalProperties": false
                         },
@@ -155,13 +188,44 @@
                           ],
                           "type": "object",
                           "additionalProperties": false
+                        },
+                        "plugin": {
+                          "description": "Plugin specifies update parameters if the target manifest is managed by a Config Management Plugin.\nWhen the argocd write-back method is configured, updates will be written as environment variables\nin the Argo CD Application spec.source.plugin.env list. When the git write-back method is\nconfigured, updates will be written to the .argocd-source-<appName>.yaml file in the git repository.",
+                          "properties": {
+                            "name": {
+                              "description": "Name is the environment variable name for the image repository/name part.\nExample: \"IMAGE_NAME\", \"REDIS_IMAGE_REPO\".\nIf Spec is set, this field is ignored.",
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "spec": {
+                              "description": "Spec is the environment variable name where the full image string\n(e.g., \"image/name:1.0\") should be written.\nUse this if your plugin expects the entire image reference in a single env var.\nIf this is set, Name and Tag will be ignored.",
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "tag": {
+                              "description": "Tag is the environment variable name for the image tag part.\nExample: \"IMAGE_TAG\", \"REDIS_IMAGE_VERSION\".\nIf Spec is set, this field is ignored.",
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-validations": [
+                            {
+                              "message": "At least one of spec or name must be specified in plugin target.",
+                              "rule": "has(self.spec) || has(self.name)"
+                            }
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "type": "object",
                       "x-kubernetes-validations": [
                         {
-                          "message": "Exactly one of helm or kustomize must be specified within manifestTargets if the block is present.",
-                          "rule": "has(self.helm) ? !has(self.kustomize) : has(self.kustomize)"
+                          "message": "Exactly one of helm, kustomize, or plugin must be specified within manifestTargets if the block is present.",
+                          "rule": "(has(self.helm) ? 1 : 0) + (has(self.kustomize) ? 1 : 0) + (has(self.plugin) ? 1 : 0) == 1"
                         }
                       ],
                       "additionalProperties": false
@@ -174,12 +238,48 @@
                   "type": "object",
                   "additionalProperties": false
                 },
-                "minItems": 1,
                 "type": "array",
                 "x-kubernetes-list-map-keys": [
                   "alias"
                 ],
                 "x-kubernetes-list-type": "map"
+              },
+              "imagesVerification": {
+                "description": "ImagesVerification overrides the global signature verification policy for applications\nmatched by this ApplicationRef. When set, it takes precedence over the spec-level\nImagesVerification for all images in this group, but can still be overridden\nat the individual ImageConfig level.",
+                "properties": {
+                  "cosignKey": {
+                    "description": "CosignKey references a Kubernetes Secret in the same namespace as the\nImageUpdater CR that holds the PEM-encoded ECDSA public key used to verify\ncosign signatures. Providing this field selects cosign key-based verification.",
+                    "properties": {
+                      "key": {
+                        "description": "Key is the key within the Secret's data map whose value contains the credential material\n(e.g. \"cosign.pub\" for a PEM-encoded public key).",
+                        "type": "string"
+                      },
+                      "secretName": {
+                        "description": "SecretName is the name of the Kubernetes Secret.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "secretName"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "enabled": {
+                    "default": true,
+                    "description": "Enabled controls whether signature verification is active at this scope.\nDefaults to true when the ImagesVerification block is present.\nSet to false to explicitly opt out of verification for this image or group.",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "at least one verification method (cosignKey) is required when verification is enabled",
+                    "rule": "self.enabled == false || has(self.cosignKey)"
+                  }
+                ],
+                "additionalProperties": false
               },
               "labelSelectors": {
                 "description": "LabelSelectors indicates the label selectors to apply for application selection",
@@ -232,8 +332,13 @@
                 "description": "NamePattern indicates the glob pattern for application name",
                 "type": "string"
               },
+              "useAnnotations": {
+                "default": false,
+                "description": "UseAnnotations When true, read image configuration from Application's\nargocd-image-updater.argoproj.io/* annotations instead of\nrequiring explicit Images[] configuration in this CR.\nWhen this field is set to true, only namePattern and labelSelectors are used for\napplication selection. All other fields (CommonUpdateSettings, WriteBackConfig, Images)\nare ignored.",
+                "type": "boolean"
+              },
               "writeBackConfig": {
-                "description": "WriteBackConfig overrides the global WriteBackConfig settings for applications\nmatched by this selector.",
+                "description": "WriteBackConfig overrides the global WriteBackConfig settings for applications\nmatched by this selector.\nThis field is ignored when UseAnnotations is true.",
                 "properties": {
                   "gitConfig": {
                     "description": "GitConfig provides Git configuration settings if the write-back method involves Git.\nThis can only be used when method is \"git\" or starts with \"git:\".",
@@ -241,6 +346,27 @@
                       "branch": {
                         "description": "Branch to commit updates to.\nRequired if write-back method is Git and this is not specified at the spec level.",
                         "type": "string"
+                      },
+                      "pullRequest": {
+                        "description": "PullRequest configures creation of pull requests when writing back image updates to Git.\nWhen set, the controller opens a PR instead of pushing to the branch.\nIf not specified write back config method is `git`.",
+                        "properties": {
+                          "github": {
+                            "description": "GitHub configures PR creation via the GitHub API.",
+                            "type": "object"
+                          },
+                          "gitlab": {
+                            "description": "GitLab configures MR creation via the GitLab API.",
+                            "type": "object"
+                          }
+                        },
+                        "type": "object",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "Exactly one of github or gitlab must be set",
+                            "rule": "(has(self.github) ? 1 : 0) + (has(self.gitlab) ? 1 : 0) == 1"
+                          }
+                        ],
+                        "additionalProperties": false
                       },
                       "repository": {
                         "description": "Repository URL to commit changes to.\nIf not specified here or at the spec level, the controller MUST infer it from the\nArgo CD Application's `spec.source.repoURL`. This field allows overriding that.",
@@ -255,24 +381,25 @@
                     "additionalProperties": false
                   },
                   "method": {
-                    "default": "argocd",
                     "description": "Method defines the method for writing back updated image versions.\nThis acts as the default if not overridden. If not specified, defaults to \"argocd\".",
                     "pattern": "^(argocd|git|git:[a-zA-Z0-9][a-zA-Z0-9-._/:]*)$",
                     "type": "string"
                   }
                 },
-                "required": [
-                  "method"
-                ],
                 "type": "object",
                 "additionalProperties": false
               }
             },
             "required": [
-              "images",
               "namePattern"
             ],
             "type": "object",
+            "x-kubernetes-validations": [
+              {
+                "message": "Either useAnnotations must be true, or images must be provided with at least one item",
+                "rule": "!(has(self.useAnnotations) && self.useAnnotations == true) ? (has(self.images) && size(self.images) > 0) : true"
+              }
+            ],
             "additionalProperties": false
           },
           "minItems": 1,
@@ -323,9 +450,42 @@
           "type": "object",
           "additionalProperties": false
         },
-        "namespace": {
-          "description": "Namespace indicates the target namespace of the applications.\nThis is the namespace where the controller will look for Argo CD Applications\nmatching the criteria in ApplicationRefs.",
-          "type": "string"
+        "imagesVerification": {
+          "description": "ImagesVerification defines the global default image signature verification policy.\nWhen set, every image update is subject to cryptographic verification before being\ncommitted to Git or applied to an Argo CD Application.\nCan be overridden at the ApplicationRef or ImageConfig level.",
+          "properties": {
+            "cosignKey": {
+              "description": "CosignKey references a Kubernetes Secret in the same namespace as the\nImageUpdater CR that holds the PEM-encoded ECDSA public key used to verify\ncosign signatures. Providing this field selects cosign key-based verification.",
+              "properties": {
+                "key": {
+                  "description": "Key is the key within the Secret's data map whose value contains the credential material\n(e.g. \"cosign.pub\" for a PEM-encoded public key).",
+                  "type": "string"
+                },
+                "secretName": {
+                  "description": "SecretName is the name of the Kubernetes Secret.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "secretName"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "enabled": {
+              "default": true,
+              "description": "Enabled controls whether signature verification is active at this scope.\nDefaults to true when the ImagesVerification block is present.\nSet to false to explicitly opt out of verification for this image or group.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one verification method (cosignKey) is required when verification is enabled",
+              "rule": "self.enabled == false || has(self.cosignKey)"
+            }
+          ],
+          "additionalProperties": false
         },
         "writeBackConfig": {
           "description": "WriteBackConfig provides global default settings for how and where to write back image updates.\nThis can be overridden at the ApplicationRef level.",
@@ -336,6 +496,27 @@
                 "branch": {
                   "description": "Branch to commit updates to.\nRequired if write-back method is Git and this is not specified at the spec level.",
                   "type": "string"
+                },
+                "pullRequest": {
+                  "description": "PullRequest configures creation of pull requests when writing back image updates to Git.\nWhen set, the controller opens a PR instead of pushing to the branch.\nIf not specified write back config method is `git`.",
+                  "properties": {
+                    "github": {
+                      "description": "GitHub configures PR creation via the GitHub API.",
+                      "type": "object"
+                    },
+                    "gitlab": {
+                      "description": "GitLab configures MR creation via the GitLab API.",
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "Exactly one of github or gitlab must be set",
+                      "rule": "(has(self.github) ? 1 : 0) + (has(self.gitlab) ? 1 : 0) == 1"
+                    }
+                  ],
+                  "additionalProperties": false
                 },
                 "repository": {
                   "description": "Repository URL to commit changes to.\nIf not specified here or at the spec level, the controller MUST infer it from the\nArgo CD Application's `spec.source.repoURL`. This field allows overriding that.",
@@ -350,22 +531,17 @@
               "additionalProperties": false
             },
             "method": {
-              "default": "argocd",
               "description": "Method defines the method for writing back updated image versions.\nThis acts as the default if not overridden. If not specified, defaults to \"argocd\".",
               "pattern": "^(argocd|git|git:[a-zA-Z0-9][a-zA-Z0-9-._/:]*)$",
               "type": "string"
             }
           },
-          "required": [
-            "method"
-          ],
           "type": "object",
           "additionalProperties": false
         }
       },
       "required": [
-        "applicationRefs",
-        "namespace"
+        "applicationRefs"
       ],
       "type": "object",
       "additionalProperties": false
@@ -373,7 +549,14 @@
     "status": {
       "description": "ImageUpdaterStatus defines the observed state of ImageUpdater",
       "properties": {
+        "applicationsMatched": {
+          "description": "ApplicationsMatched is the number of Argo CD applications matched by this CR's selectors.",
+          "format": "int32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "conditions": {
+          "description": "Conditions represent the latest available observations of the resource's state.",
           "items": {
             "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
@@ -426,58 +609,79 @@
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
         },
-        "imageStatus": {
-          "description": "ImageStatus indicates the detailed status for the list of managed images",
+        "imagesManaged": {
+          "description": "ImagesManaged is the number of images that were eligible for update checking.",
+          "format": "int32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lastCheckedAt": {
+          "description": "LastCheckedAt indicates when the controller last checked for image updates.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "lastUpdatedAt": {
+          "description": "LastUpdatedAt indicates when the controller last performed an image update.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "observedGeneration": {
+          "description": "ObservedGeneration is the most recent generation observed by the controller.",
+          "format": "int64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "recentUpdates": {
+          "description": "RecentUpdates contains the list of image updates performed during the last update cycle.",
           "items": {
-            "description": "ImageStatus contains information for an image:version and its update status in hosting applications",
+            "description": "RecentUpdate records a single image update performed during the last update.",
             "properties": {
-              "applications": {
-                "description": "Applications contains a list of applications and when the image was last updated therein",
-                "items": {
-                  "description": "ImageApplicationLastUpdated contains information for an application and when the image was last updated therein",
-                  "properties": {
-                    "appName": {
-                      "description": "AppName indicates and namespace and the application name",
-                      "type": "string"
-                    },
-                    "lastUpdatedAt": {
-                      "description": "LastUpdatedAt indicates when the image in this application was last updated",
-                      "format": "date-time",
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "appName"
-                  ],
-                  "type": "object",
-                  "additionalProperties": false
-                },
-                "type": "array"
-              },
-              "name": {
-                "description": "Name indicates the image name",
+              "alias": {
+                "description": "Alias is the alias of the image configuration that was updated.",
                 "type": "string"
               },
-              "version": {
-                "description": "Version indicates the image version",
+              "applicationsUpdated": {
+                "description": "ApplicationsUpdated is the number of applications in which this image was updated.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "image": {
+                "description": "Image is the full image reference.",
+                "type": "string"
+              },
+              "message": {
+                "description": "Message provides a human-readable description of the update action.",
+                "type": "string"
+              },
+              "newVersion": {
+                "description": "NewVersion is the new tag or digest the image was updated to.",
+                "type": "string"
+              },
+              "updatedAt": {
+                "description": "UpdatedAt is the timestamp when the update was applied.",
+                "format": "date-time",
                 "type": "string"
               }
             },
             "required": [
-              "name",
-              "version"
+              "alias",
+              "applicationsUpdated",
+              "image",
+              "newVersion",
+              "updatedAt"
             ],
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
-        },
-        "reconciledAt": {
-          "description": "LastUpdatedAt indicates when the image updater last ran",
-          "format": "date-time",
-          "type": "string"
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         }
       },
       "type": "object",

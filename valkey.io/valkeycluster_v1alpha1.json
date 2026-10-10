@@ -1672,8 +1672,32 @@
           "type": "array"
         },
         "networking": {
-          "description": "Networking groups how clients and peers reach cluster nodes (TLS today;\ndiscovery and external access land in follow-ups under this object).",
+          "description": "Networking groups how clients and peers reach cluster nodes (TLS,\nin-cluster discovery announce, and later external access).",
           "properties": {
+            "clusterDomain": {
+              "default": "cluster.local",
+              "description": "ClusterDomain is the DNS suffix kubelet publishes Service DNS under\n(kubelet --cluster-domain). Used when building Hostname announce FQDNs\nand the default TLS ServerName. Must match the cluster. Default cluster.local.",
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\\.?$",
+              "type": "string"
+            },
+            "discovery": {
+              "description": "Discovery configures in-cluster endpoint announcement after CLUSTER SLOTS.",
+              "properties": {
+                "preferredEndpointType": {
+                  "default": "IP",
+                  "description": "PreferredEndpointType selects IP (default) or Hostname announcement.\nHostname uses per-pod DNS under the cluster headless Service\n(<pod>.<headless>.<namespace>.svc.<clusterDomain>) and requires\nworkloadType StatefulSet (or the default).",
+                  "enum": [
+                    "IP",
+                    "Hostname"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "tls": {
               "description": "TLS configuration for the cluster.",
               "properties": {
@@ -1702,6 +1726,51 @@
                   ],
                   "type": "object",
                   "additionalProperties": false
+                },
+                "clientAuth": {
+                  "description": "ClientAuth configures client certificate authentication. When omitted,\nmode defaults to `Optional` and certificateUser defaults to `Disabled`.",
+                  "properties": {
+                    "certificateUser": {
+                      "default": "Disabled",
+                      "description": "CertificateUser configures how Valkey maps an authenticated client\ncertificate to an ACL user. Set to `CN` to use the certificate's Common Name\n(requires Valkey >= 9.0), or `URI` to use the first matching URI from the\ncertificate's Subject Alternative Name (SAN) (requires Valkey >= 9.1).\nDefaults to `Disabled`, which leaves the directive unset.",
+                      "enum": [
+                        "CN",
+                        "URI",
+                        "Disabled"
+                      ],
+                      "type": "string"
+                    },
+                    "mode": {
+                      "default": "Optional",
+                      "description": "Mode controls whether clients must authenticate with a TLS certificate.\n`Required` enforces mTLS, `Optional` allows both authenticated and\nunauthenticated clients, and `Disabled` turns client certificate processing\noff entirely.\nDefaults to `Optional`.",
+                      "enum": [
+                        "Required",
+                        "Optional",
+                        "Disabled"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "certificateUser has no effect when mode=Disabled: Valkey ignores client certificates in that mode",
+                      "rule": "!(has(self.mode) && self.mode == 'Disabled' && has(self.certificateUser) && self.certificateUser != 'Disabled')"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
+                "serverName": {
+                  "description": "ServerName is the hostname used for TLS verification when the operator\nconnects to a node by pod IP. When unset, the operator uses\nvalkey-<name>.<namespace>.svc.<clusterDomain> (default cluster.local).",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "type": "string",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "must be a valid DNS-1123 subdomain (lowercase alphanumerics, '-' and '.', starting and ending with an alphanumeric)",
+                      "rule": "self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?([.][a-z0-9]([-a-z0-9]*[a-z0-9])?)*$')"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -3305,6 +3374,10 @@
         {
           "message": "scheduling.nodeSelector cannot set topology.kubernetes.io/zone while zone.pinning is set: pinning renders that key itself, and the curated value would overwrite yours",
           "rule": "!has(self.scheduling) || !has(self.scheduling.zone) || !has(self.scheduling.zone.pinning) || !has(self.scheduling.nodeSelector) || !('topology.kubernetes.io/zone' in self.scheduling.nodeSelector)"
+        },
+        {
+          "message": "networking.discovery.preferredEndpointType Hostname requires workloadType StatefulSet (or omit workloadType for the StatefulSet default)",
+          "rule": "!has(self.networking) || !has(self.networking.discovery) || !has(self.networking.discovery.preferredEndpointType) || self.networking.discovery.preferredEndpointType != 'Hostname' || !has(self.workloadType) || self.workloadType == 'StatefulSet'"
         }
       ],
       "additionalProperties": false

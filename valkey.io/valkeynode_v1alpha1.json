@@ -804,6 +804,10 @@
           "type": "object",
           "additionalProperties": false
         },
+        "clusterDomain": {
+          "description": "ClusterDomain is set by the ValkeyCluster controller from\nspec.networking.clusterDomain for TLS ServerName and Hostname FQDNs.",
+          "type": "string"
+        },
         "config": {
           "additionalProperties": {
             "type": "string"
@@ -2653,6 +2657,14 @@
           "type": "object",
           "additionalProperties": false
         },
+        "preferredEndpointType": {
+          "description": "PreferredEndpointType is set by the ValkeyCluster controller from\nspec.networking.discovery. PreferredEndpointTypeHostname switches announce\nflags and managed config to hostname mode. Standalone nodes leave this empty\n(IP announce).",
+          "enum": [
+            "IP",
+            "Hostname"
+          ],
+          "type": "string"
+        },
         "priorityClassName": {
           "description": "PriorityClassName is the name of an existing PriorityClass applied to\nthe pod, protecting it from eviction under resource pressure.",
           "type": "string"
@@ -2760,6 +2772,51 @@
               ],
               "type": "object",
               "additionalProperties": false
+            },
+            "clientAuth": {
+              "description": "ClientAuth is the resolved client certificate authentication settings\nrendered into `tls-auth-clients` and `tls-auth-clients-user`. For\ncluster-owned nodes the ValkeyCluster controller copies\nspec.networking.tls.clientAuth here.",
+              "properties": {
+                "certificateUser": {
+                  "default": "Disabled",
+                  "description": "CertificateUser configures how Valkey maps an authenticated client\ncertificate to an ACL user. Set to `CN` to use the certificate's Common Name\n(requires Valkey >= 9.0), or `URI` to use the first matching URI from the\ncertificate's Subject Alternative Name (SAN) (requires Valkey >= 9.1).\nDefaults to `Disabled`, which leaves the directive unset.",
+                  "enum": [
+                    "CN",
+                    "URI",
+                    "Disabled"
+                  ],
+                  "type": "string"
+                },
+                "mode": {
+                  "default": "Optional",
+                  "description": "Mode controls whether clients must authenticate with a TLS certificate.\n`Required` enforces mTLS, `Optional` allows both authenticated and\nunauthenticated clients, and `Disabled` turns client certificate processing\noff entirely.\nDefaults to `Optional`.",
+                  "enum": [
+                    "Required",
+                    "Optional",
+                    "Disabled"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "certificateUser has no effect when mode=Disabled: Valkey ignores client certificates in that mode",
+                  "rule": "!(has(self.mode) && self.mode == 'Disabled' && has(self.certificateUser) && self.certificateUser != 'Disabled')"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "serverName": {
+              "description": "ServerName is the hostname used for TLS verification when connecting\nto the pod IP. For cluster-owned nodes this is\nspec.networking.tls.serverName, or\nvalkey-<cluster>.<ns>.svc.<clusterDomain> if that is unset. When this\nfield is empty on a node with the valkey.io/cluster label, the node\ncontroller verifies against that default name.",
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "must be a valid DNS-1123 subdomain (lowercase alphanumerics, '-' and '.', starting and ending with an alphanumeric)",
+                  "rule": "self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?([.][a-z0-9]([-a-z0-9]*[a-z0-9])?)*$')"
+                }
+              ]
             }
           },
           "required": [

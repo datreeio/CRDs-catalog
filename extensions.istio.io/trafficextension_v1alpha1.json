@@ -1,34 +1,54 @@
 {
   "properties": {
     "spec": {
-      "description": "Extend the functionality provided by the Istio proxy through WebAssembly filters. See more details at: https://istio.io/docs/reference/config/proxy_extensions/wasm-plugin.html",
+      "description": "Extend the functionality provided by the Istio proxy through WebAssembly or Lua filters. See more details at: https://istio.io/docs/reference/config/proxy_extensions/traffic_extension.html",
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "wasm"
+                ]
+              },
+              {
+                "required": [
+                  "lua"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "wasm"
+          ]
+        },
+        {
+          "required": [
+            "lua"
+          ]
+        }
+      ],
       "properties": {
-        "failStrategy": {
-          "description": "Specifies the failure behavior for the plugin due to fatal errors.\n\nValid Options: FAIL_CLOSE, FAIL_OPEN, FAIL_RELOAD",
-          "enum": [
-            "FAIL_CLOSE",
-            "FAIL_OPEN",
-            "FAIL_RELOAD"
+        "lua": {
+          "description": "Lua filter configuration.",
+          "properties": {
+            "inlineCode": {
+              "description": "The inline Lua code to be executed.",
+              "maxLength": 65536,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "inlineCode"
           ],
-          "type": "string"
-        },
-        "imagePullPolicy": {
-          "description": "The pull behaviour to be applied when fetching Wasm module by either OCI image or `http/https`.\n\nValid Options: IfNotPresent, Always",
-          "enum": [
-            "UNSPECIFIED_POLICY",
-            "IfNotPresent",
-            "Always"
-          ],
-          "type": "string"
-        },
-        "imagePullSecret": {
-          "description": "Credentials to use for OCI image pulling.",
-          "maxLength": 253,
-          "minLength": 1,
-          "type": "string"
+          "type": "object",
+          "additionalProperties": false
         },
         "match": {
-          "description": "Specifies the criteria to determine which traffic is passed to WasmPlugin.",
+          "description": "Specifies the criteria to determine which traffic is passed to TrafficExtension.",
           "items": {
             "properties": {
               "mode": {
@@ -70,34 +90,23 @@
           "type": "array"
         },
         "phase": {
-          "description": "Determines where in the filter chain this `WasmPlugin` is to be injected.\n\nValid Options: AUTHN, AUTHZ, STATS",
+          "description": "Determines where in the filter chain this `TrafficExtension` is to be injected.\n\nValid Options: AUTHN, AUTHZ, STATS",
           "enum": [
-            "UNSPECIFIED_PHASE",
+            "UNSPECIFIED",
             "AUTHN",
             "AUTHZ",
             "STATS"
           ],
           "type": "string"
         },
-        "pluginConfig": {
-          "description": "The configuration that will be passed on to the plugin.",
-          "type": "object",
-          "x-kubernetes-preserve-unknown-fields": true
-        },
-        "pluginName": {
-          "description": "The plugin name to be used in the Envoy configuration (used to be called `rootID`).",
-          "maxLength": 256,
-          "minLength": 1,
-          "type": "string"
-        },
         "priority": {
-          "description": "Determines ordering of `WasmPlugins` in the same `phase`.",
+          "description": "Determines ordering of `TrafficExtensions` in the same `phase`.",
           "format": "int32",
           "nullable": true,
           "type": "integer"
         },
         "selector": {
-          "description": "Criteria used to select the specific set of pods/VMs on which this plugin configuration should be applied.",
+          "description": "Optional.",
           "properties": {
             "matchLabels": {
               "additionalProperties": {
@@ -125,50 +134,6 @@
               ]
             }
           },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "sha256": {
-          "description": "SHA256 checksum that will be used to verify Wasm module or OCI container.",
-          "pattern": "(^$|^[a-f0-9]{64}$)",
-          "type": "string"
-        },
-        "targetRef": {
-          "properties": {
-            "group": {
-              "description": "group is the group of the target resource.",
-              "maxLength": 253,
-              "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
-              "type": "string"
-            },
-            "kind": {
-              "description": "kind is kind of the target resource.",
-              "maxLength": 63,
-              "minLength": 1,
-              "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
-              "type": "string"
-            },
-            "name": {
-              "description": "name is the name of the target resource.",
-              "maxLength": 253,
-              "minLength": 1,
-              "type": "string"
-            },
-            "namespace": {
-              "description": "namespace is the namespace of the referent.",
-              "type": "string",
-              "x-kubernetes-validations": [
-                {
-                  "message": "cross namespace referencing is not currently supported",
-                  "rule": "self.size() == 0"
-                }
-              ]
-            }
-          },
-          "required": [
-            "kind",
-            "name"
-          ],
           "type": "object",
           "additionalProperties": false
         },
@@ -216,88 +181,139 @@
           "maxItems": 16,
           "type": "array"
         },
-        "type": {
-          "description": "Specifies the type of Wasm Extension to be used.\n\nValid Options: HTTP, NETWORK",
-          "enum": [
-            "UNSPECIFIED_PLUGIN_TYPE",
-            "HTTP",
-            "NETWORK"
-          ],
-          "type": "string"
-        },
-        "url": {
-          "description": "URL of a Wasm module or OCI container.",
-          "minLength": 1,
-          "type": "string",
-          "x-kubernetes-validations": [
-            {
-              "message": "url must have schema one of [http, https, file, oci]",
-              "rule": "isURL(self) ? (url(self).getScheme() in [\"\", \"http\", \"https\", \"oci\", \"file\"]) : (isURL(\"http://\" + self) &&\nurl(\"http://\" + self).getScheme() in [\"\", \"http\", \"https\", \"oci\", \"file\"])"
-            }
-          ]
-        },
-        "verificationKey": {
-          "type": "string"
-        },
-        "vmConfig": {
-          "description": "Configuration for a Wasm VM.",
+        "wasm": {
+          "description": "WebAssembly filter configuration.",
           "properties": {
-            "env": {
-              "description": "Specifies environment variables to be injected to this VM.",
-              "items": {
-                "properties": {
-                  "name": {
-                    "description": "Name of the environment variable.",
-                    "maxLength": 256,
-                    "minLength": 1,
-                    "type": "string"
-                  },
-                  "value": {
-                    "description": "Value for the environment variable.",
-                    "maxLength": 2048,
-                    "type": "string"
-                  },
-                  "valueFrom": {
-                    "description": "Source for the environment variable's value.\n\nValid Options: INLINE, HOST",
-                    "enum": [
-                      "INLINE",
-                      "HOST"
-                    ],
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "name"
-                ],
-                "type": "object",
-                "x-kubernetes-validations": [
-                  {
-                    "message": "value may only be set when valueFrom is INLINE",
-                    "rule": "(has(self.valueFrom) ? self.valueFrom : \"\") != \"HOST\" || !has(self.value)"
-                  }
-                ],
-                "additionalProperties": false
-              },
-              "maxItems": 256,
-              "type": "array",
-              "x-kubernetes-list-map-keys": [
-                "name"
+            "failStrategy": {
+              "description": "Specifies the failure behavior for the plugin due to fatal errors.\n\nValid Options: FAIL_CLOSE, FAIL_OPEN, FAIL_RELOAD",
+              "enum": [
+                "FAIL_CLOSE",
+                "FAIL_OPEN",
+                "FAIL_RELOAD"
               ],
-              "x-kubernetes-list-type": "map"
+              "type": "string"
+            },
+            "imagePullPolicy": {
+              "description": "The pull behaviour to be applied when fetching Wasm module by either OCI image or `http/https`.\n\nValid Options: IfNotPresent, Always",
+              "enum": [
+                "UNSPECIFIED_POLICY",
+                "IfNotPresent",
+                "Always"
+              ],
+              "type": "string"
+            },
+            "imagePullSecret": {
+              "description": "Credentials to use for OCI image pulling.",
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            },
+            "pluginConfig": {
+              "description": "The configuration that will be passed on to the plugin.",
+              "type": "object",
+              "x-kubernetes-preserve-unknown-fields": true
+            },
+            "pluginName": {
+              "description": "The plugin name to be used in the Envoy configuration (used to be called `rootID`).",
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "sha256": {
+              "description": "SHA256 checksum that will be used to verify Wasm module or OCI container.",
+              "pattern": "(^$|^[a-f0-9]{64}$)",
+              "type": "string"
+            },
+            "type": {
+              "description": "Specifies the type of Wasm Extension to be used.\n\nValid Options: HTTP, NETWORK",
+              "enum": [
+                "UNSPECIFIED_PLUGIN_TYPE",
+                "HTTP",
+                "NETWORK"
+              ],
+              "type": "string"
+            },
+            "url": {
+              "description": "URL of a Wasm module or OCI container.",
+              "minLength": 1,
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "url must have schema one of [http, https, file, oci]",
+                  "rule": "isURL(self) ? (url(self).getScheme() in [\"\", \"http\", \"https\", \"file\", \"oci\"]) : (isURL(\"http://\" + self) &&\nurl(\"http://\" + self).getScheme() in [\"\", \"http\", \"https\", \"file\", \"oci\"])"
+                }
+              ]
+            },
+            "verificationKey": {
+              "type": "string"
+            },
+            "vmConfig": {
+              "description": "Configuration for a Wasm VM.",
+              "properties": {
+                "env": {
+                  "description": "Specifies environment variables to be injected to this VM.",
+                  "items": {
+                    "properties": {
+                      "name": {
+                        "description": "Name of the environment variable.",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "Value for the environment variable.",
+                        "maxLength": 2048,
+                        "type": "string"
+                      },
+                      "valueFrom": {
+                        "description": "Source for the environment variable's value.\n\nValid Options: INLINE, HOST",
+                        "enum": [
+                          "INLINE",
+                          "HOST"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "value may only be set when valueFrom is INLINE",
+                        "rule": "(has(self.valueFrom) ? self.valueFrom : \"\") != \"HOST\" || !has(self.value)"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 256,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "name"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
+          "required": [
+            "url"
+          ],
           "type": "object",
           "additionalProperties": false
         }
       },
-      "required": [
-        "url"
-      ],
       "type": "object",
       "x-kubernetes-validations": [
         {
           "message": "only one of targetRefs or selector can be set",
-          "rule": "(has(self.selector) ? 1 : 0) + (has(self.targetRef) ? 1 : 0) + (has(self.targetRefs) ? 1 : 0) <= 1"
+          "rule": "(has(self.selector) ? 1 : 0) + (has(self.targetRefs) ? 1 : 0) <= 1"
+        },
+        {
+          "message": "exactly one of wasm or lua must be set",
+          "rule": "has(self.wasm) != has(self.lua)"
         }
       ],
       "additionalProperties": false

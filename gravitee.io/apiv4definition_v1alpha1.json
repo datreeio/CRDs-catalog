@@ -15,6 +15,14 @@
     "spec": {
       "description": "ApiV4DefinitionSpec defines the desired state of ApiDefinition.",
       "properties": {
+        "allowMultiJwtOauth2Subscriptions": {
+          "description": "Allow an application to subscribe to more than one JWT/OAuth2 plan (V4 only).",
+          "type": "boolean"
+        },
+        "allowedInApiProducts": {
+          "description": "Indicates whether this API is allowed to be used in API Products.",
+          "type": "boolean"
+        },
         "analytics": {
           "description": "API Analytics (Not applicable for Native API)",
           "properties": {
@@ -110,11 +118,32 @@
               "type": "object",
               "additionalProperties": false
             },
+            "otelLogs": {
+              "description": "OpenTelemetry log export configuration.",
+              "properties": {
+                "enabled": {
+                  "description": "Enable OpenTelemetry log export for this API.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "reporterMetricsEnabled": {
+              "description": "Enable the connection-metrics reporter on the gateway.\nOnly applicable to Native v4 APIs.",
+              "type": "boolean"
+            },
             "sampling": {
               "description": "Analytics Sampling",
               "properties": {
                 "type": {
                   "description": "The sampling type to use",
+                  "enum": [
+                    "PROBABILITY",
+                    "TEMPORAL",
+                    "COUNT",
+                    "WINDOWED_COUNT"
+                  ],
                   "type": "string"
                 },
                 "value": {
@@ -135,6 +164,71 @@
                 "enabled": {
                   "description": "Specify if Tracing is Enabled or not",
                   "type": "boolean"
+                },
+                "redaction": {
+                  "description": "Masking applied to span attributes before traces are exported",
+                  "properties": {
+                    "defaultReplacement": {
+                      "description": "Replacement for FULL rules that set none, defaults to `[REDACTED]`",
+                      "type": "string"
+                    },
+                    "rules": {
+                      "description": "Masking rules, each matching span attributes by key and optionally by value",
+                      "items": {
+                        "properties": {
+                          "attributeNamePattern": {
+                            "description": "Span attribute key: glob, short name, or `regex:`-prefixed Java regex",
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "maskingStrategy": {
+                            "description": "How the matched value is masked",
+                            "properties": {
+                              "prefixLength": {
+                                "description": "PARTIAL only: number of leading characters kept visible",
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "replacement": {
+                                "description": "FULL: replacement text, defaults to `[REDACTED]`. PARTIAL: mask character, defaults to `*`",
+                                "type": "string"
+                              },
+                              "suffixLength": {
+                                "description": "PARTIAL only: number of trailing characters kept visible",
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "type": {
+                                "description": "FULL replaces the whole value, PARTIAL keeps a visible prefix and suffix",
+                                "enum": [
+                                  "FULL",
+                                  "PARTIAL"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "valuePattern": {
+                            "description": "Java regex the attribute value must partially match for the rule to apply",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "attributeNamePattern"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
                 },
                 "verbose": {
                   "description": "Specify if Tracing is Verbose or not",
@@ -159,42 +253,25 @@
           },
           "type": "array"
         },
-        "consoleNotificationConfiguration": {
-          "description": "ConsoleNotification struct sent to the mAPI, not part of the CRD spec.",
+        "consoleNotification": {
+          "description": "ConsoleNotification struct sent to the Automation API, not part of the CRD spec.",
           "properties": {
-            "config_type": {
-              "type": "string"
+            "events": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             },
             "groups": {
               "items": {
                 "type": "string"
               },
               "type": "array"
-            },
-            "hooks": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "origin": {
-              "type": "string"
-            },
-            "referenceId": {
-              "type": "string"
-            },
-            "referenceType": {
-              "type": "string"
-            },
-            "user": {
-              "type": "string"
             }
           },
           "required": [
-            "config_type",
-            "groups",
-            "hooks",
-            "origin"
+            "events",
+            "groups"
           ],
           "type": "object",
           "additionalProperties": false
@@ -280,6 +357,7 @@
                       "type": "string"
                     },
                     "secondary": {
+                      "default": false,
                       "description": "Endpoint is secondary or not?",
                       "type": "boolean"
                     },
@@ -343,7 +421,6 @@
                   },
                   "required": [
                     "inheritConfiguration",
-                    "secondary",
                     "type"
                   ],
                   "type": "object",
@@ -391,8 +468,27 @@
                     "format": "int64",
                     "type": "integer"
                   },
+                  "maxChunkSize": {
+                    "description": "Maximum size of HTTP chunks",
+                    "type": "integer"
+                  },
                   "maxConcurrentConnections": {
                     "description": "HTTP max concurrent connections",
+                    "type": "integer"
+                  },
+                  "maxConnectionLifetime": {
+                    "description": "Maximum lifetime of a pooled connection in milliseconds. 0 means no limit.",
+                    "format": "int64",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxHeaderSize": {
+                    "description": "Maximum size of HTTP headers",
+                    "type": "integer"
+                  },
+                  "maxWaitQueueSize": {
+                    "description": "Maximum size of the pool wait queue. -1 means unbounded.",
+                    "minimum": -1,
                     "type": "integer"
                   },
                   "pipelining": {
@@ -654,6 +750,15 @@
             "enabled": {
               "default": false,
               "description": "API Failover is enabled?",
+              "type": "boolean"
+            },
+            "failureCondition": {
+              "description": "EL expression marking a response as failed, e.g. `{#response.status >= 500}`",
+              "type": "string"
+            },
+            "forceNextEndpointOnFailure": {
+              "default": false,
+              "description": "On retry, target the next endpoint of the group instead of the load balancer's pick",
               "type": "boolean"
             },
             "maxFailures": {
@@ -1150,6 +1255,9 @@
           },
           "type": "array"
         },
+        "hrid": {
+          "type": "string"
+        },
         "id": {
           "description": "The API ID. If empty, this field will take the value of the `metadata.uid`\nfield of the resource.",
           "type": "string"
@@ -1164,10 +1272,12 @@
         },
         "lifecycleState": {
           "default": "UNPUBLISHED",
-          "description": "API life cycle state can be one of the values PUBLISHED, UNPUBLISHED",
+          "description": "API life cycle state can be one of the values PUBLISHED, UNPUBLISHED, DEPRECATED, ARCHIVED",
           "enum": [
             "PUBLISHED",
-            "UNPUBLISHED"
+            "UNPUBLISHED",
+            "DEPRECATED",
+            "ARCHIVED"
           ],
           "type": "string"
         },
@@ -1312,6 +1422,9 @@
                 "description": "If true, this page will be displayed as the homepage of your API documentation.",
                 "type": "boolean"
               },
+              "hrid": {
+                "type": "string"
+              },
               "id": {
                 "description": "The ID of the page.",
                 "type": "string"
@@ -1327,6 +1440,9 @@
               },
               "parent": {
                 "description": "If your page contains a folder, setting this field to the map key associated to the\nfolder entry...",
+                "type": "string"
+              },
+              "parentHrid": {
                 "type": "string"
               },
               "parentId": {
@@ -1392,6 +1508,18 @@
         "plans": {
           "additionalProperties": {
             "properties": {
+              "bootstrapPort": {
+                "description": "Bootstrap port for port-based routing (native Kafka APIs only).",
+                "type": "integer"
+              },
+              "brokerRangeEnd": {
+                "description": "End of broker port range for port-based routing (native Kafka APIs only).",
+                "type": "integer"
+              },
+              "brokerRangeStart": {
+                "description": "Start of the broker port range for port-based routing (native Kafka APIs only).",
+                "type": "integer"
+              },
               "characteristics": {
                 "description": "List of plan characteristics",
                 "items": {
@@ -1841,6 +1969,12 @@
                 "description": "The general conditions defined to use this plan",
                 "type": "string"
               },
+              "generalConditionsHrid": {
+                "type": "string"
+              },
+              "hrid": {
+                "type": "string"
+              },
               "id": {
                 "description": "Plan ID",
                 "type": "string"
@@ -1940,6 +2074,34 @@
           },
           "description": "A map of plan identifiers to plan\nKeys uniquely identify plans and are used to keep them in sync...",
           "type": "object"
+        },
+        "portalNavigation": {
+          "description": "The API's internal documentation navigation tree for the next-gen portal.",
+          "items": {
+            "description": "NavigationPath is a single entry in a portal or API definition navigation tree.",
+            "properties": {
+              "displayName": {
+                "description": "Optional human-friendly label for this node.",
+                "type": "string"
+              },
+              "order": {
+                "description": "Optional display order of this node relative to its siblings at the same level.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "path": {
+                "description": "A slash-separated path defining the navigation hierarchy.",
+                "pattern": "^/",
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         },
         "properties": {
           "default": [],
@@ -2105,7 +2267,10 @@
           "enum": [
             "PROXY",
             "MESSAGE",
-            "NATIVE"
+            "NATIVE",
+            "LLM_PROXY",
+            "MCP_PROXY",
+            "A2A_PROXY"
           ],
           "type": "string"
         },

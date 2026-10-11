@@ -82,7 +82,7 @@
           "additionalProperties": false
         },
         "directResponse": {
-          "description": "HTTPDirectResponseFilter defines the configuration to return a fixed response.",
+          "description": "DirectResponse returns a fixed response for matching requests.\n\nWhen this filter is referenced from a GRPCRoute, only a non-2xx status code\nis supported. gRPC signals success with a grpc-status trailer and a response\nmessage, which a direct response cannot produce, so a 2xx status code (which\nmaps to the gRPC OK status) yields an invalid response for gRPC clients. Use a\nnon-2xx status code to deny or block gRPC requests (e.g. 403 maps to\nPERMISSION_DENIED, 404 to UNIMPLEMENTED, 429/503 to UNAVAILABLE).",
           "properties": {
             "body": {
               "description": "Body of the direct response.\nSupports Envoy command operators for dynamic content (see https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#command-operators).",
@@ -255,7 +255,7 @@
               "additionalProperties": false
             },
             "statusCode": {
-              "description": "Status Code of the HTTP response\nIf unset, defaults to 200.",
+              "description": "Status Code of the HTTP response\nIf unset, defaults to 200.\nNote: when this filter is referenced from a GRPCRoute, a 2xx status code\n(including the default 200) is rejected; a non-2xx status code must be set.",
               "type": "integer"
             }
           },
@@ -327,11 +327,34 @@
                   "description": "Header is the name of the header whose value would be used to rewrite the Host header",
                   "type": "string"
                 },
+                "pathRegex": {
+                  "description": "PathRegex defines a regex match and substitution applied to the request path to compute\nthe rewritten Host header.\nFor example, with:\npathRegex:\n  pattern: \"^/tenant/([a-z0-9-]+)/.*\"\n  substitution: \"\\\\1.example.internal\"\na request to \"http://foo.bar.com/tenant/tenant1/api/v1\" has its upstream Host header rewritten\nto \"tenant1.example.internal\" (the request path \"/tenant/tenant1/api/v1\" is preserved).",
+                  "properties": {
+                    "pattern": {
+                      "description": "Pattern matches a regular expression against the value of the HTTP Path. The regex string must\nadhere to the syntax documented in https://github.com/google/re2/wiki/Syntax.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "substitution": {
+                      "description": "Substitution is an expression that replaces the matched portion. The expression may include numbered\ncapture groups that adhere to syntax documented in https://github.com/google/re2/wiki/Syntax.\n\nThe resulting value is used as the upstream Host header and should be constrained to a valid\nDNS hostname by using explicit regex capture groups in Pattern.\n\nThe NUL, CR, and LF characters are not allowed: they are invalid in an HTTP header value and are\nrejected by the Envoy proto (well_known_regex HTTP_HEADER_VALUE), which would otherwise cause the\ngenerated configuration to be rejected by the data plane.",
+                      "minLength": 1,
+                      "pattern": "^[^\\r\\n\\x00]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pattern",
+                    "substitution"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "type": {
                   "description": "HTTPPathModifierType defines the type of Hostname rewrite.",
                   "enum": [
                     "Header",
-                    "Backend"
+                    "Backend",
+                    "PathRegex"
                   ],
                   "type": "string"
                 }
@@ -348,6 +371,14 @@
                 {
                   "message": "header must be specified for Header type",
                   "rule": "!(!has(self.header) && self.type == 'Header')"
+                },
+                {
+                  "message": "pathRegex must be nil if the type is not PathRegex",
+                  "rule": "!(has(self.pathRegex) && self.type != 'PathRegex')"
+                },
+                {
+                  "message": "pathRegex must be specified for PathRegex type",
+                  "rule": "!(!has(self.pathRegex) && self.type == 'PathRegex')"
                 }
               ],
               "additionalProperties": false

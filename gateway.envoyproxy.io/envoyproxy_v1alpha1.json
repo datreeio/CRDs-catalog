@@ -27,7 +27,7 @@
               "type": "array"
             },
             "ciphers": {
-              "description": "Ciphers specifies the set of cipher suites supported when\nnegotiating TLS 1.0 - 1.2. This setting has no effect for TLS 1.3.\nFor the list of supported ciphers, please refer to the Envoy documentation:\nhttps://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#extensions-transport-sockets-tls-v3-tlsparameters\nIn non-FIPS Envoy Proxy builds the default cipher list is:\n- [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\n- [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\n- ECDHE-ECDSA-AES256-GCM-SHA384\n- ECDHE-RSA-AES256-GCM-SHA384\nIn builds using BoringSSL FIPS the default cipher list is:\n- ECDHE-ECDSA-AES128-GCM-SHA256\n- ECDHE-RSA-AES128-GCM-SHA256\n- ECDHE-ECDSA-AES256-GCM-SHA384\n- ECDHE-RSA-AES256-GCM-SHA384",
+              "description": "Ciphers specifies the set of cipher suites supported when\nnegotiating TLS 1.0 - 1.2. This setting has no effect for TLS 1.3.\nFor Envoy TLS cipher suite configuration semantics and default cipher\nlists, see the Envoy documentation:\nhttps://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/transport_sockets/tls/v3/common.proto#extensions-transport-sockets-tls-v3-tlsparameters\nSupported cipher suite names:\n- ECDHE-ECDSA-AES128-GCM-SHA256\n- ECDHE-RSA-AES128-GCM-SHA256\n- ECDHE-ECDSA-AES256-GCM-SHA384\n- ECDHE-RSA-AES256-GCM-SHA384\n- ECDHE-ECDSA-CHACHA20-POLY1305\n- ECDHE-RSA-CHACHA20-POLY1305\n- ECDHE-ECDSA-AES128-SHA\n- ECDHE-RSA-AES128-SHA\n- AES128-GCM-SHA256\n- AES128-SHA\n- ECDHE-ECDSA-AES256-SHA\n- ECDHE-RSA-AES256-SHA\n- AES256-GCM-SHA384\n- AES256-SHA\nSupported IANA/RFC aliases:\n- TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256\n- TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256\n- TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384\n- TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384\n- TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256\n- TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256\n- TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA\n- TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA\n- TLS_RSA_WITH_AES_128_GCM_SHA256\n- TLS_RSA_WITH_AES_128_CBC_SHA\n- TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA\n- TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA\n- TLS_RSA_WITH_AES_256_GCM_SHA384\n- TLS_RSA_WITH_AES_256_CBC_SHA\nIn non-FIPS Envoy Proxy builds the default cipher list is:\n- [ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]\n- [ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]\n- ECDHE-ECDSA-AES256-GCM-SHA384\n- ECDHE-RSA-AES256-GCM-SHA384\nIn builds using BoringSSL FIPS the default cipher list is:\n- ECDHE-ECDSA-AES128-GCM-SHA256\n- ECDHE-RSA-AES128-GCM-SHA256\n- ECDHE-ECDSA-AES256-GCM-SHA384\n- ECDHE-RSA-AES256-GCM-SHA384",
               "items": {
                 "type": "string"
               },
@@ -332,6 +332,7 @@
                   "envoy.filters.http.health_check",
                   "envoy.filters.http.fault",
                   "envoy.filters.http.cors",
+                  "envoy.filters.http.csrf",
                   "envoy.filters.http.header_mutation",
                   "envoy.filters.http.ext_authz",
                   "envoy.filters.http.api_key_auth",
@@ -364,6 +365,7 @@
                   "envoy.filters.http.health_check",
                   "envoy.filters.http.fault",
                   "envoy.filters.http.cors",
+                  "envoy.filters.http.csrf",
                   "envoy.filters.http.header_mutation",
                   "envoy.filters.http.ext_authz",
                   "envoy.filters.http.api_key_auth",
@@ -396,6 +398,7 @@
                   "envoy.filters.http.health_check",
                   "envoy.filters.http.fault",
                   "envoy.filters.http.cors",
+                  "envoy.filters.http.csrf",
                   "envoy.filters.http.header_mutation",
                   "envoy.filters.http.ext_authz",
                   "envoy.filters.http.api_key_auth",
@@ -636,7 +639,9 @@
                   "debug",
                   "info",
                   "warn",
-                  "error"
+                  "error",
+                  "off",
+                  "critical"
                 ],
                 "type": "string"
               },
@@ -659,8 +664,62 @@
           ],
           "type": "string"
         },
+        "mergeBackends": {
+          "description": "MergeBackends configures cluster deduplication: routes that reference the same backend\nshare a single Envoy cluster instead of Envoy Gateway generating one cluster per route\nrule. This reduces xDS size, active health-check traffic, and stats cardinality, and\nimproves upstream connection pooling.\n\nDisabled when unset; specifying this field at all (even without further configuration)\nenables it. Mutually exclusive with MergeGateways.",
+          "properties": {
+            "selector": {
+              "description": "Selector restricts cluster deduplication to backends whose target Service, ServiceImport,\nor Backend resource matches this label selector. When unset, every otherwise-eligible\nbackend is merged. Use this to opt individual backends into deduplication gradually\ninstead of enabling it for every backend at once.",
+              "properties": {
+                "matchExpressions": {
+                  "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                  "items": {
+                    "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                    "properties": {
+                      "key": {
+                        "description": "key is the label key that the selector applies to.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "operator"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "mergeGateways": {
-          "description": "MergeGateways defines if Gateway resources should be merged onto the same Envoy Proxy Infrastructure.\nSetting this field to true would merge all Gateway Listeners under the parent Gateway Class.\nThis means that the port, protocol and hostname tuple must be unique for every listener.\nIf a duplicate listener is detected, the newer listener (based on timestamp) will be rejected and its status will be updated with a \"Accepted=False\" condition.",
+          "description": "MergeGateways defines if Gateway resources should be merged onto the same Envoy Proxy Infrastructure.\nSetting this field to true would merge all Gateway Listeners under the parent Gateway Class.\nThis means that the port, protocol and hostname tuple must be unique for every listener.\nIf a duplicate listener is detected, the newer listener (based on timestamp) will be rejected and its status will be updated with a \"Accepted=False\" condition.\n\nMutually exclusive with MergeBackends.",
           "type": "boolean"
         },
         "mergeType": {
@@ -673,7 +732,7 @@
           "type": "string"
         },
         "preserveRouteOrder": {
-          "description": "PreserveRouteOrder determines if the order of matching for HTTPRoutes is determined by Gateway-API\nspecification (https://gateway-api.sigs.k8s.io/reference/1.4/spec/#httprouterule)\nor preserves the order defined by users in the HTTPRoute's HTTPRouteRule list.\nDefault: False",
+          "description": "PreserveRouteOrder determines if the order of matching for HTTPRoutes is determined by Gateway-API\nspecification (https://gateway-api.sigs.k8s.io/reference/api-spec/main/spec/#httprouterule)\nor preserves the order defined by users in the HTTPRoute's HTTPRouteRule list.\nDefault: False",
           "type": "boolean"
         },
         "provider": {
@@ -719,7 +778,7 @@
                                     "description": "Selects a key of a ConfigMap.",
                                     "properties": {
                                       "key": {
-                                        "description": "The key to select.",
+                                        "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                         "type": "string"
                                       },
                                       "name": {
@@ -997,7 +1056,7 @@
                               "type": "boolean"
                             },
                             "procMount": {
-                              "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                              "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                               "type": "string"
                             },
                             "readOnlyRootFilesystem": {
@@ -1091,8 +1150,16 @@
                           "items": {
                             "description": "VolumeMount describes a mounting of a Volume within a container.",
                             "properties": {
+                              "bindMountOptions": {
+                                "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "set"
+                              },
                               "mountPath": {
-                                "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                                "description": "Path within the container at which the volume should be mounted.",
                                 "type": "string"
                               },
                               "mountPropagation": {
@@ -2040,7 +2107,7 @@
                               "type": "integer"
                             },
                             "seLinuxChangePolicy": {
-                              "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used.\nIf not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes\nand \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
+                              "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\nIf not specified, \"MountOption\" is used.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
                               "type": "string"
                             },
                             "seLinuxOptions": {
@@ -2459,6 +2526,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "items if unspecified, each key-value pair in the Data field of the referenced\nConfigMap will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the ConfigMap,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                                     "items": {
@@ -2476,6 +2548,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -2552,6 +2629,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "Items is a list of downward API volume file",
                                     "items": {
@@ -2616,6 +2698,11 @@
                                           "type": "object",
                                           "x-kubernetes-map-type": "atomic",
                                           "additionalProperties": false
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -2637,6 +2724,11 @@
                                   "medium": {
                                     "description": "medium represents what type of storage medium should back this directory.\nThe default is \"\" which means to use the node's default medium.\nMust be an empty string (default) or Memory.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                                     "type": "string"
+                                  },
+                                  "mode": {
+                                    "description": "mode specifies the permission bits for the emptyDir directory, in numeric\nnotation (e.g., 0755, 01777). Must be a value between 0000 and 01777.\nIf not specified, defaults to 0777.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup. If fsGroup is specified, the fsGroup permissions\nwill override the mode specified here.\nThis field has no effect on Windows.\nThis field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+                                    "format": "int32",
+                                    "type": "integer"
                                   },
                                   "sizeLimit": {
                                     "anyOf": [
@@ -2677,7 +2769,7 @@
                                             "x-kubernetes-list-type": "atomic"
                                           },
                                           "dataSource": {
-                                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                                             "properties": {
                                               "apiGroup": {
                                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -2701,7 +2793,7 @@
                                             "additionalProperties": false
                                           },
                                           "dataSourceRef": {
-                                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                                             "properties": {
                                               "apiGroup": {
                                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -3028,7 +3120,7 @@
                                 "additionalProperties": false
                               },
                               "image": {
-                                "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro) and non-executable files (noexec).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
+                                "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
                                 "properties": {
                                   "pullPolicy": {
                                     "description": "Policy for pulling OCI objects. Possible values are:\nAlways: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\nNever: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\nIfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\nDefaults to Always if :latest tag is specified, or IfNotPresent otherwise.",
@@ -3177,7 +3269,7 @@
                                 "additionalProperties": false
                               },
                               "portworxVolume": {
-                                "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate\nis on.",
+                                "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver.",
                                 "properties": {
                                   "fsType": {
                                     "description": "fSType represents the filesystem type to mount\nMust be a filesystem type supported by the host operating system.\nEx. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
@@ -3204,6 +3296,11 @@
                                   "defaultMode": {
                                     "description": "defaultMode are the mode bits used to set permissions on created files by default.\nMust be an octal value between 0000 and 0777 or a decimal value between 0 and 511.\nYAML accepts both octal and decimal values, JSON requires decimal values for mode bits.\nDirectories within the path are not affected by this setting.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup, and the result can be other mode bits set.",
                                     "format": "int32",
+                                    "type": "integer"
+                                  },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
                                     "type": "integer"
                                   },
                                   "sources": {
@@ -3276,6 +3373,11 @@
                                             "signerName": {
                                               "description": "Select all ClusterTrustBundles that match this signer name.\nMutually-exclusive with name.  The contents of all selected\nClusterTrustBundles will be unified and deduplicated.",
                                               "type": "string"
+                                            },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
                                             }
                                           },
                                           "required": [
@@ -3304,6 +3406,11 @@
                                                   "path": {
                                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                                     "type": "string"
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -3397,6 +3504,11 @@
                                                     "type": "object",
                                                     "x-kubernetes-map-type": "atomic",
                                                     "additionalProperties": false
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -3440,6 +3552,11 @@
                                               "description": "Kubelet's generated CSRs will be addressed to this signer.",
                                               "type": "string"
                                             },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
                                             "userAnnotations": {
                                               "additionalProperties": {
                                                 "type": "string"
@@ -3475,6 +3592,11 @@
                                                   "path": {
                                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                                     "type": "string"
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -3516,6 +3638,11 @@
                                             "path": {
                                               "description": "path is the path relative to the mount point of the file to project the\ntoken into.",
                                               "type": "string"
+                                            },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
                                             }
                                           },
                                           "required": [
@@ -3700,6 +3827,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "items If unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                                     "items": {
@@ -3717,6 +3849,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -3888,7 +4025,7 @@
                                     "description": "Selects a key of a ConfigMap.",
                                     "properties": {
                                       "key": {
-                                        "description": "The key to select.",
+                                        "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                         "type": "string"
                                       },
                                       "name": {
@@ -4166,7 +4303,7 @@
                               "type": "boolean"
                             },
                             "procMount": {
-                              "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                              "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                               "type": "string"
                             },
                             "readOnlyRootFilesystem": {
@@ -4260,8 +4397,16 @@
                           "items": {
                             "description": "VolumeMount describes a mounting of a Volume within a container.",
                             "properties": {
+                              "bindMountOptions": {
+                                "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array",
+                                "x-kubernetes-list-type": "set"
+                              },
                               "mountPath": {
-                                "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                                "description": "Path within the container at which the volume should be mounted.",
                                 "type": "string"
                               },
                               "mountPropagation": {
@@ -4349,7 +4494,7 @@
                                       "description": "Selects a key of a ConfigMap.",
                                       "properties": {
                                         "key": {
-                                          "description": "The key to select.",
+                                          "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                           "type": "string"
                                         },
                                         "name": {
@@ -4617,6 +4762,10 @@
                                         "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                                         "x-kubernetes-int-or-string": true
                                       },
+                                      "protocol": {
+                                        "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                                        "type": "string"
+                                      },
                                       "scheme": {
                                         "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
                                         "type": "string"
@@ -4738,6 +4887,10 @@
                                         "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                                         "x-kubernetes-int-or-string": true
                                       },
+                                      "protocol": {
+                                        "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                                        "type": "string"
+                                      },
                                       "scheme": {
                                         "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
                                         "type": "string"
@@ -4828,6 +4981,10 @@
                               "grpc": {
                                 "description": "GRPC specifies a GRPC HealthCheckRequest.",
                                 "properties": {
+                                  "mode": {
+                                    "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                                    "type": "string"
+                                  },
                                   "port": {
                                     "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                                     "format": "int32",
@@ -4891,6 +5048,10 @@
                                     ],
                                     "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                                     "x-kubernetes-int-or-string": true
+                                  },
+                                  "protocol": {
+                                    "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                                    "type": "string"
                                   },
                                   "scheme": {
                                     "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5030,6 +5191,10 @@
                               "grpc": {
                                 "description": "GRPC specifies a GRPC HealthCheckRequest.",
                                 "properties": {
+                                  "mode": {
+                                    "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                                    "type": "string"
+                                  },
                                   "port": {
                                     "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                                     "format": "int32",
@@ -5093,6 +5258,10 @@
                                     ],
                                     "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                                     "x-kubernetes-int-or-string": true
+                                  },
+                                  "protocol": {
+                                    "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                                    "type": "string"
                                   },
                                   "scheme": {
                                     "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5350,7 +5519,7 @@
                                 "type": "boolean"
                               },
                               "procMount": {
-                                "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                                "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                                 "type": "string"
                               },
                               "readOnlyRootFilesystem": {
@@ -5465,6 +5634,10 @@
                               "grpc": {
                                 "description": "GRPC specifies a GRPC HealthCheckRequest.",
                                 "properties": {
+                                  "mode": {
+                                    "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                                    "type": "string"
+                                  },
                                   "port": {
                                     "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                                     "format": "int32",
@@ -5528,6 +5701,10 @@
                                     ],
                                     "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                                     "x-kubernetes-int-or-string": true
+                                  },
+                                  "protocol": {
+                                    "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                                    "type": "string"
                                   },
                                   "scheme": {
                                     "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5647,8 +5824,16 @@
                             "items": {
                               "description": "VolumeMount describes a mounting of a Volume within a container.",
                               "properties": {
+                                "bindMountOptions": {
+                                  "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-type": "set"
+                                },
                                 "mountPath": {
-                                  "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                                  "description": "Path within the container at which the volume should be mounted.",
                                   "type": "string"
                                 },
                                 "mountPropagation": {
@@ -6603,7 +6788,7 @@
                               "type": "integer"
                             },
                             "seLinuxChangePolicy": {
-                              "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used.\nIf not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes\nand \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
+                              "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\nIf not specified, \"MountOption\" is used.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
                               "type": "string"
                             },
                             "seLinuxOptions": {
@@ -7022,6 +7207,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "items if unspecified, each key-value pair in the Data field of the referenced\nConfigMap will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the ConfigMap,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                                     "items": {
@@ -7039,6 +7229,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -7115,6 +7310,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "Items is a list of downward API volume file",
                                     "items": {
@@ -7179,6 +7379,11 @@
                                           "type": "object",
                                           "x-kubernetes-map-type": "atomic",
                                           "additionalProperties": false
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -7200,6 +7405,11 @@
                                   "medium": {
                                     "description": "medium represents what type of storage medium should back this directory.\nThe default is \"\" which means to use the node's default medium.\nMust be an empty string (default) or Memory.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                                     "type": "string"
+                                  },
+                                  "mode": {
+                                    "description": "mode specifies the permission bits for the emptyDir directory, in numeric\nnotation (e.g., 0755, 01777). Must be a value between 0000 and 01777.\nIf not specified, defaults to 0777.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup. If fsGroup is specified, the fsGroup permissions\nwill override the mode specified here.\nThis field has no effect on Windows.\nThis field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+                                    "format": "int32",
+                                    "type": "integer"
                                   },
                                   "sizeLimit": {
                                     "anyOf": [
@@ -7240,7 +7450,7 @@
                                             "x-kubernetes-list-type": "atomic"
                                           },
                                           "dataSource": {
-                                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                                             "properties": {
                                               "apiGroup": {
                                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -7264,7 +7474,7 @@
                                             "additionalProperties": false
                                           },
                                           "dataSourceRef": {
-                                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                                             "properties": {
                                               "apiGroup": {
                                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -7591,7 +7801,7 @@
                                 "additionalProperties": false
                               },
                               "image": {
-                                "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro) and non-executable files (noexec).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
+                                "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
                                 "properties": {
                                   "pullPolicy": {
                                     "description": "Policy for pulling OCI objects. Possible values are:\nAlways: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\nNever: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\nIfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\nDefaults to Always if :latest tag is specified, or IfNotPresent otherwise.",
@@ -7740,7 +7950,7 @@
                                 "additionalProperties": false
                               },
                               "portworxVolume": {
-                                "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate\nis on.",
+                                "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver.",
                                 "properties": {
                                   "fsType": {
                                     "description": "fSType represents the filesystem type to mount\nMust be a filesystem type supported by the host operating system.\nEx. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
@@ -7767,6 +7977,11 @@
                                   "defaultMode": {
                                     "description": "defaultMode are the mode bits used to set permissions on created files by default.\nMust be an octal value between 0000 and 0777 or a decimal value between 0 and 511.\nYAML accepts both octal and decimal values, JSON requires decimal values for mode bits.\nDirectories within the path are not affected by this setting.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup, and the result can be other mode bits set.",
                                     "format": "int32",
+                                    "type": "integer"
+                                  },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
                                     "type": "integer"
                                   },
                                   "sources": {
@@ -7839,6 +8054,11 @@
                                             "signerName": {
                                               "description": "Select all ClusterTrustBundles that match this signer name.\nMutually-exclusive with name.  The contents of all selected\nClusterTrustBundles will be unified and deduplicated.",
                                               "type": "string"
+                                            },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
                                             }
                                           },
                                           "required": [
@@ -7867,6 +8087,11 @@
                                                   "path": {
                                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                                     "type": "string"
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -7960,6 +8185,11 @@
                                                     "type": "object",
                                                     "x-kubernetes-map-type": "atomic",
                                                     "additionalProperties": false
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -8003,6 +8233,11 @@
                                               "description": "Kubelet's generated CSRs will be addressed to this signer.",
                                               "type": "string"
                                             },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
+                                            },
                                             "userAnnotations": {
                                               "additionalProperties": {
                                                 "type": "string"
@@ -8038,6 +8273,11 @@
                                                   "path": {
                                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                                     "type": "string"
+                                                  },
+                                                  "user": {
+                                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                                    "format": "int64",
+                                                    "type": "integer"
                                                   }
                                                 },
                                                 "required": [
@@ -8079,6 +8319,11 @@
                                             "path": {
                                               "description": "path is the path relative to the mount point of the file to project the\ntoken into.",
                                               "type": "string"
+                                            },
+                                            "user": {
+                                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                              "format": "int64",
+                                              "type": "integer"
                                             }
                                           },
                                           "required": [
@@ -8263,6 +8508,11 @@
                                     "format": "int32",
                                     "type": "integer"
                                   },
+                                  "defaultUser": {
+                                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "items": {
                                     "description": "items If unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                                     "items": {
@@ -8280,6 +8530,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -8431,7 +8686,7 @@
                   "additionalProperties": false
                 },
                 "envoyHpa": {
-                  "description": "EnvoyHpa defines the Horizontal Pod Autoscaler settings for Envoy Proxy Deployment.",
+                  "description": "EnvoyHpa defines the Horizontal Pod Autoscaler settings for Envoy Proxy Deployment.\nIf the HPA is set, the Replicas field from EnvoyDeployment will be ignored, and the\nnumber of replicas is solely managed by the HPA. Use MinReplicas to control the\nlower bound of the replica count instead.",
                   "properties": {
                     "behavior": {
                       "description": "behavior configures the scaling behavior of the target\nin both Up and Down directions (scaleUp and scaleDown fields respectively).\nIf not set, the default HPAScalingRules for scale up and scale down are used.\nSee k8s.io.autoscaling.v2.HorizontalPodAutoScalerBehavior.",
@@ -8488,7 +8743,7 @@
                                   "type": "string"
                                 }
                               ],
-                              "description": "tolerance is the tolerance on the ratio between the current and desired\nmetric value under which no updates are made to the desired number of\nreplicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not\nset, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi,\nand scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be\ntriggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an beta field and requires the HPAConfigurableTolerance feature\ngate to be enabled.",
+                              "description": "tolerance is the tolerance on the ratio between the current and desired\nmetric value under which no updates are made to the desired number of\nreplicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not\nset, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi,\nand scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be\ntriggered when the actual consumption falls below 95Mi or exceeds 101Mi.",
                               "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                               "x-kubernetes-int-or-string": true
                             }
@@ -8548,7 +8803,7 @@
                                   "type": "string"
                                 }
                               ],
-                              "description": "tolerance is the tolerance on the ratio between the current and desired\nmetric value under which no updates are made to the desired number of\nreplicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not\nset, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi,\nand scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be\ntriggered when the actual consumption falls below 95Mi or exceeds 101Mi.\n\nThis is an beta field and requires the HPAConfigurableTolerance feature\ngate to be enabled.",
+                              "description": "tolerance is the tolerance on the ratio between the current and desired\nmetric value under which no updates are made to the desired number of\nreplicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not\nset, the default cluster-wide tolerance is applied (by default 10%).\n\nFor example, if autoscaling is configured with a memory consumption target of 100Mi,\nand scale-down and scale-up tolerances of 5% and 1% respectively, scaling will be\ntriggered when the actual consumption falls below 95Mi or exceeds 101Mi.",
                               "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                               "x-kubernetes-int-or-string": true
                             }
@@ -9325,7 +9580,7 @@
               "additionalProperties": false
             },
             "type": {
-              "description": "Type is the type of resource provider to use. A resource provider provides\ninfrastructure resources for running the data plane, e.g. Envoy proxy, and\noptional auxiliary control planes. Supported types are \"Kubernetes\"and \"Host\".",
+              "description": "Type is the type of resource provider to use. A resource provider provides\ninfrastructure resources for running the data plane, e.g. Envoy proxy, and\noptional auxiliary control planes. Supported types are \"Kubernetes\" and \"Host\".",
               "enum": [
                 "Kubernetes",
                 "Host"
@@ -9348,6 +9603,11 @@
           "properties": {
             "drainTimeout": {
               "description": "DrainTimeout defines the graceful drain timeout. This should be less than the pod's terminationGracePeriodSeconds.\nIf unspecified, defaults to 60 seconds.",
+              "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+              "type": "string"
+            },
+            "healthCheckFailureDelay": {
+              "description": "HealthCheckFailureDelay defines the delay before failing health checks during the graceful drain process.\nIf unspecified, defaults to 0 seconds.",
               "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
               "type": "string"
             },
@@ -9774,6 +10034,78 @@
                                               "type": "object",
                                               "additionalProperties": false
                                             },
+                                            "healthCheckLog": {
+                                              "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                              "properties": {
+                                                "matches": {
+                                                  "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                                  "items": {
+                                                    "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                                    "enum": [
+                                                      "Failure",
+                                                      "FailureSeriesStart",
+                                                      "Success",
+                                                      "HealthyTransition"
+                                                    ],
+                                                    "type": "string"
+                                                  },
+                                                  "maxItems": 4,
+                                                  "type": "array",
+                                                  "x-kubernetes-list-type": "set",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "a failure type and a success type must both be specified together",
+                                                      "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                                    }
+                                                  ]
+                                                },
+                                                "sinks": {
+                                                  "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                                  "items": {
+                                                    "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                                    "properties": {
+                                                      "file": {
+                                                        "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                                        "properties": {
+                                                          "path": {
+                                                            "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "path"
+                                                        ],
+                                                        "type": "object",
+                                                        "additionalProperties": false
+                                                      },
+                                                      "type": {
+                                                        "description": "Type defines the type of sink.",
+                                                        "enum": [
+                                                          "File"
+                                                        ],
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type"
+                                                    ],
+                                                    "type": "object",
+                                                    "x-kubernetes-validations": [
+                                                      {
+                                                        "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                                        "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                                      }
+                                                    ],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "maxItems": 1,
+                                                  "type": "array"
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
+                                            },
                                             "healthyThreshold": {
                                               "default": 1,
                                               "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -9850,6 +10182,7 @@
                                                 },
                                                 "method": {
                                                   "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                                  "maxLength": 16,
                                                   "type": "string"
                                                 },
                                                 "path": {
@@ -9857,6 +10190,53 @@
                                                   "maxLength": 1024,
                                                   "minLength": 1,
                                                   "type": "string"
+                                                },
+                                                "requestBody": {
+                                                  "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                                  "properties": {
+                                                    "binary": {
+                                                      "description": "Binary payload base64 encoded.",
+                                                      "format": "byte",
+                                                      "type": "string"
+                                                    },
+                                                    "text": {
+                                                      "description": "Text payload in plain text.",
+                                                      "type": "string"
+                                                    },
+                                                    "type": {
+                                                      "allOf": [
+                                                        {
+                                                          "enum": [
+                                                            "Text",
+                                                            "Binary"
+                                                          ]
+                                                        },
+                                                        {
+                                                          "enum": [
+                                                            "Text",
+                                                            "Binary"
+                                                          ]
+                                                        }
+                                                      ],
+                                                      "description": "Type defines the type of the payload.",
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "type"
+                                                  ],
+                                                  "type": "object",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "If payload type is Text, text field needs to be set.",
+                                                      "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                                    },
+                                                    {
+                                                      "message": "If payload type is Binary, binary field needs to be set.",
+                                                      "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                                    }
+                                                  ],
+                                                  "additionalProperties": false
                                                 },
                                                 "retriableStatuses": {
                                                   "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
@@ -9873,6 +10253,12 @@
                                                 "path"
                                               ],
                                               "type": "object",
+                                              "x-kubernetes-validations": [
+                                                {
+                                                  "message": "The requestBody field can only be set when method is POST or PUT.",
+                                                  "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                                }
+                                              ],
                                               "additionalProperties": false
                                             },
                                             "initialJitter": {
@@ -10248,6 +10634,38 @@
                                                 "type": "string"
                                               },
                                               "type": "array"
+                                            },
+                                            "outOfBand": {
+                                              "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                              "properties": {
+                                                "authority": {
+                                                  "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                                  "maxLength": 259,
+                                                  "minLength": 1,
+                                                  "pattern": "^[^\\x00\\n\\r]*$",
+                                                  "type": "string"
+                                                },
+                                                "port": {
+                                                  "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                                  "format": "int32",
+                                                  "maximum": 65535,
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "reportingPeriod": {
+                                                  "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                                  "type": "string",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "reportingPeriod must be greater than 0",
+                                                      "rule": "duration(self) > duration('0s')"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
                                             },
                                             "weightExpirationPeriod": {
                                               "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
@@ -11189,6 +11607,78 @@
                                               "type": "object",
                                               "additionalProperties": false
                                             },
+                                            "healthCheckLog": {
+                                              "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                              "properties": {
+                                                "matches": {
+                                                  "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                                  "items": {
+                                                    "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                                    "enum": [
+                                                      "Failure",
+                                                      "FailureSeriesStart",
+                                                      "Success",
+                                                      "HealthyTransition"
+                                                    ],
+                                                    "type": "string"
+                                                  },
+                                                  "maxItems": 4,
+                                                  "type": "array",
+                                                  "x-kubernetes-list-type": "set",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "a failure type and a success type must both be specified together",
+                                                      "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                                    }
+                                                  ]
+                                                },
+                                                "sinks": {
+                                                  "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                                  "items": {
+                                                    "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                                    "properties": {
+                                                      "file": {
+                                                        "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                                        "properties": {
+                                                          "path": {
+                                                            "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                            "minLength": 1,
+                                                            "type": "string"
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "path"
+                                                        ],
+                                                        "type": "object",
+                                                        "additionalProperties": false
+                                                      },
+                                                      "type": {
+                                                        "description": "Type defines the type of sink.",
+                                                        "enum": [
+                                                          "File"
+                                                        ],
+                                                        "type": "string"
+                                                      }
+                                                    },
+                                                    "required": [
+                                                      "type"
+                                                    ],
+                                                    "type": "object",
+                                                    "x-kubernetes-validations": [
+                                                      {
+                                                        "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                                        "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                                      }
+                                                    ],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "maxItems": 1,
+                                                  "type": "array"
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
+                                            },
                                             "healthyThreshold": {
                                               "default": 1,
                                               "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -11265,6 +11755,7 @@
                                                 },
                                                 "method": {
                                                   "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                                  "maxLength": 16,
                                                   "type": "string"
                                                 },
                                                 "path": {
@@ -11272,6 +11763,53 @@
                                                   "maxLength": 1024,
                                                   "minLength": 1,
                                                   "type": "string"
+                                                },
+                                                "requestBody": {
+                                                  "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                                  "properties": {
+                                                    "binary": {
+                                                      "description": "Binary payload base64 encoded.",
+                                                      "format": "byte",
+                                                      "type": "string"
+                                                    },
+                                                    "text": {
+                                                      "description": "Text payload in plain text.",
+                                                      "type": "string"
+                                                    },
+                                                    "type": {
+                                                      "allOf": [
+                                                        {
+                                                          "enum": [
+                                                            "Text",
+                                                            "Binary"
+                                                          ]
+                                                        },
+                                                        {
+                                                          "enum": [
+                                                            "Text",
+                                                            "Binary"
+                                                          ]
+                                                        }
+                                                      ],
+                                                      "description": "Type defines the type of the payload.",
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "type"
+                                                  ],
+                                                  "type": "object",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "If payload type is Text, text field needs to be set.",
+                                                      "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                                    },
+                                                    {
+                                                      "message": "If payload type is Binary, binary field needs to be set.",
+                                                      "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                                    }
+                                                  ],
+                                                  "additionalProperties": false
                                                 },
                                                 "retriableStatuses": {
                                                   "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
@@ -11288,6 +11826,12 @@
                                                 "path"
                                               ],
                                               "type": "object",
+                                              "x-kubernetes-validations": [
+                                                {
+                                                  "message": "The requestBody field can only be set when method is POST or PUT.",
+                                                  "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                                }
+                                              ],
                                               "additionalProperties": false
                                             },
                                             "initialJitter": {
@@ -11663,6 +12207,38 @@
                                                 "type": "string"
                                               },
                                               "type": "array"
+                                            },
+                                            "outOfBand": {
+                                              "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                              "properties": {
+                                                "authority": {
+                                                  "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                                  "maxLength": 259,
+                                                  "minLength": 1,
+                                                  "pattern": "^[^\\x00\\n\\r]*$",
+                                                  "type": "string"
+                                                },
+                                                "port": {
+                                                  "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                                  "format": "int32",
+                                                  "maximum": 65535,
+                                                  "minimum": 1,
+                                                  "type": "integer"
+                                                },
+                                                "reportingPeriod": {
+                                                  "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                                  "type": "string",
+                                                  "x-kubernetes-validations": [
+                                                    {
+                                                      "message": "reportingPeriod must be greater than 0",
+                                                      "rule": "duration(self) > duration('0s')"
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "type": "object",
+                                              "additionalProperties": false
                                             },
                                             "weightExpirationPeriod": {
                                               "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
@@ -12319,6 +12895,78 @@
               "type": "object",
               "additionalProperties": false
             },
+            "healthCheckLog": {
+              "description": "HealthCheckLog defines health check event logging for xRoute-backed clusters.",
+              "properties": {
+                "matches": {
+                  "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                  "items": {
+                    "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                    "enum": [
+                      "Failure",
+                      "FailureSeriesStart",
+                      "Success",
+                      "HealthyTransition"
+                    ],
+                    "type": "string"
+                  },
+                  "maxItems": 4,
+                  "type": "array",
+                  "x-kubernetes-list-type": "set",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "a failure type and a success type must both be specified together",
+                      "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                    }
+                  ]
+                },
+                "sinks": {
+                  "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                  "items": {
+                    "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                    "properties": {
+                      "file": {
+                        "description": "File defines the file sink configuration.\nRequired when type is File.",
+                        "properties": {
+                          "path": {
+                            "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "path"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": {
+                        "description": "Type defines the type of sink.",
+                        "enum": [
+                          "File"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                        "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 1,
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "metrics": {
               "description": "Metrics defines metrics configuration for managed proxies.",
               "properties": {
@@ -12779,6 +13427,78 @@
                                         "type": "object",
                                         "additionalProperties": false
                                       },
+                                      "healthCheckLog": {
+                                        "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                        "properties": {
+                                          "matches": {
+                                            "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                            "items": {
+                                              "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                              "enum": [
+                                                "Failure",
+                                                "FailureSeriesStart",
+                                                "Success",
+                                                "HealthyTransition"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "maxItems": 4,
+                                            "type": "array",
+                                            "x-kubernetes-list-type": "set",
+                                            "x-kubernetes-validations": [
+                                              {
+                                                "message": "a failure type and a success type must both be specified together",
+                                                "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                              }
+                                            ]
+                                          },
+                                          "sinks": {
+                                            "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                            "items": {
+                                              "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                              "properties": {
+                                                "file": {
+                                                  "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                                  "properties": {
+                                                    "path": {
+                                                      "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "path"
+                                                  ],
+                                                  "type": "object",
+                                                  "additionalProperties": false
+                                                },
+                                                "type": {
+                                                  "description": "Type defines the type of sink.",
+                                                  "enum": [
+                                                    "File"
+                                                  ],
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "type"
+                                              ],
+                                              "type": "object",
+                                              "x-kubernetes-validations": [
+                                                {
+                                                  "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                                  "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                                }
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "maxItems": 1,
+                                            "type": "array"
+                                          }
+                                        },
+                                        "type": "object",
+                                        "additionalProperties": false
+                                      },
                                       "healthyThreshold": {
                                         "default": 1,
                                         "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -12855,6 +13575,7 @@
                                           },
                                           "method": {
                                             "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                            "maxLength": 16,
                                             "type": "string"
                                           },
                                           "path": {
@@ -12862,6 +13583,53 @@
                                             "maxLength": 1024,
                                             "minLength": 1,
                                             "type": "string"
+                                          },
+                                          "requestBody": {
+                                            "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                            "properties": {
+                                              "binary": {
+                                                "description": "Binary payload base64 encoded.",
+                                                "format": "byte",
+                                                "type": "string"
+                                              },
+                                              "text": {
+                                                "description": "Text payload in plain text.",
+                                                "type": "string"
+                                              },
+                                              "type": {
+                                                "allOf": [
+                                                  {
+                                                    "enum": [
+                                                      "Text",
+                                                      "Binary"
+                                                    ]
+                                                  },
+                                                  {
+                                                    "enum": [
+                                                      "Text",
+                                                      "Binary"
+                                                    ]
+                                                  }
+                                                ],
+                                                "description": "Type defines the type of the payload.",
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type"
+                                            ],
+                                            "type": "object",
+                                            "x-kubernetes-validations": [
+                                              {
+                                                "message": "If payload type is Text, text field needs to be set.",
+                                                "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                              },
+                                              {
+                                                "message": "If payload type is Binary, binary field needs to be set.",
+                                                "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                              }
+                                            ],
+                                            "additionalProperties": false
                                           },
                                           "retriableStatuses": {
                                             "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
@@ -12878,6 +13646,12 @@
                                           "path"
                                         ],
                                         "type": "object",
+                                        "x-kubernetes-validations": [
+                                          {
+                                            "message": "The requestBody field can only be set when method is POST or PUT.",
+                                            "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                          }
+                                        ],
                                         "additionalProperties": false
                                       },
                                       "initialJitter": {
@@ -13253,6 +14027,38 @@
                                           "type": "string"
                                         },
                                         "type": "array"
+                                      },
+                                      "outOfBand": {
+                                        "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                        "properties": {
+                                          "authority": {
+                                            "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                            "maxLength": 259,
+                                            "minLength": 1,
+                                            "pattern": "^[^\\x00\\n\\r]*$",
+                                            "type": "string"
+                                          },
+                                          "port": {
+                                            "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                            "format": "int32",
+                                            "maximum": 65535,
+                                            "minimum": 1,
+                                            "type": "integer"
+                                          },
+                                          "reportingPeriod": {
+                                            "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                            "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                            "type": "string",
+                                            "x-kubernetes-validations": [
+                                              {
+                                                "message": "reportingPeriod must be greater than 0",
+                                                "rule": "duration(self) > duration('0s')"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "type": "object",
+                                        "additionalProperties": false
                                       },
                                       "weightExpirationPeriod": {
                                         "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
@@ -13900,6 +14706,33 @@
             "tracing": {
               "description": "Tracing defines tracing configuration for managed proxies.\nIf unspecified, will not send tracing data.",
               "properties": {
+                "clientSamplingFraction": {
+                  "description": "ClientSamplingFraction represents the fraction of requests that should be\nselected for tracing when requested by the client.\nIf unspecified, client-forced tracing is disabled by default and users must\nset this field to opt in.",
+                  "properties": {
+                    "denominator": {
+                      "default": 100,
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "numerator": {
+                      "format": "int32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "numerator"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "numerator must be less than or equal to denominator",
+                      "rule": "self.numerator <= self.denominator"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
                 "customTags": {
                   "additionalProperties": {
                     "properties": {
@@ -13972,6 +14805,33 @@
                   },
                   "description": "CustomTags defines the custom tags to add to each span.\nIf provider is kubernetes, pod name and namespace are added by default.\n\nDeprecated: Use Tags instead.",
                   "type": "object"
+                },
+                "overallSamplingFraction": {
+                  "description": "OverallSamplingFraction represents the fraction of requests that should be\nselected for tracing after all other sampling checks have been applied.",
+                  "properties": {
+                    "denominator": {
+                      "default": 100,
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "numerator": {
+                      "format": "int32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "numerator"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "numerator must be less than or equal to denominator",
+                      "rule": "self.numerator <= self.denominator"
+                    }
+                  ],
+                  "additionalProperties": false
                 },
                 "provider": {
                   "description": "Provider defines the tracing provider.",
@@ -14312,6 +15172,78 @@
                                   "type": "object",
                                   "additionalProperties": false
                                 },
+                                "healthCheckLog": {
+                                  "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                  "properties": {
+                                    "matches": {
+                                      "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                        "enum": [
+                                          "Failure",
+                                          "FailureSeriesStart",
+                                          "Success",
+                                          "HealthyTransition"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "maxItems": 4,
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "set",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "a failure type and a success type must both be specified together",
+                                          "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                        }
+                                      ]
+                                    },
+                                    "sinks": {
+                                      "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                        "properties": {
+                                          "file": {
+                                            "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                            "properties": {
+                                              "path": {
+                                                "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "path"
+                                            ],
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "type": {
+                                            "description": "Type defines the type of sink.",
+                                            "enum": [
+                                              "File"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "type"
+                                        ],
+                                        "type": "object",
+                                        "x-kubernetes-validations": [
+                                          {
+                                            "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                            "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                          }
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "maxItems": 1,
+                                      "type": "array"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
                                 "healthyThreshold": {
                                   "default": 1,
                                   "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -14388,6 +15320,7 @@
                                     },
                                     "method": {
                                       "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                      "maxLength": 16,
                                       "type": "string"
                                     },
                                     "path": {
@@ -14395,6 +15328,53 @@
                                       "maxLength": 1024,
                                       "minLength": 1,
                                       "type": "string"
+                                    },
+                                    "requestBody": {
+                                      "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                      "properties": {
+                                        "binary": {
+                                          "description": "Binary payload base64 encoded.",
+                                          "format": "byte",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "description": "Text payload in plain text.",
+                                          "type": "string"
+                                        },
+                                        "type": {
+                                          "allOf": [
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            },
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            }
+                                          ],
+                                          "description": "Type defines the type of the payload.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "type": "object",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "If payload type is Text, text field needs to be set.",
+                                          "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                        },
+                                        {
+                                          "message": "If payload type is Binary, binary field needs to be set.",
+                                          "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                        }
+                                      ],
+                                      "additionalProperties": false
                                     },
                                     "retriableStatuses": {
                                       "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
@@ -14411,6 +15391,12 @@
                                     "path"
                                   ],
                                   "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "The requestBody field can only be set when method is POST or PUT.",
+                                      "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                    }
+                                  ],
                                   "additionalProperties": false
                                 },
                                 "initialJitter": {
@@ -14786,6 +15772,38 @@
                                     "type": "string"
                                   },
                                   "type": "array"
+                                },
+                                "outOfBand": {
+                                  "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                  "properties": {
+                                    "authority": {
+                                      "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                      "maxLength": 259,
+                                      "minLength": 1,
+                                      "pattern": "^[^\\x00\\n\\r]*$",
+                                      "type": "string"
+                                    },
+                                    "port": {
+                                      "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                      "format": "int32",
+                                      "maximum": 65535,
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "reportingPeriod": {
+                                      "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "reportingPeriod must be greater than 0",
+                                          "rule": "duration(self) > duration('0s')"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
                                 },
                                 "weightExpirationPeriod": {
                                   "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
@@ -15560,6 +16578,12 @@
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "mergeGateways and mergeBackends cannot both be enabled",
+          "rule": "!(has(self.mergeGateways) && self.mergeGateways && has(self.mergeBackends))"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

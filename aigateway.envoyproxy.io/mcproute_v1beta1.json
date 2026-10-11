@@ -86,6 +86,67 @@
                 "minimum": 1,
                 "type": "integer"
               },
+              "prefixMode": {
+                "description": "PrefixMode controls how tool and prompt names from this backend are prefixed.\nTakes precedence over the route-level PrefixMode when set.",
+                "enum": [
+                  "Always",
+                  "Never"
+                ],
+                "type": "string"
+              },
+              "promptSelector": {
+                "description": "PromptSelector filters the prompts exposed by this MCP server, analogous to ToolSelector.\nIf not specified, all prompts from the MCP server are exposed.\n\nThis is also used to determine which prompt names can be safely exposed unprefixed when\nthis backend's effective PrefixMode is Never: only prompts named in Include are validated\nfor cross-backend uniqueness and exposed bare. If unset while PrefixMode is Never, this\nbackend's prompts are not exposed bare (they keep the `<backendName>__` prefix) because\ntheir names cannot be proven unique at admission time.",
+                "properties": {
+                  "exclude": {
+                    "description": "Exclude is a list of prompt names to exclude. The specified prompts will not be available.\nExclude rules take precedence over include rules.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "type": "array"
+                  },
+                  "excludeRegex": {
+                    "description": "ExcludeRegex is a list of RE2-compatible regular expressions that, when matched, exclude the prompt.\nPrompts matching these patterns will not be available. Exclude rules take precedence over include rules.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "type": "array"
+                  },
+                  "include": {
+                    "description": "Include is a list of prompt names to include. Only the specified prompts will be available.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "type": "array"
+                  },
+                  "includeRegex": {
+                    "description": "IncludeRegex is a list of RE2-compatible regular expressions that, when matched, include the prompt.\nOnly prompts matching these patterns will be available.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 32,
+                    "type": "array"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "include and includeRegex are mutually exclusive",
+                    "rule": "!(has(self.include) && has(self.includeRegex))"
+                  },
+                  {
+                    "message": "exclude and excludeRegex are mutually exclusive",
+                    "rule": "!(has(self.exclude) && has(self.excludeRegex))"
+                  },
+                  {
+                    "message": "at least one of include, includeRegex, exclude, or excludeRegex must be specified",
+                    "rule": "has(self.include) || has(self.includeRegex) || has(self.exclude) || has(self.excludeRegex)"
+                  }
+                ],
+                "additionalProperties": false
+              },
               "securityPolicy": {
                 "description": "SecurityPolicy is the security policy to apply to this MCP server.",
                 "properties": {
@@ -97,12 +158,21 @@
                         "minLength": 1,
                         "type": "string"
                       },
+                      "injectionPolicy": {
+                        "default": "Always",
+                        "description": "InjectionPolicy controls when the configured API key is written onto the target header.\nAlways (the default) writes the credential, replacing any existing value, including\nvalues populated by forwardHeaders.\nIfNotPresent writes the API key only if the target header is absent, so a\ncaller-supplied token forwarded onto the same header is preserved.\n\nInjectionPolicy applies only to header injection. It must not be set to IfNotPresent\nwhen queryParam is used, because query-parameter injection always rewrites the backend URL.",
+                        "enum": [
+                          "Always",
+                          "IfNotPresent"
+                        ],
+                        "type": "string"
+                      },
                       "inline": {
                         "description": "Inline contains the API key as an inline string.",
                         "type": "string"
                       },
                       "queryParam": {
-                        "description": "QueryParam is the HTTP query parameter to inject the API key into.\nFor example, if QueryParam is set to \"api_key\", and the API key is \"mysecretkey\", the request URL will be modified to include\n\"?api_key=mysecretkey\".\n\nEither one of Header or QueryParam can be specified to inject the API key.",
+                        "description": "QueryParam is the HTTP query parameter to inject the API key into.\nFor example, if QueryParam is set to \"api_key\", and the API key is \"mysecretkey\", the request URL will be modified to include\n\"?api_key=mysecretkey\".\n\nEither one of Header or QueryParam can be specified to inject the API key.\n\nNote: Embedding credentials in URLs (including query parameters) is generally not recommended because URLs can be exposed in logs\nand intermediary systems; prefer header-based injection when possible.",
                         "minLength": 1,
                         "type": "string"
                       },
@@ -154,6 +224,10 @@
                       {
                         "message": "only one of header or queryParam can be set",
                         "rule": "!(has(self.header) && has(self.queryParam))"
+                      },
+                      {
+                        "message": "injectionPolicy cannot be IfNotPresent when queryParam is set",
+                        "rule": "!(has(self.queryParam) && has(self.injectionPolicy) && self.injectionPolicy == 'IfNotPresent')"
                       }
                     ],
                     "additionalProperties": false
@@ -238,6 +312,65 @@
             }
           ]
         },
+        "backendSelector": {
+          "description": "BackendSelector restricts which of this route's backends a given request may fan\nout to, evaluated once per candidate backend when a client session is initialized.\nIf unspecified, all backends on the route are considered.\n\nSecurity note: a backendSelector rule whose CEL expression reads request.auth.jwt\n(claims or scopes) only reflects verified JWT data when SecurityPolicy.OAuth is\nconfigured for this route; the XValidation below enforces that pairing so that\nunauthenticated or forged bearer tokens can't influence backend selection.",
+          "properties": {
+            "defaultAction": {
+              "default": "Deny",
+              "description": "DefaultAction is the action to take when no rules match. If unspecified, defaults to Deny.",
+              "enum": [
+                "Allow",
+                "Deny"
+              ],
+              "type": "string"
+            },
+            "rules": {
+              "description": "Rules defines a list of backend selection rules.\nThese rules are evaluated in order, the first matching rule will be applied,\nand the rest will be skipped.\n\nIf no rules are defined, DefaultAction is applied to every candidate backend\n(defaults to Deny).",
+              "items": {
+                "description": "MCPBackendSelectorRule defines a single backend selection rule.",
+                "properties": {
+                  "action": {
+                    "default": "Allow",
+                    "description": "Action is the decision for matching backends. If unspecified, defaults to Allow.",
+                    "enum": [
+                      "Allow",
+                      "Deny"
+                    ],
+                    "type": "string"
+                  },
+                  "cel": {
+                    "description": "CEL specifies a Common Expression Language (CEL) expression, evaluated once for\neach backend already listed in backendRefs. It does not parse a list of backends\nout of the request. Each evaluation binds request.mcp.backend to the name of the\none candidate backend under test, so the expression should answer \"is this backend\nallowed\", not \"which backends should be used\". The expression must return a\nboolean; evaluation errors or non-boolean results are treated as \"no match\". A\nmatch means the rule applies, and Action below decides whether that's an Allow or\na Deny for that backend.\n\nExample CEL expressions:\n\t* `request.mcp.backend in request.auth.jwt.claims.mcp_backends`\n\t* `(\",\" + request.headers[\"x-ai-eg-mcp-backend-subset\"] + \",\").contains(\",\" + request.mcp.backend + \",\")`\n\nAvailable attributes are the same as documented on MCPRouteAuthorizationRule.CEL,\nexcept request.mcp.method, request.mcp.tool, and request.mcp.params are not\npopulated (no MCP method has been selected yet at backend-selection time).\n\nNote: The CEL expression support is experimental, and the attributes\navailable to the expression may change in future releases.",
+                    "maxLength": 4096,
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 32,
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "backendTrafficPolicy": {
+          "description": "BackendTrafficPolicy configures the auto-generated Envoy Gateway BackendTrafficPolicy\nresources for this MCPRoute, for example the OAuth protected resource metadata policy\ncreated when SecurityPolicy.OAuth is configured.",
+          "properties": {
+            "mergeType": {
+              "description": "MergeType determines how the auto-generated BackendTrafficPolicy (for example, the\nOAuth protected resource metadata policy) is merged with other BackendTrafficPolicy\nconfigurations targeting the same route or a parent Gateway/Listener.\n\nWhen set, the auto-generated BackendTrafficPolicy will merge with the closest parent\nBackendTrafficPolicy in the route's attachment hierarchy instead of overriding it\nentirely, per Envoy Gateway's merge semantics.\n\nIf unset, no merging occurs, and the auto-generated BackendTrafficPolicy fully\noverrides any other BackendTrafficPolicy targeting the same route.\n\nSee: https://gateway.envoyproxy.io/docs/tasks/traffic/backend-traffic-policy/",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Replace is not a valid MergeType for BackendTrafficPolicy",
+                  "rule": "self != 'Replace'"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "headers": {
           "description": "Headers are HTTP headers that must match for this route to be selected.\nMultiple match values are ANDed together, meaning, a request must match all the specified headers to select the route.",
           "items": {
@@ -260,7 +393,7 @@
                 "type": "string"
               },
               "value": {
-                "description": "Value is the value of HTTP Header to be matched.",
+                "description": "Value is the value of HTTP Header to be matched.\n<gateway:experimental:description>\nMust consist of printable US-ASCII characters, optionally separated\nby single tabs or spaces. See: https://tools.ietf.org/html/rfc7230#section-3.2\n</gateway:experimental:description>\n\n<gateway:experimental:validation:Pattern=`^[!-~]+([\\t ]?[!-~]+)*$`>",
                 "maxLength": 4096,
                 "minLength": 1,
                 "type": "string"
@@ -279,6 +412,18 @@
             "name"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "hostnames": {
+          "description": "Hostnames is a list of hostnames matched against the HTTP Host header to select this MCPRoute.\nThis is equivalent to the Hostnames field in the Gateway API HTTPRouteSpec. When specified, the\ngenerated HTTPRoute includes these hostnames, so the MCP route lands in the per-host virtual host\ninstead of the wildcard vhost (the same scoping AIGatewayRoute.Hostnames provides).\nSee https://gateway-api.sigs.k8s.io/reference/api-types/httproute/#hostnames\nfor the details of the Hostnames field in the Gateway API.",
+          "items": {
+            "description": "Hostname is the fully qualified domain name of a network host. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n 1. IPs are not allowed.\n 2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n    label must appear by itself as the first label.\n\nHostname can be \"precise\" which is a domain name without the terminating\ndot of a network host (e.g. \"foo.example.com\") or \"wildcard\", which is a\ndomain name prefixed with a single wildcard label (e.g. `*.example.com`).\n\nNote that as per RFC1035 and RFC1123, a *label* must consist of lower case\nalphanumeric characters or '-', and must start and end with an alphanumeric\ncharacter. No other punctuation is allowed.",
+            "maxLength": 253,
+            "minLength": 1,
+            "pattern": "^(\\*\\.)?[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "type": "array"
         },
         "parentRefs": {
           "description": "ParentRefs are the names of the Gateway resources this MCPRoute is being attached to.\nCross namespace references are not supported. In other words, the Gateway resources must be in the\nsame namespace as the MCPRoute. Currently, each reference's Kind must be Gateway.",
@@ -350,6 +495,14 @@
           "maxLength": 1024,
           "type": "string"
         },
+        "prefixMode": {
+          "description": "PrefixMode controls how tool and prompt names from all backends on this route are prefixed.",
+          "enum": [
+            "Always",
+            "Never"
+          ],
+          "type": "string"
+        },
         "securityPolicy": {
           "description": "SecurityPolicy defines the security policy for this MCPRoute.",
           "properties": {
@@ -401,33 +554,46 @@
                 "extractFrom": {
                   "description": "ExtractFrom is where to fetch the key from the coming request.\nThe value from the first source that has a key will be used.",
                   "items": {
-                    "description": "ExtractFrom is where to fetch the key from the coming request.\nOnly one of header, param or cookie is supposed to be specified.",
+                    "description": "ExtractFrom is where to fetch the key from the coming request.\nOnly one of headers, params or cookies must be specified.",
                     "properties": {
                       "cookies": {
-                        "description": "Cookies is the names of the cookie to fetch the key from.\nIf multiple cookies are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies is supposed to be specified.",
+                        "description": "Cookies is the names of the cookie to fetch the key from.\nIf multiple cookies are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies must be specified.",
                         "items": {
+                          "minLength": 1,
                           "type": "string"
                         },
+                        "minItems": 1,
                         "type": "array"
                       },
                       "headers": {
-                        "description": "Headers is the names of the header to fetch the key from.\nIf multiple headers are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies is supposed to be specified.",
+                        "description": "Headers is the names of the header to fetch the key from.\nIf multiple headers are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies must be specified.",
                         "items": {
+                          "minLength": 1,
                           "type": "string"
                         },
+                        "minItems": 1,
                         "type": "array"
                       },
                       "params": {
-                        "description": "Params is the names of the query parameter to fetch the key from.\nIf multiple params are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies is supposed to be specified.",
+                        "description": "Params is the names of the query parameter to fetch the key from.\nIf multiple params are specified, envoy will look for the api key in the order of the list.\nThis field is optional, but only one of headers, params or cookies must be specified.",
                         "items": {
+                          "minLength": 1,
                           "type": "string"
                         },
+                        "minItems": 1,
                         "type": "array"
                       }
                     },
                     "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "exactly one of headers, params, or cookies must be specified",
+                        "rule": "(has(self.headers) ? 1 : 0) + (has(self.params) ? 1 : 0) + (has(self.cookies) ? 1 : 0) == 1"
+                      }
+                    ],
                     "additionalProperties": false
                   },
+                  "minItems": 1,
                   "type": "array"
                 },
                 "forwardClientIDHeader": {
@@ -891,6 +1057,48 @@
                               },
                               "type": "object",
                               "additionalProperties": false
+                            },
+                            "retryBudget": {
+                              "description": "RetryBudget provides settings for retry budget, which limits the number of retries in a given percentage.\nRetryBudget take precedence over maxParallelRetries.",
+                              "properties": {
+                                "minRetryConcurrency": {
+                                  "description": "MinRetryConcurrency specifies the minimum retry concurrency allowed for the retry budget.\nFor example, a budget of 20% with a minimum retry concurrency of 3\nwill allow 5 active retries while there are 25 active requests.\nIf there are 2 active requests, there are still 3 active retries\nallowed because of the minimum retry concurrency.\nDefaults to 3.",
+                                  "format": "int32",
+                                  "type": "integer"
+                                },
+                                "percent": {
+                                  "description": "Percent specifies the limit on concurrent retries as a percentage [0, 100] of\nthe sum of active requests and active pending requests.",
+                                  "properties": {
+                                    "denominator": {
+                                      "default": 100,
+                                      "format": "int32",
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "numerator": {
+                                      "format": "int32",
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "numerator"
+                                  ],
+                                  "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "numerator must be less than or equal to denominator",
+                                      "rule": "self.numerator <= self.denominator"
+                                    }
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "percent"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
                             }
                           },
                           "type": "object",
@@ -1007,6 +1215,78 @@
                                   "type": "object",
                                   "additionalProperties": false
                                 },
+                                "healthCheckLog": {
+                                  "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                  "properties": {
+                                    "matches": {
+                                      "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                        "enum": [
+                                          "Failure",
+                                          "FailureSeriesStart",
+                                          "Success",
+                                          "HealthyTransition"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "maxItems": 4,
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "set",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "a failure type and a success type must both be specified together",
+                                          "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                        }
+                                      ]
+                                    },
+                                    "sinks": {
+                                      "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                        "properties": {
+                                          "file": {
+                                            "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                            "properties": {
+                                              "path": {
+                                                "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "path"
+                                            ],
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "type": {
+                                            "description": "Type defines the type of sink.",
+                                            "enum": [
+                                              "File"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "type"
+                                        ],
+                                        "type": "object",
+                                        "x-kubernetes-validations": [
+                                          {
+                                            "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                            "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                          }
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "maxItems": 1,
+                                      "type": "array"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
                                 "healthyThreshold": {
                                   "default": 1,
                                   "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -1075,7 +1355,7 @@
                                       "type": "array"
                                     },
                                     "hostname": {
-                                      "description": "Hostname defines the HTTP host that will be requested during health checking.\nDefault: HTTPRoute or GRPCRoute hostname.",
+                                      "description": "Hostname defines the HTTP Host header used for active HTTP health checks.\nHost selection uses this order: this field, the associated Backend endpoint\nhostname if available, then the effective Route hostname.",
                                       "maxLength": 253,
                                       "minLength": 1,
                                       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
@@ -1083,6 +1363,7 @@
                                     },
                                     "method": {
                                       "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                      "maxLength": 16,
                                       "type": "string"
                                     },
                                     "path": {
@@ -1090,12 +1371,75 @@
                                       "maxLength": 1024,
                                       "minLength": 1,
                                       "type": "string"
+                                    },
+                                    "requestBody": {
+                                      "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                      "properties": {
+                                        "binary": {
+                                          "description": "Binary payload base64 encoded.",
+                                          "format": "byte",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "description": "Text payload in plain text.",
+                                          "type": "string"
+                                        },
+                                        "type": {
+                                          "allOf": [
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            },
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            }
+                                          ],
+                                          "description": "Type defines the type of the payload.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "type": "object",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "If payload type is Text, text field needs to be set.",
+                                          "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                        },
+                                        {
+                                          "message": "If payload type is Binary, binary field needs to be set.",
+                                          "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                        }
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "retriableStatuses": {
+                                      "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
+                                      "items": {
+                                        "description": "HTTPStatus defines the http status code.",
+                                        "maximum": 599,
+                                        "minimum": 100,
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
                                     }
                                   },
                                   "required": [
                                     "path"
                                   ],
                                   "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "The requestBody field can only be set when method is POST or PUT.",
+                                      "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                    }
+                                  ],
                                   "additionalProperties": false
                                 },
                                 "initialJitter": {
@@ -1108,6 +1452,20 @@
                                   "description": "Interval defines the time between active health checks.",
                                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                   "type": "string"
+                                },
+                                "overrides": {
+                                  "description": "Overrides defines the configuration of the overriding health check settings for all endpoints\nin the backend cluster. This allows customization of port and other settings that may differ\nfrom the main service configuration.",
+                                  "properties": {
+                                    "port": {
+                                      "description": "Port overrides the health check port.\nIf not set, the endpoint's serving port is used for health checks.\nThis is useful when health checks are served on a different port than\nthe main service port (e.g., port 443 for service, port 9090 for health checks).",
+                                      "format": "int32",
+                                      "maximum": 65535,
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
                                 },
                                 "tcp": {
                                   "description": "TCP defines the configuration of tcp health checker.\nIt's required while the health checker type is TCP.",
@@ -1238,7 +1596,7 @@
                                 },
                                 "unhealthyThreshold": {
                                   "default": 3,
-                                  "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.",
+                                  "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.\nWithout RetriableStatuses configured, any health check failure results in the host being immediately\nconsidered unhealthy. When RetriableStatuses is set, health checks returning those statuses are retried\nup to this threshold before the host is marked unhealthy.",
                                   "format": "int32",
                                   "minimum": 1,
                                   "type": "integer"
@@ -1274,6 +1632,11 @@
                             "passive": {
                               "description": "Passive passive check configuration",
                               "properties": {
+                                "alwaysEjectOneEndpoint": {
+                                  "default": false,
+                                  "description": "AlwaysEjectOneEndpoint defines whether at least one host should be ejected,\nregardless of MaxEjectionPercent.",
+                                  "type": "boolean"
+                                },
                                 "baseEjectionTime": {
                                   "default": "30s",
                                   "description": "BaseEjectionTime defines the base duration for which a host will be ejected on consecutive failures.",
@@ -1314,6 +1677,8 @@
                                   "default": 10,
                                   "description": "MaxEjectionPercent sets the maximum percentage of hosts in a cluster that can be ejected.",
                                   "format": "int32",
+                                  "maximum": 100,
+                                  "minimum": 0,
                                   "type": "integer"
                                 },
                                 "splitExternalLocalOriginErrors": {
@@ -1332,6 +1697,41 @@
                         "http2": {
                           "description": "HTTP2 provides HTTP/2 configuration for backend connections.",
                           "properties": {
+                            "connectionKeepalive": {
+                              "description": "ConnectionKeepalive configures HTTP/2 connection keepalive using PING frames.",
+                              "properties": {
+                                "idleInterval": {
+                                  "description": "IdleInterval specifies how long a connection must be idle before a PING is sent.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "interval": {
+                                  "description": "Interval specifies how often to send HTTP/2 PING frames to keep the connection alive.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "intervalJitter": {
+                                  "description": "IntervalJitter specifies a random jitter percentage added to each interval.\nDefaults to 15% if not specified.",
+                                  "format": "int32",
+                                  "maximum": 100,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "timeout": {
+                                  "description": "Timeout specifies how long to wait for a PING response before considering the connection dead.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "x-kubernetes-validations": [
+                                {
+                                  "message": "timeout must be less than interval",
+                                  "rule": "!has(self.timeout) || !has(self.interval) || duration(self.timeout) < duration(self.interval)"
+                                }
+                              ],
+                              "additionalProperties": false
+                            },
                             "initialConnectionWindowSize": {
                               "allOf": [
                                 {
@@ -1390,6 +1790,78 @@
                         "loadBalancer": {
                           "description": "LoadBalancer policy to apply when routing traffic from the gateway to\nthe backend endpoints. Defaults to `LeastRequest`.",
                           "properties": {
+                            "backendUtilization": {
+                              "description": "BackendUtilization defines the configuration when the load balancer type is\nset to BackendUtilization.",
+                              "properties": {
+                                "blackoutPeriod": {
+                                  "description": "A given endpoint must report load metrics continuously for at least this long before the endpoint weight will be used.\nDefault is 10s.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "errorUtilizationPenaltyPercent": {
+                                  "description": "ErrorUtilizationPenaltyPercent adjusts endpoint weights based on the error rate (eps/qps).\nThis is expressed as a percentage-based integer where 100 represents 1.0, 150 represents 1.5, etc.\n\nFor example:\n- 100 => 1.0x\n- 120 => 1.2x\n- 200 => 2.0x\n\nMust be non-negative.",
+                                  "format": "int32",
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "keepResponseHeaders": {
+                                  "default": false,
+                                  "description": "KeepResponseHeaders keeps the ORCA load report headers/trailers before sending the response to the client.\nDefaults to false.",
+                                  "type": "boolean"
+                                },
+                                "metricNamesForComputingUtilization": {
+                                  "description": "Metric names used to compute utilization if application_utilization is not set.\nFor map fields in ORCA proto, use the form \"<map_field>.<key>\", e.g., \"named_metrics.foo\".",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "outOfBand": {
+                                  "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                  "properties": {
+                                    "authority": {
+                                      "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                      "maxLength": 259,
+                                      "minLength": 1,
+                                      "pattern": "^[^\\x00\\n\\r]*$",
+                                      "type": "string"
+                                    },
+                                    "port": {
+                                      "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                      "format": "int32",
+                                      "maximum": 65535,
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "reportingPeriod": {
+                                      "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "reportingPeriod must be greater than 0",
+                                          "rule": "duration(self) > duration('0s')"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "weightExpirationPeriod": {
+                                  "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "weightUpdatePeriod": {
+                                  "description": "How often endpoint weights are recalculated. Values less than 100ms are capped at 100ms. Default 1s.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "consistentHash": {
                               "description": "ConsistentHash defines the configuration when the load balancer type is\nset to ConsistentHash",
                               "properties": {
@@ -1513,6 +1985,34 @@
                               ],
                               "additionalProperties": false
                             },
+                            "dynamicModule": {
+                              "description": "DynamicModule defines the configuration when the load balancer type is\nset to DynamicModule. The referenced module must be registered in the\nEnvoyProxy resource's dynamicModules allowlist.",
+                              "properties": {
+                                "config": {
+                                  "description": "Config is optional configuration for the module's load balancer\nimplementation. This is serialized and passed to the module's\ninitialization function.",
+                                  "x-kubernetes-preserve-unknown-fields": true
+                                },
+                                "lbPolicyName": {
+                                  "description": "LBPolicyName identifies a specific load balancer implementation within\nthe dynamic module. A single shared library can contain multiple LB\npolicy implementations. This value is passed to the module's\ninitialization function to select the appropriate implementation.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "description": "Name references a dynamic module registered in the EnvoyProxy resource's\ndynamicModules list. The referenced module must exist in the registry;\notherwise, the policy will be rejected.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "lbPolicyName",
+                                "name"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "endpointOverride": {
                               "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
                               "properties": {
@@ -1541,7 +2041,7 @@
                               "additionalProperties": false
                             },
                             "slowStart": {
-                              "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
+                              "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nSupported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
                               "properties": {
                                 "window": {
                                   "description": "Window defines the duration of the warm up period for newly added host.\nDuring slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently only supports linear growth of traffic. For additional details,\nsee https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#config-cluster-v3-cluster-slowstartconfig",
@@ -1556,12 +2056,14 @@
                               "additionalProperties": false
                             },
                             "type": {
-                              "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\".",
+                              "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\",\n\"BackendUtilization\",\n\"DynamicModule\".",
                               "enum": [
                                 "ConsistentHash",
                                 "LeastRequest",
                                 "Random",
-                                "RoundRobin"
+                                "RoundRobin",
+                                "BackendUtilization",
+                                "DynamicModule"
                               ],
                               "type": "string"
                             },
@@ -1598,6 +2100,34 @@
                                   },
                                   "type": "object",
                                   "additionalProperties": false
+                                },
+                                "weightedZones": {
+                                  "description": "WeightedZones configures weight-based traffic distribution across locality zones.\nTraffic is distributed proportionally based on the sum of all zone weights.",
+                                  "items": {
+                                    "description": "WeightedZoneConfig defines the weight for a specific locality zone.",
+                                    "properties": {
+                                      "weight": {
+                                        "description": "Weight defines the weight for this locality.\nHigher values receive more traffic. The actual traffic distribution\nis proportional to this value relative to other localities.",
+                                        "format": "int32",
+                                        "type": "integer"
+                                      },
+                                      "zone": {
+                                        "description": "Zone specifies the topology zone this weight applies to.\nThe value should match the topology.kubernetes.io/zone label\nof the nodes where endpoints are running.\nZones not listed in the configuration receive a default weight of 1.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "weight",
+                                      "zone"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-map-keys": [
+                                    "zone"
+                                  ],
+                                  "x-kubernetes-list-type": "map"
                                 }
                               },
                               "type": "object",
@@ -1614,12 +2144,36 @@
                               "rule": "self.type == 'ConsistentHash' ? has(self.consistentHash) : !has(self.consistentHash)"
                             },
                             {
-                              "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
-                              "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                              "message": "If LoadBalancer type is BackendUtilization, backendUtilization field needs to be set.",
+                              "rule": "self.type == 'BackendUtilization' ? has(self.backendUtilization) : !has(self.backendUtilization)"
                             },
                             {
-                              "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
-                              "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
+                              "message": "If LoadBalancer type is DynamicModule, dynamicModule field needs to be set.",
+                              "rule": "self.type == 'DynamicModule' ? has(self.dynamicModule) : !has(self.dynamicModule)"
+                            },
+                            {
+                              "message": "Currently SlowStart is only supported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
+                              "rule": "self.type in ['Random', 'ConsistentHash', 'DynamicModule'] ? !has(self.slowStart) : true"
+                            },
+                            {
+                              "message": "PreferLocal zone-aware routing is not supported for ConsistentHash load balancers. Use weightedZones instead.",
+                              "rule": "self.type == 'ConsistentHash' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                            },
+                            {
+                              "message": "PreferLocal zone-aware routing is not currently supported for BackendUtilization load balancers. Only WeightedZones can be used with BackendUtilization.",
+                              "rule": "self.type == 'BackendUtilization' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                            },
+                            {
+                              "message": "ZoneAware routing is not supported for DynamicModule load balancers.",
+                              "rule": "self.type == 'DynamicModule' ? !has(self.zoneAware) : true"
+                            },
+                            {
+                              "message": "ZoneAware PreferLocal and WeightedZones cannot be specified together.",
+                              "rule": "has(self.zoneAware) ? !(has(self.zoneAware.preferLocal) && has(self.zoneAware.weightedZones)) : true"
+                            },
+                            {
+                              "message": "EndpointOverride is not supported for DynamicModule load balancers.",
+                              "rule": "self.type == 'DynamicModule' ? !has(self.endpointOverride) : true"
                             }
                           ],
                           "additionalProperties": false
@@ -1628,7 +2182,7 @@
                           "description": "ProxyProtocol enables the Proxy Protocol when communicating with the backend.",
                           "properties": {
                             "version": {
-                              "description": "Version of ProxyProtol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
+                              "description": "Version of ProxyProtocol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
                               "enum": [
                                 "V1",
                                 "V2"
@@ -1775,6 +2329,11 @@
                                 },
                                 "requestTimeout": {
                                   "description": "RequestTimeout is the time until which entire response is received from the upstream.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "streamIdleTimeout": {
+                                  "description": " The stream idle timeout defines the amount of time a stream can exist without any upstream or downstream activity.\n If not specified, StreamIdleTimeout is inherited from the listener-level setting, which can be configured via ClientTrafficPolicy.",
                                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                   "type": "string"
                                 }
@@ -2014,6 +2573,48 @@
                               },
                               "type": "object",
                               "additionalProperties": false
+                            },
+                            "retryBudget": {
+                              "description": "RetryBudget provides settings for retry budget, which limits the number of retries in a given percentage.\nRetryBudget take precedence over maxParallelRetries.",
+                              "properties": {
+                                "minRetryConcurrency": {
+                                  "description": "MinRetryConcurrency specifies the minimum retry concurrency allowed for the retry budget.\nFor example, a budget of 20% with a minimum retry concurrency of 3\nwill allow 5 active retries while there are 25 active requests.\nIf there are 2 active requests, there are still 3 active retries\nallowed because of the minimum retry concurrency.\nDefaults to 3.",
+                                  "format": "int32",
+                                  "type": "integer"
+                                },
+                                "percent": {
+                                  "description": "Percent specifies the limit on concurrent retries as a percentage [0, 100] of\nthe sum of active requests and active pending requests.",
+                                  "properties": {
+                                    "denominator": {
+                                      "default": 100,
+                                      "format": "int32",
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "numerator": {
+                                      "format": "int32",
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "numerator"
+                                  ],
+                                  "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "numerator must be less than or equal to denominator",
+                                      "rule": "self.numerator <= self.denominator"
+                                    }
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "percent"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
                             }
                           },
                           "type": "object",
@@ -2130,6 +2731,78 @@
                                   "type": "object",
                                   "additionalProperties": false
                                 },
+                                "healthCheckLog": {
+                                  "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                  "properties": {
+                                    "matches": {
+                                      "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                        "enum": [
+                                          "Failure",
+                                          "FailureSeriesStart",
+                                          "Success",
+                                          "HealthyTransition"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "maxItems": 4,
+                                      "type": "array",
+                                      "x-kubernetes-list-type": "set",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "a failure type and a success type must both be specified together",
+                                          "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                        }
+                                      ]
+                                    },
+                                    "sinks": {
+                                      "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                      "items": {
+                                        "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                        "properties": {
+                                          "file": {
+                                            "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                            "properties": {
+                                              "path": {
+                                                "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                "minLength": 1,
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "path"
+                                            ],
+                                            "type": "object",
+                                            "additionalProperties": false
+                                          },
+                                          "type": {
+                                            "description": "Type defines the type of sink.",
+                                            "enum": [
+                                              "File"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "type"
+                                        ],
+                                        "type": "object",
+                                        "x-kubernetes-validations": [
+                                          {
+                                            "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                            "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                          }
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "maxItems": 1,
+                                      "type": "array"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
                                 "healthyThreshold": {
                                   "default": 1,
                                   "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -2198,7 +2871,7 @@
                                       "type": "array"
                                     },
                                     "hostname": {
-                                      "description": "Hostname defines the HTTP host that will be requested during health checking.\nDefault: HTTPRoute or GRPCRoute hostname.",
+                                      "description": "Hostname defines the HTTP Host header used for active HTTP health checks.\nHost selection uses this order: this field, the associated Backend endpoint\nhostname if available, then the effective Route hostname.",
                                       "maxLength": 253,
                                       "minLength": 1,
                                       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
@@ -2206,6 +2879,7 @@
                                     },
                                     "method": {
                                       "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                      "maxLength": 16,
                                       "type": "string"
                                     },
                                     "path": {
@@ -2213,12 +2887,75 @@
                                       "maxLength": 1024,
                                       "minLength": 1,
                                       "type": "string"
+                                    },
+                                    "requestBody": {
+                                      "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                      "properties": {
+                                        "binary": {
+                                          "description": "Binary payload base64 encoded.",
+                                          "format": "byte",
+                                          "type": "string"
+                                        },
+                                        "text": {
+                                          "description": "Text payload in plain text.",
+                                          "type": "string"
+                                        },
+                                        "type": {
+                                          "allOf": [
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            },
+                                            {
+                                              "enum": [
+                                                "Text",
+                                                "Binary"
+                                              ]
+                                            }
+                                          ],
+                                          "description": "Type defines the type of the payload.",
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "type"
+                                      ],
+                                      "type": "object",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "If payload type is Text, text field needs to be set.",
+                                          "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                        },
+                                        {
+                                          "message": "If payload type is Binary, binary field needs to be set.",
+                                          "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                        }
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    "retriableStatuses": {
+                                      "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
+                                      "items": {
+                                        "description": "HTTPStatus defines the http status code.",
+                                        "maximum": 599,
+                                        "minimum": 100,
+                                        "type": "integer"
+                                      },
+                                      "type": "array"
                                     }
                                   },
                                   "required": [
                                     "path"
                                   ],
                                   "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "The requestBody field can only be set when method is POST or PUT.",
+                                      "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                    }
+                                  ],
                                   "additionalProperties": false
                                 },
                                 "initialJitter": {
@@ -2231,6 +2968,20 @@
                                   "description": "Interval defines the time between active health checks.",
                                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                   "type": "string"
+                                },
+                                "overrides": {
+                                  "description": "Overrides defines the configuration of the overriding health check settings for all endpoints\nin the backend cluster. This allows customization of port and other settings that may differ\nfrom the main service configuration.",
+                                  "properties": {
+                                    "port": {
+                                      "description": "Port overrides the health check port.\nIf not set, the endpoint's serving port is used for health checks.\nThis is useful when health checks are served on a different port than\nthe main service port (e.g., port 443 for service, port 9090 for health checks).",
+                                      "format": "int32",
+                                      "maximum": 65535,
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
                                 },
                                 "tcp": {
                                   "description": "TCP defines the configuration of tcp health checker.\nIt's required while the health checker type is TCP.",
@@ -2361,7 +3112,7 @@
                                 },
                                 "unhealthyThreshold": {
                                   "default": 3,
-                                  "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.",
+                                  "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.\nWithout RetriableStatuses configured, any health check failure results in the host being immediately\nconsidered unhealthy. When RetriableStatuses is set, health checks returning those statuses are retried\nup to this threshold before the host is marked unhealthy.",
                                   "format": "int32",
                                   "minimum": 1,
                                   "type": "integer"
@@ -2397,6 +3148,11 @@
                             "passive": {
                               "description": "Passive passive check configuration",
                               "properties": {
+                                "alwaysEjectOneEndpoint": {
+                                  "default": false,
+                                  "description": "AlwaysEjectOneEndpoint defines whether at least one host should be ejected,\nregardless of MaxEjectionPercent.",
+                                  "type": "boolean"
+                                },
                                 "baseEjectionTime": {
                                   "default": "30s",
                                   "description": "BaseEjectionTime defines the base duration for which a host will be ejected on consecutive failures.",
@@ -2437,6 +3193,8 @@
                                   "default": 10,
                                   "description": "MaxEjectionPercent sets the maximum percentage of hosts in a cluster that can be ejected.",
                                   "format": "int32",
+                                  "maximum": 100,
+                                  "minimum": 0,
                                   "type": "integer"
                                 },
                                 "splitExternalLocalOriginErrors": {
@@ -2455,6 +3213,41 @@
                         "http2": {
                           "description": "HTTP2 provides HTTP/2 configuration for backend connections.",
                           "properties": {
+                            "connectionKeepalive": {
+                              "description": "ConnectionKeepalive configures HTTP/2 connection keepalive using PING frames.",
+                              "properties": {
+                                "idleInterval": {
+                                  "description": "IdleInterval specifies how long a connection must be idle before a PING is sent.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "interval": {
+                                  "description": "Interval specifies how often to send HTTP/2 PING frames to keep the connection alive.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "intervalJitter": {
+                                  "description": "IntervalJitter specifies a random jitter percentage added to each interval.\nDefaults to 15% if not specified.",
+                                  "format": "int32",
+                                  "maximum": 100,
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "timeout": {
+                                  "description": "Timeout specifies how long to wait for a PING response before considering the connection dead.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "x-kubernetes-validations": [
+                                {
+                                  "message": "timeout must be less than interval",
+                                  "rule": "!has(self.timeout) || !has(self.interval) || duration(self.timeout) < duration(self.interval)"
+                                }
+                              ],
+                              "additionalProperties": false
+                            },
                             "initialConnectionWindowSize": {
                               "allOf": [
                                 {
@@ -2513,6 +3306,78 @@
                         "loadBalancer": {
                           "description": "LoadBalancer policy to apply when routing traffic from the gateway to\nthe backend endpoints. Defaults to `LeastRequest`.",
                           "properties": {
+                            "backendUtilization": {
+                              "description": "BackendUtilization defines the configuration when the load balancer type is\nset to BackendUtilization.",
+                              "properties": {
+                                "blackoutPeriod": {
+                                  "description": "A given endpoint must report load metrics continuously for at least this long before the endpoint weight will be used.\nDefault is 10s.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "errorUtilizationPenaltyPercent": {
+                                  "description": "ErrorUtilizationPenaltyPercent adjusts endpoint weights based on the error rate (eps/qps).\nThis is expressed as a percentage-based integer where 100 represents 1.0, 150 represents 1.5, etc.\n\nFor example:\n- 100 => 1.0x\n- 120 => 1.2x\n- 200 => 2.0x\n\nMust be non-negative.",
+                                  "format": "int32",
+                                  "minimum": 0,
+                                  "type": "integer"
+                                },
+                                "keepResponseHeaders": {
+                                  "default": false,
+                                  "description": "KeepResponseHeaders keeps the ORCA load report headers/trailers before sending the response to the client.\nDefaults to false.",
+                                  "type": "boolean"
+                                },
+                                "metricNamesForComputingUtilization": {
+                                  "description": "Metric names used to compute utilization if application_utilization is not set.\nFor map fields in ORCA proto, use the form \"<map_field>.<key>\", e.g., \"named_metrics.foo\".",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "type": "array"
+                                },
+                                "outOfBand": {
+                                  "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                  "properties": {
+                                    "authority": {
+                                      "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                      "maxLength": 259,
+                                      "minLength": 1,
+                                      "pattern": "^[^\\x00\\n\\r]*$",
+                                      "type": "string"
+                                    },
+                                    "port": {
+                                      "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                      "format": "int32",
+                                      "maximum": 65535,
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "reportingPeriod": {
+                                      "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "reportingPeriod must be greater than 0",
+                                          "rule": "duration(self) > duration('0s')"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "weightExpirationPeriod": {
+                                  "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                },
+                                "weightUpdatePeriod": {
+                                  "description": "How often endpoint weights are recalculated. Values less than 100ms are capped at 100ms. Default 1s.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "consistentHash": {
                               "description": "ConsistentHash defines the configuration when the load balancer type is\nset to ConsistentHash",
                               "properties": {
@@ -2636,6 +3501,34 @@
                               ],
                               "additionalProperties": false
                             },
+                            "dynamicModule": {
+                              "description": "DynamicModule defines the configuration when the load balancer type is\nset to DynamicModule. The referenced module must be registered in the\nEnvoyProxy resource's dynamicModules allowlist.",
+                              "properties": {
+                                "config": {
+                                  "description": "Config is optional configuration for the module's load balancer\nimplementation. This is serialized and passed to the module's\ninitialization function.",
+                                  "x-kubernetes-preserve-unknown-fields": true
+                                },
+                                "lbPolicyName": {
+                                  "description": "LBPolicyName identifies a specific load balancer implementation within\nthe dynamic module. A single shared library can contain multiple LB\npolicy implementations. This value is passed to the module's\ninitialization function to select the appropriate implementation.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "description": "Name references a dynamic module registered in the EnvoyProxy resource's\ndynamicModules list. The referenced module must exist in the registry;\notherwise, the policy will be rejected.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "lbPolicyName",
+                                "name"
+                              ],
+                              "type": "object",
+                              "additionalProperties": false
+                            },
                             "endpointOverride": {
                               "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
                               "properties": {
@@ -2664,7 +3557,7 @@
                               "additionalProperties": false
                             },
                             "slowStart": {
-                              "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
+                              "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nSupported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
                               "properties": {
                                 "window": {
                                   "description": "Window defines the duration of the warm up period for newly added host.\nDuring slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently only supports linear growth of traffic. For additional details,\nsee https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#config-cluster-v3-cluster-slowstartconfig",
@@ -2679,12 +3572,14 @@
                               "additionalProperties": false
                             },
                             "type": {
-                              "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\".",
+                              "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\",\n\"BackendUtilization\",\n\"DynamicModule\".",
                               "enum": [
                                 "ConsistentHash",
                                 "LeastRequest",
                                 "Random",
-                                "RoundRobin"
+                                "RoundRobin",
+                                "BackendUtilization",
+                                "DynamicModule"
                               ],
                               "type": "string"
                             },
@@ -2721,6 +3616,34 @@
                                   },
                                   "type": "object",
                                   "additionalProperties": false
+                                },
+                                "weightedZones": {
+                                  "description": "WeightedZones configures weight-based traffic distribution across locality zones.\nTraffic is distributed proportionally based on the sum of all zone weights.",
+                                  "items": {
+                                    "description": "WeightedZoneConfig defines the weight for a specific locality zone.",
+                                    "properties": {
+                                      "weight": {
+                                        "description": "Weight defines the weight for this locality.\nHigher values receive more traffic. The actual traffic distribution\nis proportional to this value relative to other localities.",
+                                        "format": "int32",
+                                        "type": "integer"
+                                      },
+                                      "zone": {
+                                        "description": "Zone specifies the topology zone this weight applies to.\nThe value should match the topology.kubernetes.io/zone label\nof the nodes where endpoints are running.\nZones not listed in the configuration receive a default weight of 1.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "weight",
+                                      "zone"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-map-keys": [
+                                    "zone"
+                                  ],
+                                  "x-kubernetes-list-type": "map"
                                 }
                               },
                               "type": "object",
@@ -2737,12 +3660,36 @@
                               "rule": "self.type == 'ConsistentHash' ? has(self.consistentHash) : !has(self.consistentHash)"
                             },
                             {
-                              "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
-                              "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                              "message": "If LoadBalancer type is BackendUtilization, backendUtilization field needs to be set.",
+                              "rule": "self.type == 'BackendUtilization' ? has(self.backendUtilization) : !has(self.backendUtilization)"
                             },
                             {
-                              "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
-                              "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
+                              "message": "If LoadBalancer type is DynamicModule, dynamicModule field needs to be set.",
+                              "rule": "self.type == 'DynamicModule' ? has(self.dynamicModule) : !has(self.dynamicModule)"
+                            },
+                            {
+                              "message": "Currently SlowStart is only supported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
+                              "rule": "self.type in ['Random', 'ConsistentHash', 'DynamicModule'] ? !has(self.slowStart) : true"
+                            },
+                            {
+                              "message": "PreferLocal zone-aware routing is not supported for ConsistentHash load balancers. Use weightedZones instead.",
+                              "rule": "self.type == 'ConsistentHash' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                            },
+                            {
+                              "message": "PreferLocal zone-aware routing is not currently supported for BackendUtilization load balancers. Only WeightedZones can be used with BackendUtilization.",
+                              "rule": "self.type == 'BackendUtilization' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                            },
+                            {
+                              "message": "ZoneAware routing is not supported for DynamicModule load balancers.",
+                              "rule": "self.type == 'DynamicModule' ? !has(self.zoneAware) : true"
+                            },
+                            {
+                              "message": "ZoneAware PreferLocal and WeightedZones cannot be specified together.",
+                              "rule": "has(self.zoneAware) ? !(has(self.zoneAware.preferLocal) && has(self.zoneAware.weightedZones)) : true"
+                            },
+                            {
+                              "message": "EndpointOverride is not supported for DynamicModule load balancers.",
+                              "rule": "self.type == 'DynamicModule' ? !has(self.endpointOverride) : true"
                             }
                           ],
                           "additionalProperties": false
@@ -2751,7 +3698,7 @@
                           "description": "ProxyProtocol enables the Proxy Protocol when communicating with the backend.",
                           "properties": {
                             "version": {
-                              "description": "Version of ProxyProtol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
+                              "description": "Version of ProxyProtocol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
                               "enum": [
                                 "V1",
                                 "V2"
@@ -2900,6 +3847,11 @@
                                   "description": "RequestTimeout is the time until which entire response is received from the upstream.",
                                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                   "type": "string"
+                                },
+                                "streamIdleTimeout": {
+                                  "description": " The stream idle timeout defines the amount of time a stream can exist without any upstream or downstream activity.\n If not specified, StreamIdleTimeout is inherited from the listener-level setting, which can be configured via ClientTrafficPolicy.",
+                                  "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                  "type": "string"
                                 }
                               },
                               "type": "object",
@@ -2939,7 +3891,11 @@
                       "type": "array"
                     },
                     "path": {
-                      "description": "Path is the path of the HTTP External Authorization service.\nIf path is specified, the authorization request will be sent to that path,\nor else the authorization request will use the path of the original request.\n\nPlease note that the original request path will be appended to the path specified here.\nFor example, if the original request path is \"/hello\", and the path specified here is \"/auth\",\nthen the path of the authorization request will be \"/auth/hello\". If the path is not specified,\nthe path of the authorization request will be \"/hello\".",
+                      "description": "Path is the path of the HTTP External Authorization service.\nIf path is specified, the authorization request will be sent to that path,\nor else the authorization request will use the path of the original request.\n\nPlease note that the original request path will be appended to the path specified here.\nFor example, if the original request path is \"/hello\", and the path specified here is \"/auth\",\nthen the path of the authorization request will be \"/auth/hello\". If the path is not specified,\nthe path of the authorization request will be \"/hello\".\nOnly one of Path or PathOverride can be set.",
+                      "type": "string"
+                    },
+                    "pathOverride": {
+                      "description": "PathOverride replaces the original request path in the authorization request.\nIf set, the path will be overridden to this value during authorization.\nFor example, if the original request path is \"/hello\", and PathOverride is set to \"/auth\",\nthen the path of the authorization request will be \"/auth\".\nOnly one of Path or PathOverride can be set.",
                       "type": "string"
                     }
                   },
@@ -2956,13 +3912,65 @@
                     {
                       "message": "BackendRefs only supports Core, multicluster.x-k8s.io, and gateway.envoyproxy.io groups.",
                       "rule": "has(self.backendRefs) ? (self.backendRefs.all(f, f.group == \"\" || f.group == 'multicluster.x-k8s.io' || f.group == 'gateway.envoyproxy.io')) : true"
+                    },
+                    {
+                      "message": "only one of path or pathOverride can be specified",
+                      "rule": "!(has(self.path) && has(self.pathOverride))"
                     }
                   ],
                   "additionalProperties": false
                 },
+                "includeRouteMetadata": {
+                  "description": "IncludeRouteMetadata sends Envoy Gateway's built-in route metadata to the\nexternal authorization service as context.\n\nThis includes Envoy Gateway's built-in metadata for the selected route in\nthe \"envoy-gateway\" metadata namespace.\n\nThe metadata is exposed under the \"resources\" field as a list of route\nresource objects. For example:\n\nenvoy-gateway:\n  resources:\n  - kind: HTTPRoute\n    name: backend\n    namespace: default\n    annotations:\n      foo: bar\n\nThe resource object may include fields such as kind, namespace, name,\nsectionName, and supported route annotations.",
+                  "type": "boolean"
+                },
                 "recomputeRoute": {
                   "description": "RecomputeRoute clears the route cache and recalculates the routing decision.\nThis field must be enabled if the headers added or modified by the ExtAuth are used for\nroute matching decisions. If the recomputation selects a new route, features targeting\nthe new matched route will be applied.",
                   "type": "boolean"
+                },
+                "statusOnError": {
+                  "description": "Sets the HTTP status that is returned when the authorization service returns an error\nor cannot be reached. Defaults to 403 Forbidden.\nOnly 4xx and 5xx status codes are supported.",
+                  "enum": [
+                    400,
+                    401,
+                    402,
+                    403,
+                    404,
+                    405,
+                    406,
+                    407,
+                    408,
+                    409,
+                    410,
+                    411,
+                    412,
+                    413,
+                    414,
+                    415,
+                    416,
+                    417,
+                    421,
+                    422,
+                    423,
+                    424,
+                    426,
+                    428,
+                    429,
+                    431,
+                    500,
+                    501,
+                    502,
+                    503,
+                    504,
+                    505,
+                    506,
+                    507,
+                    508,
+                    510,
+                    511
+                  ],
+                  "format": "int32",
+                  "type": "integer"
                 },
                 "timeout": {
                   "description": "Timeout defines the timeout for requests to the external authorization service.\nIf not specified, defaults to 10 seconds.",
@@ -2983,6 +3991,16 @@
               ],
               "additionalProperties": false
             },
+            "mergeType": {
+              "description": "MergeType determines how the auto-generated SecurityPolicy for this MCPRoute (which\nenforces OAuth/JWT, API key, or external authorization) is merged with other\nSecurityPolicy configurations targeting the same route or a parent Gateway/Listener.\n\nWhen set, the auto-generated SecurityPolicy will merge with the closest parent\nSecurityPolicy in the route's attachment hierarchy (for example, one targeting a\nGateway, Gateway listener, ListenerSet, or ListenerSet listener) instead of\noverriding it entirely, per Envoy Gateway's merge semantics.\n\nIf unset, no merging occurs, and the auto-generated SecurityPolicy fully overrides\nany other SecurityPolicy targeting the same route.\n\nSee: https://gateway.envoyproxy.io/docs/tasks/security/apikey-authn/",
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "Replace is not a valid MergeType for SecurityPolicy",
+                  "rule": "self != 'Replace'"
+                }
+              ]
+            },
             "oauth": {
               "description": "OAuth defines the configuration for the MCP spec compatible OAuth authentication.",
               "properties": {
@@ -2993,6 +4011,12 @@
                   },
                   "maxItems": 32,
                   "type": "array"
+                },
+                "authorizationServerMetadataUrl": {
+                  "description": "AuthorizationServerMetadataURL is the URL the controller fetches the OAuth 2.0 Authorization\nServer Metadata document from, as defined in RFC 8414. When set, it replaces the well-known\nURIs derived from Issuer.\n\nSet this when the metadata lives somewhere the issuer does not lead to, for example an issuer\nof \"https://example.com/api/idp/authn\" whose document is served only at\n\"https://example.com/api/idp/v4/authn/.well-known/openid-configuration\".\n\nIssuer is unaffected by this field. It continues to identify the authorization server in the\nprotected resource metadata the gateway publishes, and to derive the well-known URIs when this\nfield is unset. When JWKS is not set, the JWKS URI is discovered from the document fetched here.",
+                  "format": "uri",
+                  "maxLength": 1024,
+                  "type": "string"
                 },
                 "claimToHeaders": {
                   "description": "ClaimToHeaders specifies JWT claims to extract and forward as HTTP headers to backend MCP servers.\nThis enables backends to access user identity for authorization, auditing, or personalization.\n\nSecurity considerations:\n- Any client-provided headers matching the configured header names will be stripped to prevent forgery\n- Only the specified claims are extracted; the full JWT is not forwarded to backends\n- Consider using a header prefix (e.g., \"X-Jwt-Claim-\") to avoid conflicts with other headers",
@@ -3267,6 +4291,48 @@
                                   },
                                   "type": "object",
                                   "additionalProperties": false
+                                },
+                                "retryBudget": {
+                                  "description": "RetryBudget provides settings for retry budget, which limits the number of retries in a given percentage.\nRetryBudget take precedence over maxParallelRetries.",
+                                  "properties": {
+                                    "minRetryConcurrency": {
+                                      "description": "MinRetryConcurrency specifies the minimum retry concurrency allowed for the retry budget.\nFor example, a budget of 20% with a minimum retry concurrency of 3\nwill allow 5 active retries while there are 25 active requests.\nIf there are 2 active requests, there are still 3 active retries\nallowed because of the minimum retry concurrency.\nDefaults to 3.",
+                                      "format": "int32",
+                                      "type": "integer"
+                                    },
+                                    "percent": {
+                                      "description": "Percent specifies the limit on concurrent retries as a percentage [0, 100] of\nthe sum of active requests and active pending requests.",
+                                      "properties": {
+                                        "denominator": {
+                                          "default": 100,
+                                          "format": "int32",
+                                          "minimum": 1,
+                                          "type": "integer"
+                                        },
+                                        "numerator": {
+                                          "format": "int32",
+                                          "minimum": 0,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "required": [
+                                        "numerator"
+                                      ],
+                                      "type": "object",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "numerator must be less than or equal to denominator",
+                                          "rule": "self.numerator <= self.denominator"
+                                        }
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "percent"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
                                 }
                               },
                               "type": "object",
@@ -3383,6 +4449,78 @@
                                       "type": "object",
                                       "additionalProperties": false
                                     },
+                                    "healthCheckLog": {
+                                      "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                                      "properties": {
+                                        "matches": {
+                                          "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                                          "items": {
+                                            "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                                            "enum": [
+                                              "Failure",
+                                              "FailureSeriesStart",
+                                              "Success",
+                                              "HealthyTransition"
+                                            ],
+                                            "type": "string"
+                                          },
+                                          "maxItems": 4,
+                                          "type": "array",
+                                          "x-kubernetes-list-type": "set",
+                                          "x-kubernetes-validations": [
+                                            {
+                                              "message": "a failure type and a success type must both be specified together",
+                                              "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                                            }
+                                          ]
+                                        },
+                                        "sinks": {
+                                          "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                                          "items": {
+                                            "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                                            "properties": {
+                                              "file": {
+                                                "description": "File defines the file sink configuration.\nRequired when type is File.",
+                                                "properties": {
+                                                  "path": {
+                                                    "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "path"
+                                                ],
+                                                "type": "object",
+                                                "additionalProperties": false
+                                              },
+                                              "type": {
+                                                "description": "Type defines the type of sink.",
+                                                "enum": [
+                                                  "File"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "type"
+                                            ],
+                                            "type": "object",
+                                            "x-kubernetes-validations": [
+                                              {
+                                                "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                                                "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                                              }
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          "maxItems": 1,
+                                          "type": "array"
+                                        }
+                                      },
+                                      "type": "object",
+                                      "additionalProperties": false
+                                    },
                                     "healthyThreshold": {
                                       "default": 1,
                                       "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -3451,7 +4589,7 @@
                                           "type": "array"
                                         },
                                         "hostname": {
-                                          "description": "Hostname defines the HTTP host that will be requested during health checking.\nDefault: HTTPRoute or GRPCRoute hostname.",
+                                          "description": "Hostname defines the HTTP Host header used for active HTTP health checks.\nHost selection uses this order: this field, the associated Backend endpoint\nhostname if available, then the effective Route hostname.",
                                           "maxLength": 253,
                                           "minLength": 1,
                                           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
@@ -3459,6 +4597,7 @@
                                         },
                                         "method": {
                                           "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                                          "maxLength": 16,
                                           "type": "string"
                                         },
                                         "path": {
@@ -3466,12 +4605,75 @@
                                           "maxLength": 1024,
                                           "minLength": 1,
                                           "type": "string"
+                                        },
+                                        "requestBody": {
+                                          "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                                          "properties": {
+                                            "binary": {
+                                              "description": "Binary payload base64 encoded.",
+                                              "format": "byte",
+                                              "type": "string"
+                                            },
+                                            "text": {
+                                              "description": "Text payload in plain text.",
+                                              "type": "string"
+                                            },
+                                            "type": {
+                                              "allOf": [
+                                                {
+                                                  "enum": [
+                                                    "Text",
+                                                    "Binary"
+                                                  ]
+                                                },
+                                                {
+                                                  "enum": [
+                                                    "Text",
+                                                    "Binary"
+                                                  ]
+                                                }
+                                              ],
+                                              "description": "Type defines the type of the payload.",
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "type"
+                                          ],
+                                          "type": "object",
+                                          "x-kubernetes-validations": [
+                                            {
+                                              "message": "If payload type is Text, text field needs to be set.",
+                                              "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                                            },
+                                            {
+                                              "message": "If payload type is Binary, binary field needs to be set.",
+                                              "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                                            }
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        "retriableStatuses": {
+                                          "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
+                                          "items": {
+                                            "description": "HTTPStatus defines the http status code.",
+                                            "maximum": 599,
+                                            "minimum": 100,
+                                            "type": "integer"
+                                          },
+                                          "type": "array"
                                         }
                                       },
                                       "required": [
                                         "path"
                                       ],
                                       "type": "object",
+                                      "x-kubernetes-validations": [
+                                        {
+                                          "message": "The requestBody field can only be set when method is POST or PUT.",
+                                          "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                                        }
+                                      ],
                                       "additionalProperties": false
                                     },
                                     "initialJitter": {
@@ -3484,6 +4686,20 @@
                                       "description": "Interval defines the time between active health checks.",
                                       "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                       "type": "string"
+                                    },
+                                    "overrides": {
+                                      "description": "Overrides defines the configuration of the overriding health check settings for all endpoints\nin the backend cluster. This allows customization of port and other settings that may differ\nfrom the main service configuration.",
+                                      "properties": {
+                                        "port": {
+                                          "description": "Port overrides the health check port.\nIf not set, the endpoint's serving port is used for health checks.\nThis is useful when health checks are served on a different port than\nthe main service port (e.g., port 443 for service, port 9090 for health checks).",
+                                          "format": "int32",
+                                          "maximum": 65535,
+                                          "minimum": 1,
+                                          "type": "integer"
+                                        }
+                                      },
+                                      "type": "object",
+                                      "additionalProperties": false
                                     },
                                     "tcp": {
                                       "description": "TCP defines the configuration of tcp health checker.\nIt's required while the health checker type is TCP.",
@@ -3614,7 +4830,7 @@
                                     },
                                     "unhealthyThreshold": {
                                       "default": 3,
-                                      "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.",
+                                      "description": "UnhealthyThreshold defines the number of unhealthy health checks required before a backend host is marked unhealthy.\nWithout RetriableStatuses configured, any health check failure results in the host being immediately\nconsidered unhealthy. When RetriableStatuses is set, health checks returning those statuses are retried\nup to this threshold before the host is marked unhealthy.",
                                       "format": "int32",
                                       "minimum": 1,
                                       "type": "integer"
@@ -3650,6 +4866,11 @@
                                 "passive": {
                                   "description": "Passive passive check configuration",
                                   "properties": {
+                                    "alwaysEjectOneEndpoint": {
+                                      "default": false,
+                                      "description": "AlwaysEjectOneEndpoint defines whether at least one host should be ejected,\nregardless of MaxEjectionPercent.",
+                                      "type": "boolean"
+                                    },
                                     "baseEjectionTime": {
                                       "default": "30s",
                                       "description": "BaseEjectionTime defines the base duration for which a host will be ejected on consecutive failures.",
@@ -3690,6 +4911,8 @@
                                       "default": 10,
                                       "description": "MaxEjectionPercent sets the maximum percentage of hosts in a cluster that can be ejected.",
                                       "format": "int32",
+                                      "maximum": 100,
+                                      "minimum": 0,
                                       "type": "integer"
                                     },
                                     "splitExternalLocalOriginErrors": {
@@ -3708,6 +4931,41 @@
                             "http2": {
                               "description": "HTTP2 provides HTTP/2 configuration for backend connections.",
                               "properties": {
+                                "connectionKeepalive": {
+                                  "description": "ConnectionKeepalive configures HTTP/2 connection keepalive using PING frames.",
+                                  "properties": {
+                                    "idleInterval": {
+                                      "description": "IdleInterval specifies how long a connection must be idle before a PING is sent.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    },
+                                    "interval": {
+                                      "description": "Interval specifies how often to send HTTP/2 PING frames to keep the connection alive.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    },
+                                    "intervalJitter": {
+                                      "description": "IntervalJitter specifies a random jitter percentage added to each interval.\nDefaults to 15% if not specified.",
+                                      "format": "int32",
+                                      "maximum": 100,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "timeout": {
+                                      "description": "Timeout specifies how long to wait for a PING response before considering the connection dead.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "x-kubernetes-validations": [
+                                    {
+                                      "message": "timeout must be less than interval",
+                                      "rule": "!has(self.timeout) || !has(self.interval) || duration(self.timeout) < duration(self.interval)"
+                                    }
+                                  ],
+                                  "additionalProperties": false
+                                },
                                 "initialConnectionWindowSize": {
                                   "allOf": [
                                     {
@@ -3766,6 +5024,78 @@
                             "loadBalancer": {
                               "description": "LoadBalancer policy to apply when routing traffic from the gateway to\nthe backend endpoints. Defaults to `LeastRequest`.",
                               "properties": {
+                                "backendUtilization": {
+                                  "description": "BackendUtilization defines the configuration when the load balancer type is\nset to BackendUtilization.",
+                                  "properties": {
+                                    "blackoutPeriod": {
+                                      "description": "A given endpoint must report load metrics continuously for at least this long before the endpoint weight will be used.\nDefault is 10s.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    },
+                                    "errorUtilizationPenaltyPercent": {
+                                      "description": "ErrorUtilizationPenaltyPercent adjusts endpoint weights based on the error rate (eps/qps).\nThis is expressed as a percentage-based integer where 100 represents 1.0, 150 represents 1.5, etc.\n\nFor example:\n- 100 => 1.0x\n- 120 => 1.2x\n- 200 => 2.0x\n\nMust be non-negative.",
+                                      "format": "int32",
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "keepResponseHeaders": {
+                                      "default": false,
+                                      "description": "KeepResponseHeaders keeps the ORCA load report headers/trailers before sending the response to the client.\nDefaults to false.",
+                                      "type": "boolean"
+                                    },
+                                    "metricNamesForComputingUtilization": {
+                                      "description": "Metric names used to compute utilization if application_utilization is not set.\nFor map fields in ORCA proto, use the form \"<map_field>.<key>\", e.g., \"named_metrics.foo\".",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "outOfBand": {
+                                      "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                                      "properties": {
+                                        "authority": {
+                                          "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                                          "maxLength": 259,
+                                          "minLength": 1,
+                                          "pattern": "^[^\\x00\\n\\r]*$",
+                                          "type": "string"
+                                        },
+                                        "port": {
+                                          "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                                          "format": "int32",
+                                          "maximum": 65535,
+                                          "minimum": 1,
+                                          "type": "integer"
+                                        },
+                                        "reportingPeriod": {
+                                          "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                                          "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                          "type": "string",
+                                          "x-kubernetes-validations": [
+                                            {
+                                              "message": "reportingPeriod must be greater than 0",
+                                              "rule": "duration(self) > duration('0s')"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "type": "object",
+                                      "additionalProperties": false
+                                    },
+                                    "weightExpirationPeriod": {
+                                      "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    },
+                                    "weightUpdatePeriod": {
+                                      "description": "How often endpoint weights are recalculated. Values less than 100ms are capped at 100ms. Default 1s.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
                                 "consistentHash": {
                                   "description": "ConsistentHash defines the configuration when the load balancer type is\nset to ConsistentHash",
                                   "properties": {
@@ -3889,6 +5219,34 @@
                                   ],
                                   "additionalProperties": false
                                 },
+                                "dynamicModule": {
+                                  "description": "DynamicModule defines the configuration when the load balancer type is\nset to DynamicModule. The referenced module must be registered in the\nEnvoyProxy resource's dynamicModules allowlist.",
+                                  "properties": {
+                                    "config": {
+                                      "description": "Config is optional configuration for the module's load balancer\nimplementation. This is serialized and passed to the module's\ninitialization function.",
+                                      "x-kubernetes-preserve-unknown-fields": true
+                                    },
+                                    "lbPolicyName": {
+                                      "description": "LBPolicyName identifies a specific load balancer implementation within\nthe dynamic module. A single shared library can contain multiple LB\npolicy implementations. This value is passed to the module's\ninitialization function to select the appropriate implementation.",
+                                      "maxLength": 253,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "description": "Name references a dynamic module registered in the EnvoyProxy resource's\ndynamicModules list. The referenced module must exist in the registry;\notherwise, the policy will be rejected.",
+                                      "maxLength": 253,
+                                      "minLength": 1,
+                                      "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$",
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "lbPolicyName",
+                                    "name"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
                                 "endpointOverride": {
                                   "description": "EndpointOverride defines the configuration for endpoint override.\nWhen specified, the load balancer will attempt to route requests to endpoints\nbased on the override information extracted from request headers or metadata.\n If the override endpoints are not available, the configured load balancer policy will be used as fallback.",
                                   "properties": {
@@ -3917,7 +5275,7 @@
                                   "additionalProperties": false
                                 },
                                 "slowStart": {
-                                  "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently this is only supported for RoundRobin and LeastRequest load balancers",
+                                  "description": "SlowStart defines the configuration related to the slow start load balancer policy.\nIf set, during slow start window, traffic sent to the newly added hosts will gradually increase.\nSupported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
                                   "properties": {
                                     "window": {
                                       "description": "Window defines the duration of the warm up period for newly added host.\nDuring slow start window, traffic sent to the newly added hosts will gradually increase.\nCurrently only supports linear growth of traffic. For additional details,\nsee https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/cluster.proto#config-cluster-v3-cluster-slowstartconfig",
@@ -3932,12 +5290,14 @@
                                   "additionalProperties": false
                                 },
                                 "type": {
-                                  "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\".",
+                                  "description": "Type decides the type of Load Balancer policy.\nValid LoadBalancerType values are\n\"ConsistentHash\",\n\"LeastRequest\",\n\"Random\",\n\"RoundRobin\",\n\"BackendUtilization\",\n\"DynamicModule\".",
                                   "enum": [
                                     "ConsistentHash",
                                     "LeastRequest",
                                     "Random",
-                                    "RoundRobin"
+                                    "RoundRobin",
+                                    "BackendUtilization",
+                                    "DynamicModule"
                                   ],
                                   "type": "string"
                                 },
@@ -3974,6 +5334,34 @@
                                       },
                                       "type": "object",
                                       "additionalProperties": false
+                                    },
+                                    "weightedZones": {
+                                      "description": "WeightedZones configures weight-based traffic distribution across locality zones.\nTraffic is distributed proportionally based on the sum of all zone weights.",
+                                      "items": {
+                                        "description": "WeightedZoneConfig defines the weight for a specific locality zone.",
+                                        "properties": {
+                                          "weight": {
+                                            "description": "Weight defines the weight for this locality.\nHigher values receive more traffic. The actual traffic distribution\nis proportional to this value relative to other localities.",
+                                            "format": "int32",
+                                            "type": "integer"
+                                          },
+                                          "zone": {
+                                            "description": "Zone specifies the topology zone this weight applies to.\nThe value should match the topology.kubernetes.io/zone label\nof the nodes where endpoints are running.\nZones not listed in the configuration receive a default weight of 1.",
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "weight",
+                                          "zone"
+                                        ],
+                                        "type": "object",
+                                        "additionalProperties": false
+                                      },
+                                      "type": "array",
+                                      "x-kubernetes-list-map-keys": [
+                                        "zone"
+                                      ],
+                                      "x-kubernetes-list-type": "map"
                                     }
                                   },
                                   "type": "object",
@@ -3990,12 +5378,36 @@
                                   "rule": "self.type == 'ConsistentHash' ? has(self.consistentHash) : !has(self.consistentHash)"
                                 },
                                 {
-                                  "message": "Currently SlowStart is only supported for RoundRobin and LeastRequest load balancers.",
-                                  "rule": "self.type in ['Random', 'ConsistentHash'] ? !has(self.slowStart) : true "
+                                  "message": "If LoadBalancer type is BackendUtilization, backendUtilization field needs to be set.",
+                                  "rule": "self.type == 'BackendUtilization' ? has(self.backendUtilization) : !has(self.backendUtilization)"
                                 },
                                 {
-                                  "message": "Currently ZoneAware is only supported for LeastRequest, Random, and RoundRobin load balancers.",
-                                  "rule": "self.type == 'ConsistentHash' ? !has(self.zoneAware) : true "
+                                  "message": "If LoadBalancer type is DynamicModule, dynamicModule field needs to be set.",
+                                  "rule": "self.type == 'DynamicModule' ? has(self.dynamicModule) : !has(self.dynamicModule)"
+                                },
+                                {
+                                  "message": "Currently SlowStart is only supported for RoundRobin, LeastRequest, and BackendUtilization load balancers.",
+                                  "rule": "self.type in ['Random', 'ConsistentHash', 'DynamicModule'] ? !has(self.slowStart) : true"
+                                },
+                                {
+                                  "message": "PreferLocal zone-aware routing is not supported for ConsistentHash load balancers. Use weightedZones instead.",
+                                  "rule": "self.type == 'ConsistentHash' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                                },
+                                {
+                                  "message": "PreferLocal zone-aware routing is not currently supported for BackendUtilization load balancers. Only WeightedZones can be used with BackendUtilization.",
+                                  "rule": "self.type == 'BackendUtilization' && has(self.zoneAware) ? !has(self.zoneAware.preferLocal) : true"
+                                },
+                                {
+                                  "message": "ZoneAware routing is not supported for DynamicModule load balancers.",
+                                  "rule": "self.type == 'DynamicModule' ? !has(self.zoneAware) : true"
+                                },
+                                {
+                                  "message": "ZoneAware PreferLocal and WeightedZones cannot be specified together.",
+                                  "rule": "has(self.zoneAware) ? !(has(self.zoneAware.preferLocal) && has(self.zoneAware.weightedZones)) : true"
+                                },
+                                {
+                                  "message": "EndpointOverride is not supported for DynamicModule load balancers.",
+                                  "rule": "self.type == 'DynamicModule' ? !has(self.endpointOverride) : true"
                                 }
                               ],
                               "additionalProperties": false
@@ -4004,7 +5416,7 @@
                               "description": "ProxyProtocol enables the Proxy Protocol when communicating with the backend.",
                               "properties": {
                                 "version": {
-                                  "description": "Version of ProxyProtol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
+                                  "description": "Version of ProxyProtocol\nValid ProxyProtocolVersion values are\n\"V1\"\n\"V2\"",
                                   "enum": [
                                     "V1",
                                     "V2"
@@ -4153,6 +5565,11 @@
                                       "description": "RequestTimeout is the time until which entire response is received from the upstream.",
                                       "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                                       "type": "string"
+                                    },
+                                    "streamIdleTimeout": {
+                                      "description": " The stream idle timeout defines the amount of time a stream can exist without any upstream or downstream activity.\n If not specified, StreamIdleTimeout is inherited from the listener-level setting, which can be configured via ClientTrafficPolicy.",
+                                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                                      "type": "string"
                                     }
                                   },
                                   "type": "object",
@@ -4187,6 +5604,11 @@
                         "cacheDuration": {
                           "default": "300s",
                           "description": "Duration is a string value representing a duration in time. The format is as specified\nin GEP-2257, a strict subset of the syntax parsed by Golang time.ParseDuration.",
+                          "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                          "type": "string"
+                        },
+                        "failedRefetchDuration": {
+                          "description": "FailedRefetchDuration is the duration Envoy waits before re-fetching the JWKS\nafter a failed fetch.\nThis does not control retries within a single fetch attempt (see BackendSettings.Retry),\nonly the interval between fetch attempts after a failure.\nIf not specified, Envoy's default of 1 second is used.",
                           "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                           "type": "string"
                         },
@@ -4290,8 +5712,8 @@
           "type": "object",
           "x-kubernetes-validations": [
             {
-              "message": "oauth must be configured when any authorization rule uses a jwt source",
-              "rule": "!(has(self.authorization) && self.authorization.rules.exists(r, has(r.source) && has(r.source.jwt)) && !has(self.oauth))"
+              "message": "oauth must be configured when any authorization rule uses a jwt source or references request.auth.jwt in a cel expression",
+              "rule": "!(has(self.authorization) && self.authorization.rules.exists(r, (has(r.source) && has(r.source.jwt)) || (has(r.cel) && r.cel.contains('auth.jwt'))) && !has(self.oauth))"
             }
           ],
           "additionalProperties": false
@@ -4302,6 +5724,12 @@
         "parentRefs"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "securityPolicy.oauth must be configured when a backendSelector rule's cel expression references request.auth.jwt",
+          "rule": "!(has(self.backendSelector) && self.backendSelector.rules.exists(r, has(r.cel) && r.cel.contains('auth.jwt')) && !(has(self.securityPolicy) && has(self.securityPolicy.oauth)))"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

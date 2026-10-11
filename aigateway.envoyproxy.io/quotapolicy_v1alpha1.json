@@ -1,5 +1,5 @@
 {
-  "description": "QuotaPolicy specifies token quota configuration for inference services.\nProviding a list of backends in the AIGatewayRouteRule allows failover to a different service\nif token quota for a service had been exceeded.",
+  "description": "QuotaPolicy specifies token quota configuration for inference services.\nGenerates rate limit configuration and tracks quota usage.\nReject requests with 429 once all related quota to that request has been exceeded.\n",
   "properties": {
     "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -16,11 +16,11 @@
       "description": "QuotaPolicySpec specifies rules for computing token based costs of requests.",
       "properties": {
         "perModelQuotas": {
-          "description": "PerModelQuotas specifies quota for different models served by the AIServiceBackend(s) where this\npolicy is attached.",
+          "description": "PerModelQuotas specifies quota for different models served by the AIServiceBackend(s) where this\npolicy is attached.\n\nWhen multiple QuotaPolicies define the same Model for the same AIServiceBackend,\nthe policy whose namespace/name is alphabetically first takes precedence.\nKeys are sorted to ensure deterministic snapshot generation.",
           "items": {
             "properties": {
               "modelName": {
-                "description": "Model name for which the quota is specified.",
+                "description": "Model name for which the quota is specified.\nThis must match the ModelNameOverride set in the AIGatewayRoute's BackendRef\nfor the quota policy to apply to that backend.",
                 "minLength": 1,
                 "type": "string"
               },
@@ -28,11 +28,11 @@
                 "description": "Expression for computing request cost and rules for matching requests to quota buckets.",
                 "properties": {
                   "bucketRules": {
-                    "description": "BucketRules are a list of client selectors and quotas. If a request\nmatches multiple rules, each of their associated quotas get applied, so a\nsingle request might burn down the quota for multiple rules.",
+                    "description": "BucketRules are a list of client selectors and quotas. If a request\nmatches multiple rules, each of their associated quotas get applied, so a\nsingle request might burn down the quota for multiple rules.\n\nClient selectors that match under the same model / service backend will be\ncombined with the first limit taking precedence.",
                     "items": {
                       "properties": {
                         "clientSelectors": {
-                          "description": "ClientSelectors holds the list of conditions to select\nspecific clients using attributes from the traffic flow.\nAll individual select conditions must hold True for this rule\nand its limit to be applied.\n\nIf no client selectors are specified, the rule applies to all traffic of\nthe targeted AIServiceBackend.",
+                          "description": "ClientSelectors holds the list of conditions to select\nspecific clients using attributes from the traffic flow.\nAll individual select conditions must hold True for this rule\nand its limit to be applied.\nCurrently, only header types are honored.\n\nIf no client selectors are specified, the rule applies to all traffic of\nthe targeted AIServiceBackend.",
                           "items": {
                             "description": "RateLimitSelectCondition specifies the attributes within the traffic flow that can\nbe used to select a subset of clients to be ratelimited.\nAll the individual conditions must hold True for the overall condition to hold True.\nAnd, at least one of headers or methods or path or sourceCIDR or queryParams condition must be specified.",
                             "properties": {
@@ -74,7 +74,7 @@
                                   "type": "object",
                                   "additionalProperties": false
                                 },
-                                "maxItems": 16,
+                                "maxItems": 128,
                                 "type": "array"
                               },
                               "methods": {
@@ -186,6 +186,11 @@
                               "sourceCIDR": {
                                 "description": "SourceCIDR is the client IP Address range to match on.",
                                 "properties": {
+                                  "invert": {
+                                    "default": false,
+                                    "description": "Invert specifies whether the source range match result will be inverted.\nWhen true, the rule matches when the client IP is not in the specified range(s).",
+                                    "type": "boolean"
+                                  },
                                   "type": {
                                     "default": "Exact",
                                     "enum": [
@@ -224,7 +229,13 @@
                           "description": "Quota value for given client selectors.\nThis quota is applied for traffic flows when the selectors\ncompute to True, causing the request to be counted towards the limit.\nA response with 429 HTTP status code is sent back to the client when\nthe selected requests have exceeded the quota.",
                           "properties": {
                             "duration": {
-                              "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                              "description": "Time window. Must be exactly one of: \"1s\" (1 second), \"1m\" (1 minute), \"1h\" (1 hour), or \"1d\" (1 day).",
+                              "enum": [
+                                "1s",
+                                "1m",
+                                "1h",
+                                "1d"
+                              ],
                               "type": "string"
                             },
                             "limit": {
@@ -253,14 +264,20 @@
                     "type": "array"
                   },
                   "costExpression": {
-                    "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n * \"input_tokens + cached_input_tokens * 0.1 + output_tokens * 6\"",
+                    "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n \"input_tokens + cached_input_tokens + output_tokens\"",
                     "type": "string"
                   },
                   "defaultBucket": {
                     "description": "Quota applicable to all traffic. This value can be overridden for specific classes of requests\nusing the \"BucketRules\" configuration.",
                     "properties": {
                       "duration": {
-                        "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                        "description": "Time window. Must be exactly one of: \"1s\" (1 second), \"1m\" (1 minute), \"1h\" (1 hour), or \"1d\" (1 day).",
+                        "enum": [
+                          "1s",
+                          "1m",
+                          "1h",
+                          "1d"
+                        ],
                         "type": "string"
                       },
                       "limit": {
@@ -276,17 +293,14 @@
                     "additionalProperties": false
                   },
                   "mode": {
-                    "description": "The \"Mode\" determines how quota is charged to the \"DefaultBucket\" and matching \"BucketRules\".\nIn the \"exclusive\" mode the quota is charged to matching BucketRules or the DefaultBucket\nif no BucketRules match the request. The request is denied if all matching buckets are out of quota.\nIn the \"shared\" mode the quota is charged to all matching \"BucketRules\" AND the \"DefaultBucket\"\nand request is allowed only if the quota is available in all matching buckets.",
+                    "default": "Shared",
+                    "description": "The \"Mode\" determines how quota is charged to the \"DefaultBucket\" and matching \"BucketRules\".\nIn the \"shared\" mode the quota is charged to all matching \"BucketRules\" AND the \"DefaultBucket\"\nand request is allowed only if the quota is available in at least one matching buckets.\nDefaults to \"Shared\".",
                     "enum": [
-                      "Exclusive",
                       "Shared"
                     ],
                     "type": "string"
                   }
                 },
-                "required": [
-                  "mode"
-                ],
                 "type": "object",
                 "additionalProperties": false
               }
@@ -302,17 +316,23 @@
           "type": "array"
         },
         "serviceQuota": {
-          "description": "Quota for all models served by AIServiceBackend(s). This value can be overridden for specific models using the \"PerModelQuotas\"\nconfiguration.",
+          "description": "Quota for all models served by AIServiceBackend(s). This value can be overridden for specific models using the \"PerModelQuotas\"\nconfiguration.\n\nCurrently, the rate limit configuration is properly set up, but the descriptor set is not being set in the Envoy Configuration",
           "properties": {
             "costExpression": {
-              "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n * \"input_tokens + cached_input_tokens * 0.1 + output_tokens * 6\"",
+              "description": "CostExpression specifies a CEL expression for computing the quota burndown of the LLM-related request.\nIf no expression is specified the \"total_tokens\" value is used.\nFor example:\n\n \"input_tokens + cached_input_tokens + output_tokens\"",
               "type": "string"
             },
             "quota": {
               "description": "Quota value applicable to all requests.\nA response with 429 HTTP status code is sent back to the client when\nthe selected requests have exceeded the quota.",
               "properties": {
                 "duration": {
-                  "description": "Time window. The suffix is used to specify units. The following\nsuffixes are supported:\n* s - seconds (the default unit)\n* m - minutes\n* h - hours",
+                  "description": "Time window. Must be exactly one of: \"1s\" (1 second), \"1m\" (1 minute), \"1h\" (1 hour), or \"1d\" (1 day).",
+                  "enum": [
+                    "1s",
+                    "1m",
+                    "1h",
+                    "1d"
+                  ],
                   "type": "string"
                 },
                 "limit": {

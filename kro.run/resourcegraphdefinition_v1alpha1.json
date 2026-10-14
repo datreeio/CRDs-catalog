@@ -35,17 +35,19 @@
                     "description": "Metadata contains the name and optional namespace of the external resource.",
                     "properties": {
                       "name": {
-                        "description": "Name is the name of the external resource to reference.\nThis field is required.",
+                        "description": "Name is the name of the external resource to reference.\nMutually exclusive with Selector.",
+                        "minLength": 1,
                         "type": "string"
                       },
                       "namespace": {
-                        "description": "Namespace is the namespace of the external resource.\nIf empty, the instance's namespace will be used.",
+                        "description": "Namespace is the namespace of the external resource.\nFor single external refs (Name), defaults to the instance's namespace.\nFor external collections (Selector), empty means list across all namespaces.",
                         "type": "string"
+                      },
+                      "selector": {
+                        "description": "Selector is a label selector for collection external references.\nWhen set, all resources matching the selector are included.\nThe selector may be a literal Kubernetes [metav1.LabelSelector] object or a full CEL\nexpression that resolves to one at reconcile time.\n\nMutually exclusive with Name.",
+                        "x-kubernetes-preserve-unknown-fields": true
                       }
                     },
-                    "required": [
-                      "name"
-                    ],
                     "type": "object",
                     "additionalProperties": false
                   }
@@ -76,14 +78,14 @@
                 "type": "string"
               },
               "includeWhen": {
-                "description": "IncludeWhen is a list of CEL expressions that determine whether this resource should be created.\nAll expressions must evaluate to true for the resource to be included.\nIf not specified, the resource is always included.\nExample: [\"schema.spec.enableMonitoring == true\"]",
+                "description": "IncludeWhen is a list of CEL expressions that determine whether this resource should be created.\nAll expressions must evaluate to true for the resource to be included.\nIf not specified, the resource is always included.\nExpressions may reference schema fields and/or fields in other resources in the RGD. They are\nre-evaluated during reconciliation, so resources may be created later or\npruned later as conditions change.\nEach entry must be a single standalone CEL expression wrapped in ${...}.\nExample: [\"${schema.spec.enableMonitoring == true}\", \"${network.status.ready == true}\"]",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "readyWhen": {
-                "description": "ReadyWhen is a list of CEL expressions that determine when this resource is considered ready.\nAll expressions must evaluate to true for the resource to be ready.\nIf not specified, the resource is considered ready when it exists.\nExample: [\"self.status.phase == 'Running'\", \"self.status.readyReplicas > 0\"]",
+                "description": "ReadyWhen is a list of CEL expressions that determine when this resource is considered ready.\nAll expressions must evaluate to true for the resource to be ready.\nIf not specified, the resource is considered ready when it exists.\nEach entry must be a single standalone CEL expression wrapped in ${...}.\nExamples:\n- Single resource: [\"${database.status.phase == 'Running'}\", \"${database.status.readyReplicas > 0}\"]\n- Collection: [\"${each.status.phase == 'Running'}\"]",
                 "items": {
                   "type": "string"
                 },
@@ -164,6 +166,17 @@
                 }
               ]
             },
+            "categories": {
+              "description": "Categories is a list of grouped resources this custom resource belongs to.\nResources in a category can be retrieved together with `kubectl get <category>`.\nExample: [\"kro\"] makes instances appear in `kubectl get kro`.",
+              "items": {
+                "maxLength": 63,
+                "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
             "group": {
               "default": "kro.run",
               "description": "Group is the API group for the generated CRD. Together with APIVersion and Kind,\nit forms the complete GVK (Group-Version-Kind) identifier.\nIf omitted, defaults to \"kro.run\". This field is immutable after creation.\nExample: \"mycompany.io\", \"databases.example.com\"",
@@ -207,8 +220,34 @@
               "type": "object",
               "additionalProperties": false
             },
+            "scope": {
+              "default": "Namespaced",
+              "description": "Scope determines whether the generated instance CRD is Namespaced or Cluster scoped.\nDefaults to Namespaced to preserve existing behaviour. This field is immutable after creation.",
+              "enum": [
+                "Namespaced",
+                "Cluster"
+              ],
+              "type": "string",
+              "x-kubernetes-validations": [
+                {
+                  "message": "scope is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ]
+            },
+            "shortNames": {
+              "description": "ShortNames are aliases for the generated CRD that can be used with kubectl.\nExample: [\"wa\", \"webapp\"] allows `kubectl get wa` or `kubectl get webapp` instead of `kubectl get webapplications`.",
+              "items": {
+                "maxLength": 63,
+                "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+                "type": "string"
+              },
+              "maxItems": 32,
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            },
             "spec": {
-              "description": "Spec defines the schema for the instance's spec section using SimpleSchema syntax.\nThis becomes the OpenAPI schema for instances of the generated CRD.\nUse SimpleSchema's concise syntax to define fields, types, defaults, and validations.\nExample: {\"replicas\": \"integer | default=1 | min=1 | max=10\"}",
+              "description": "Spec defines the schema for the instance's spec section using SimpleSchema syntax.\nThis becomes the OpenAPI schema for instances of the generated CRD.\nUse SimpleSchema's concise syntax to define fields, types, defaults, and validations.\nMarkers are space-separated after a single \"|\" separator.\nExample: {\"replicas\": \"integer | default=1 minimum=1 maximum=10\"}",
               "type": "object",
               "x-kubernetes-preserve-unknown-fields": true
             },
@@ -225,7 +264,8 @@
           },
           "required": [
             "apiVersion",
-            "kind"
+            "kind",
+            "scope"
           ],
           "type": "object",
           "additionalProperties": false
@@ -241,7 +281,7 @@
       "description": "ResourceGraphDefinitionStatus defines the observed state of ResourceGraphDefinition.\nIt provides information about the deployment state, resource ordering, and conditions.",
       "properties": {
         "conditions": {
-          "description": "Conditions represent the latest available observations of the ResourceGraphDefinition's state.\nCommon condition types include \"Ready\", \"Validated\", and \"ReconcilerDeployed\".",
+          "description": "Conditions represent the latest available observations of the ResourceGraphDefinition's state.\nCommon condition types include \"Ready\", \"GraphRevisionsResolved\", \"GraphAccepted\",\n\"KindReady\", and \"ControllerReady\".",
           "items": {
             "description": "Condition is the common struct used by all CRDs managed by ACK service\ncontrollers to indicate terminal states  of the CR and its backend AWS\nservice API resource",
             "properties": {
@@ -282,6 +322,11 @@
           },
           "type": "array"
         },
+        "lastIssuedRevision": {
+          "description": "LastIssuedRevision is the highest GraphRevision revision number ever issued for this RGD.\nIt is a persisted high-water mark used to keep revision allocation monotonic across GC.",
+          "format": "int64",
+          "type": "integer"
+        },
         "resources": {
           "description": "Resources provides detailed information about each resource in the graph,\nincluding their dependencies.",
           "items": {
@@ -313,7 +358,7 @@
           "type": "array"
         },
         "state": {
-          "description": "State indicates whether the ResourceGraphDefinition is Active or Inactive.\nActive means the CRD has been created and the controller is running.\nInactive means the ResourceGraphDefinition has been disabled or encountered an error.",
+          "description": "State indicates whether the ResourceGraphDefinition is Active or Inactive.\nActive means the graph is accepted and the generated CRD and dynamic controller\nare currently serving.\nInactive means the current graph is not accepted or the RGD is not currently serving.",
           "type": "string"
         },
         "topologicalOrder": {

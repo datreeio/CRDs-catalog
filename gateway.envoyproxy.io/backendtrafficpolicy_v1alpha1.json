@@ -643,6 +643,78 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "healthCheckLog": {
+                  "description": "HealthCheckLog defines health check event logging configuration for this cluster.\nWhen set, HC probe outcomes are logged to the configured sinks.\nTakes precedence over the gateway-level EnvoyProxy.spec.telemetry.healthCheckLog.",
+                  "properties": {
+                    "matches": {
+                      "description": "Matches defines which health check probe outcomes produce a log entry.\nWhen omitted or empty, all events are logged.\n\nEach value must be unique. Multiple values are ORed. If any failure type is\nspecified then a success type must also be specified, and vice versa.",
+                      "items": {
+                        "description": "ProxyHealthCheckLogEventType specifies which health check probe outcomes produce a log entry.",
+                        "enum": [
+                          "Failure",
+                          "FailureSeriesStart",
+                          "Success",
+                          "HealthyTransition"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 4,
+                      "type": "array",
+                      "x-kubernetes-list-type": "set",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "a failure type and a success type must both be specified together",
+                          "rule": "self.exists(e, e == 'Failure' || e == 'FailureSeriesStart') == self.exists(e, e == 'Success' || e == 'HealthyTransition')"
+                        }
+                      ]
+                    },
+                    "sinks": {
+                      "description": "Sinks defines where health check events are written.\nWhen omitted, events are written to /dev/stdout.",
+                      "items": {
+                        "description": "ProxyHealthCheckLogSink defines a destination for health check event logs.",
+                        "properties": {
+                          "file": {
+                            "description": "File defines the file sink configuration.\nRequired when type is File.",
+                            "properties": {
+                              "path": {
+                                "description": "Path specifies the file path for health check event output.\nUse /dev/stdout to write to standard output.",
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": {
+                            "description": "Type defines the type of sink.",
+                            "enum": [
+                              "File"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type"
+                        ],
+                        "type": "object",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "If ProxyHealthCheckLogSink type is File, file field needs to be set.",
+                            "rule": "self.type == 'File' ? has(self.file) : !has(self.file)"
+                          }
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 1,
+                      "type": "array"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "healthyThreshold": {
                   "default": 1,
                   "description": "HealthyThreshold defines the number of healthy health checks required before a backend host is marked healthy.",
@@ -719,6 +791,7 @@
                     },
                     "method": {
                       "description": "Method defines the HTTP method used for health checking.\nDefaults to GET",
+                      "maxLength": 16,
                       "type": "string"
                     },
                     "path": {
@@ -726,6 +799,53 @@
                       "maxLength": 1024,
                       "minLength": 1,
                       "type": "string"
+                    },
+                    "requestBody": {
+                      "description": "RequestBody defines the HTTP request body payload sent during health checking.",
+                      "properties": {
+                        "binary": {
+                          "description": "Binary payload base64 encoded.",
+                          "format": "byte",
+                          "type": "string"
+                        },
+                        "text": {
+                          "description": "Text payload in plain text.",
+                          "type": "string"
+                        },
+                        "type": {
+                          "allOf": [
+                            {
+                              "enum": [
+                                "Text",
+                                "Binary"
+                              ]
+                            },
+                            {
+                              "enum": [
+                                "Text",
+                                "Binary"
+                              ]
+                            }
+                          ],
+                          "description": "Type defines the type of the payload.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "If payload type is Text, text field needs to be set.",
+                          "rule": "self.type == 'Text' ? has(self.text) : !has(self.text)"
+                        },
+                        {
+                          "message": "If payload type is Binary, binary field needs to be set.",
+                          "rule": "self.type == 'Binary' ? has(self.binary) : !has(self.binary)"
+                        }
+                      ],
+                      "additionalProperties": false
                     },
                     "retriableStatuses": {
                       "description": "RetriableStatuses defines a list of HTTP response statuses considered retriable.\nResponses matching these statuses count towards the unhealthy threshold but\ndo not result in the host being considered immediately unhealthy.\nThe expected statuses take precedence for any range overlaps with this field.",
@@ -742,6 +862,12 @@
                     "path"
                   ],
                   "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "The requestBody field can only be set when method is POST or PUT.",
+                      "rule": "!has(self.requestBody) || (has(self.method) && self.method.upperAscii() in ['POST','PUT'])"
+                    }
+                  ],
                   "additionalProperties": false
                 },
                 "initialJitter": {
@@ -1153,6 +1279,38 @@
                   },
                   "type": "array"
                 },
+                "outOfBand": {
+                  "description": "OutOfBand enables out-of-band ORCA load reporting. When set, Envoy opens a\nserver-streaming gRPC connection to each endpoint's\nxds.service.orca.v3.OpenRcaService/StreamCoreMetrics and pulls load\nreports periodically, instead of relying on in-band ORCA metrics\ncarried in response headers/trailers.\n\nThe backend must implement OpenRcaService for this to take effect.",
+                  "properties": {
+                    "authority": {
+                      "description": "Authority overrides the :authority header on the OutOfBand gRPC stream.\nIf unset, Envoy uses the endpoint hostname, then the dialed address, then\nthe cluster name.",
+                      "maxLength": 259,
+                      "minLength": 1,
+                      "pattern": "^[^\\x00\\n\\r]*$",
+                      "type": "string"
+                    },
+                    "port": {
+                      "description": "Port overrides the port used for the OutOfBand reporting connection, e.g. to\nreach a separate reporting sidecar. Defaults to the endpoint's port.",
+                      "format": "int32",
+                      "maximum": 65535,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "reportingPeriod": {
+                      "description": "ReportingPeriod is how often Envoy requests load reports from the server.\nMust be greater than 0. Defaults to 10s.",
+                      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
+                      "type": "string",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "reportingPeriod must be greater than 0",
+                          "rule": "duration(self) > duration('0s')"
+                        }
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "weightExpirationPeriod": {
                   "description": "If a given endpoint has not reported load metrics in this long, stop using the reported weight. Defaults to 3m.",
                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
@@ -1484,7 +1642,7 @@
           "additionalProperties": false
         },
         "mergeType": {
-          "description": "MergeType determines how this configuration is merged with existing BackendTrafficPolicy\nconfigurations targeting a parent resource. When set, this configuration will be merged\ninto a parent BackendTrafficPolicy (i.e. the one targeting a Gateway or Listener).\nThis field cannot be set when targeting a parent resource (Gateway).\nIf unset, no merging occurs, and only the most specific configuration takes effect.",
+          "description": "MergeType determines how this configuration is merged with existing BackendTrafficPolicy\nconfigurations targeting a parent resource. When set, this configuration will be merged\ninto the closest parent BackendTrafficPolicy in the route's attachment hierarchy (for\nexample, one targeting a Gateway, Gateway listener, ListenerSet, or ListenerSet listener).\nCurrently, this field can only be set when targeting xRoute resources.\nIf unset, no merging occurs, and only the most specific configuration takes effect.",
           "type": "string",
           "x-kubernetes-validations": [
             {
@@ -1565,7 +1723,7 @@
                                 "type": "object",
                                 "additionalProperties": false
                               },
-                              "maxItems": 64,
+                              "maxItems": 128,
                               "type": "array"
                             },
                             "methods": {
@@ -1822,20 +1980,42 @@
                       "limit": {
                         "description": "Limit holds the rate limit values.\nThis limit is applied for traffic flows when the selectors\ncompute to True, causing the request to be counted towards the limit.\nThe limit is enforced and the request is ratelimited, i.e. a response with\n429 HTTP status code is sent back to the client when\nthe selected requests have reached the limit.",
                         "properties": {
+                          "fromMetadata": {
+                            "description": "FromMetadata sources the limit value from per-request dynamic metadata.\nWhen the referenced metadata value is present, it overrides Requests/Unit for that\nrequest; otherwise Requests/Unit are used as the default.\n\nThe referenced metadata value must be a struct containing an integer \"requests_per_unit\"\nproperty and a \"unit\" property with a value parseable to a RateLimitUnit. An upstream\nfilter (e.g. ext_proc) is responsible for writing this struct into dynamic metadata.\n\nOnly supported for Global Rate Limits.",
+                            "properties": {
+                              "key": {
+                                "description": "Key is the key to retrieve the limit value from within the namespaced filter metadata.",
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "description": "Namespace is the namespace of the dynamic metadata.",
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "namespace"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "requests": {
                             "description": "Requests is the number of requests (or cost units, when used with\ncost-based rate limiting) allowed per Unit.",
-                            "format": "int32",
+                            "format": "int64",
                             "maximum": 4294967295,
-                            "minimum": 1,
+                            "minimum": 0,
                             "type": "integer"
                           },
                           "unit": {
-                            "description": "RateLimitUnit specifies the intervals for setting rate limits.\nValid RateLimitUnit values are \"Second\", \"Minute\", \"Hour\", \"Day\", \"Month\" and \"Year\".",
+                            "description": "RateLimitUnit specifies the intervals for setting rate limits.\nValid RateLimitUnit values are \"Second\", \"Minute\", \"Hour\", \"Day\", \"Week\", \"Month\" and \"Year\".",
                             "enum": [
                               "Second",
                               "Minute",
                               "Hour",
                               "Day",
+                              "Week",
                               "Month",
                               "Year"
                             ],
@@ -1933,7 +2113,7 @@
                                 "type": "object",
                                 "additionalProperties": false
                               },
-                              "maxItems": 64,
+                              "maxItems": 128,
                               "type": "array"
                             },
                             "methods": {
@@ -2190,20 +2370,42 @@
                       "limit": {
                         "description": "Limit holds the rate limit values.\nThis limit is applied for traffic flows when the selectors\ncompute to True, causing the request to be counted towards the limit.\nThe limit is enforced and the request is ratelimited, i.e. a response with\n429 HTTP status code is sent back to the client when\nthe selected requests have reached the limit.",
                         "properties": {
+                          "fromMetadata": {
+                            "description": "FromMetadata sources the limit value from per-request dynamic metadata.\nWhen the referenced metadata value is present, it overrides Requests/Unit for that\nrequest; otherwise Requests/Unit are used as the default.\n\nThe referenced metadata value must be a struct containing an integer \"requests_per_unit\"\nproperty and a \"unit\" property with a value parseable to a RateLimitUnit. An upstream\nfilter (e.g. ext_proc) is responsible for writing this struct into dynamic metadata.\n\nOnly supported for Global Rate Limits.",
+                            "properties": {
+                              "key": {
+                                "description": "Key is the key to retrieve the limit value from within the namespaced filter metadata.",
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "namespace": {
+                                "description": "Namespace is the namespace of the dynamic metadata.",
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "namespace"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
                           "requests": {
                             "description": "Requests is the number of requests (or cost units, when used with\ncost-based rate limiting) allowed per Unit.",
-                            "format": "int32",
+                            "format": "int64",
                             "maximum": 4294967295,
-                            "minimum": 1,
+                            "minimum": 0,
                             "type": "integer"
                           },
                           "unit": {
-                            "description": "RateLimitUnit specifies the intervals for setting rate limits.\nValid RateLimitUnit values are \"Second\", \"Minute\", \"Hour\", \"Day\", \"Month\" and \"Year\".",
+                            "description": "RateLimitUnit specifies the intervals for setting rate limits.\nValid RateLimitUnit values are \"Second\", \"Minute\", \"Hour\", \"Day\", \"Week\", \"Month\" and \"Year\".",
                             "enum": [
                               "Second",
                               "Minute",
                               "Hour",
                               "Day",
+                              "Week",
                               "Month",
                               "Year"
                             ],
@@ -2246,6 +2448,10 @@
                     {
                       "message": "response cost is not supported for Local Rate Limits",
                       "rule": "self.all(r, !has(r.cost) || !has(r.cost.response))"
+                    },
+                    {
+                      "message": "limit fromMetadata is not supported for Local Rate Limits",
+                      "rule": "self.all(r, !has(r.limit.fromMetadata))"
                     }
                   ]
                 }
@@ -2300,6 +2506,57 @@
               "match": {
                 "description": "Match configuration.",
                 "properties": {
+                  "responseHeaders": {
+                    "description": "Response headers to match on. The match evaluates to true if all matches are successful.",
+                    "items": {
+                      "description": "ResponseOverrideHeaderMatch defines the configuration for matching a response header.",
+                      "properties": {
+                        "name": {
+                          "description": "Name of the HTTP header.\nThe header name is case-insensitive.\nFor example, \"Foo\" and \"foo\" are considered the same header.",
+                          "maxLength": 256,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                          "type": "string"
+                        },
+                        "value": {
+                          "description": "Value within the HTTP header to match against.",
+                          "properties": {
+                            "type": {
+                              "default": "Exact",
+                              "description": "Type specifies how to match against a string.",
+                              "enum": [
+                                "Exact",
+                                "Prefix",
+                                "Suffix",
+                                "RegularExpression"
+                              ],
+                              "type": "string"
+                            },
+                            "value": {
+                              "description": "Value specifies the string value that the match must have.",
+                              "maxLength": 1024,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "value"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "value"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 16,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "statusCodes": {
                     "description": "Status code to match on. The match evaluates to true if any of the matches are successful.",
                     "items": {
@@ -2375,10 +2632,13 @@
                     "type": "array"
                   }
                 },
-                "required": [
-                  "statusCodes"
-                ],
                 "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "at least one of statusCodes or responseHeaders must be specified",
+                    "rule": "has(self.statusCodes) || has(self.responseHeaders)"
+                  }
+                ],
                 "additionalProperties": false
               },
               "redirect": {
@@ -3028,6 +3288,33 @@
             "tracing": {
               "description": "Tracing configures the tracing settings for the backend or HTTPRoute.\n\nThis takes precedence over EnvoyProxy tracing when set.",
               "properties": {
+                "clientSamplingFraction": {
+                  "description": "ClientSamplingFraction represents the fraction of requests that should be\nselected for tracing when requested by the client.\nIf unspecified, client-forced tracing is disabled by default and users must\nset this field to opt in.",
+                  "properties": {
+                    "denominator": {
+                      "default": 100,
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "numerator": {
+                      "format": "int32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "numerator"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "numerator must be less than or equal to denominator",
+                      "rule": "self.numerator <= self.denominator"
+                    }
+                  ],
+                  "additionalProperties": false
+                },
                 "customTags": {
                   "additionalProperties": {
                     "properties": {
@@ -3100,6 +3387,33 @@
                   },
                   "description": "CustomTags defines the custom tags to add to each span.\nIf provider is kubernetes, pod name and namespace are added by default.\n\nDeprecated: Use Tags instead.",
                   "type": "object"
+                },
+                "overallSamplingFraction": {
+                  "description": "OverallSamplingFraction represents the fraction of requests that should be\nselected for tracing after all other sampling checks have been applied.",
+                  "properties": {
+                    "denominator": {
+                      "default": 100,
+                      "format": "int32",
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "numerator": {
+                      "format": "int32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "numerator"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "numerator must be less than or equal to denominator",
+                      "rule": "self.numerator <= self.denominator"
+                    }
+                  ],
+                  "additionalProperties": false
                 },
                 "samplingFraction": {
                   "description": "SamplingFraction represents the fraction of requests that should be\nselected for tracing if no prior sampling decision has been made.",
@@ -3229,16 +3543,20 @@
           "rule": "has(self.targetRef) ? self.targetRef.group == 'gateway.networking.k8s.io' : true "
         },
         {
-          "message": "this policy can only have a targetRef.kind of Gateway/HTTPRoute/GRPCRoute/TCPRoute/UDPRoute/TLSRoute",
-          "rule": "has(self.targetRef) ? self.targetRef.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute'] : true"
+          "message": "this policy can only have a targetRef.kind of Gateway/ListenerSet/HTTPRoute/GRPCRoute/TCPRoute/UDPRoute/TLSRoute",
+          "rule": "has(self.targetRef) ? self.targetRef.kind in ['Gateway', 'ListenerSet', 'HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute'] : true"
         },
         {
           "message": "this policy can only have a targetRefs[*].group of gateway.networking.k8s.io",
           "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, ref.group == 'gateway.networking.k8s.io') : true "
         },
         {
-          "message": "this policy can only have a targetRefs[*].kind of Gateway/HTTPRoute/GRPCRoute/TCPRoute/UDPRoute/TLSRoute",
-          "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, ref.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute']) : true "
+          "message": "this policy can only have a targetRefs[*].kind of Gateway/ListenerSet/HTTPRoute/GRPCRoute/TCPRoute/UDPRoute/TLSRoute",
+          "rule": "has(self.targetRefs) ? self.targetRefs.all(ref, ref.kind in ['Gateway', 'ListenerSet', 'HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute']) : true "
+        },
+        {
+          "message": "mergeType can only be used with xRoute targets",
+          "rule": "!has(self.mergeType) || ((!has(self.targetRef) || self.targetRef.kind in ['HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute']) && (!has(self.targetRefs) || self.targetRefs.all(ref, ref.kind in ['HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute'])) && (!has(self.targetSelectors) || self.targetSelectors.all(sel, sel.kind in ['HTTPRoute', 'GRPCRoute', 'UDPRoute', 'TCPRoute', 'TLSRoute'])))"
         },
         {
           "message": "either compression or compressor can be set, not both",
@@ -3249,8 +3567,8 @@
           "rule": "!has(self.requestBuffer) || !has(self.httpUpgrade) || self.httpUpgrade.size() == 0"
         },
         {
-          "message": "admissionControl can only be used with HTTPRoute, GRPCRoute, or Gateway targets",
-          "rule": "!has(self.admissionControl) || ((!has(self.targetRef) || self.targetRef.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute']) && (!has(self.targetRefs) || self.targetRefs.all(ref, ref.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute'])) && (!has(self.targetSelectors) || self.targetSelectors.all(sel, sel.kind in ['Gateway', 'HTTPRoute', 'GRPCRoute'])))"
+          "message": "admissionControl can only be used with HTTPRoute, GRPCRoute, Gateway, or ListenerSet targets",
+          "rule": "!has(self.admissionControl) || ((!has(self.targetRef) || self.targetRef.kind in ['Gateway', 'ListenerSet', 'HTTPRoute', 'GRPCRoute']) && (!has(self.targetRefs) || self.targetRefs.all(ref, ref.kind in ['Gateway', 'ListenerSet', 'HTTPRoute', 'GRPCRoute'])) && (!has(self.targetSelectors) || self.targetSelectors.all(sel, sel.kind in ['Gateway', 'ListenerSet', 'HTTPRoute', 'GRPCRoute'])))"
         },
         {
           "message": "predictivePercent in preconnect policy only works with RoundRobin or Random load balancers",

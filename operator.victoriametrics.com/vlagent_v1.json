@@ -50,7 +50,7 @@
                     "x-kubernetes-list-type": "atomic"
                   },
                   "dataSource": {
-                    "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                    "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                     "properties": {
                       "apiGroup": {
                         "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -74,7 +74,7 @@
                     "additionalProperties": false
                   },
                   "dataSourceRef": {
-                    "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                    "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                     "properties": {
                       "apiGroup": {
                         "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -101,7 +101,7 @@
                     "additionalProperties": false
                   },
                   "resources": {
-                    "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                    "description": "resources represents the minimum resources the volume should have.\nUsers are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
                     "properties": {
                       "limits": {
                         "additionalProperties": {
@@ -222,7 +222,7 @@
                       "description": "When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource\nthat it does not recognizes, then it should ignore that update and let other controllers\nhandle it.",
                       "type": "string"
                     },
-                    "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+                    "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.",
                     "type": "object",
                     "x-kubernetes-map-type": "granular"
                   },
@@ -239,7 +239,7 @@
                       "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                       "x-kubernetes-int-or-string": true
                     },
-                    "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+                    "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.",
                     "type": "object"
                   },
                   "capacity": {
@@ -307,6 +307,55 @@
                     "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                     "type": "string"
                   },
+                  "healthStatus": {
+                    "description": "healthStatus contains the latest controller-reported health information\nfor the volume bound to this claim.",
+                    "properties": {
+                      "healthConditions": {
+                        "description": "conditions is the set of adverse conditions reported by\nthe CSI controller plugin. An empty list means no adverse condition.\nAt most 16 conditions may be reported.",
+                        "items": {
+                          "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+                          "properties": {
+                            "message": {
+                              "description": "message is a human-readable description.\nMaximum permitted length of a message is 1024 bytes.",
+                              "type": "string"
+                            },
+                            "reason": {
+                              "description": "reason is a brief CamelCase machine-parseable reason.\nTogether with status it forms the unique identity of a condition entry.\nMaximum permitted length of a reason is 256 bytes.",
+                              "type": "string"
+                            },
+                            "status": {
+                              "description": "status is the machine-parseable health category.\nPossible values:\n- \"Inaccessible\": the volume cannot be accessed.\n- \"DataLoss\": data loss has been detected on the volume.\n- \"Degraded\": the volume is functioning with reduced capability.",
+                              "enum": [
+                                "DataLoss",
+                                "Degraded",
+                                "Inaccessible"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "status"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-map-keys": [
+                          "status",
+                          "reason"
+                        ],
+                        "x-kubernetes-list-type": "map"
+                      },
+                      "lastTransitionTime": {
+                        "description": "lastTransitionTime is when the current set of conditions first appeared.",
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
                   "modifyVolumeStatus": {
                     "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
                     "properties": {
@@ -339,6 +388,10 @@
           },
           "type": "array"
         },
+        "componentVersion": {
+          "description": "ComponentVersion defines default images tag for all components.\nit can be overwritten with component specific image.tag value.",
+          "type": "string"
+        },
         "configMaps": {
           "description": "ConfigMaps is a list of ConfigMaps in the same namespace as the Application\nobject, which shall be mounted into the Application container\nat /etc/vm/configs/CONFIGMAP_NAME folder",
           "items": {
@@ -359,7 +412,7 @@
           "type": "array"
         },
         "disableAutomountServiceAccountToken": {
-          "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes (available from v0.54.0).\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
+          "description": "DisableAutomountServiceAccountToken whether to disable serviceAccount auto mount by Kubernetes\nOperator will conditionally create volumes and volumeMounts for containers if it requires k8s API access.\nFor example, vmagent and vm-config-reloader requires k8s API access.\nOperator creates volumes with name: \"kube-api-access\", which can be used as volumeMount for extraContainers if needed.\nAnd also adds VolumeMounts at /var/run/secrets/kubernetes.io/serviceaccount.",
           "type": "boolean"
         },
         "disableSelfServiceScrape": {
@@ -368,53 +421,16 @@
         },
         "dnsConfig": {
           "description": "Specifies the DNS parameters of a pod.\nParameters specified here will be merged to the generated DNS\nconfiguration based on DNSPolicy.",
-          "items": {
-            "x-kubernetes-preserve-unknown-fields": true
-          },
-          "properties": {
-            "nameservers": {
-              "description": "A list of DNS name server IP addresses.\nThis will be appended to the base nameservers generated from DNSPolicy.\nDuplicated nameservers will be removed.",
-              "items": {
-                "type": "string"
-              },
-              "type": "array",
-              "x-kubernetes-list-type": "atomic"
-            },
-            "options": {
-              "description": "A list of DNS resolver options.\nThis will be merged with the base options generated from DNSPolicy.\nDuplicated entries will be removed. Resolution options given in Options\nwill override those that appear in the base DNSPolicy.",
-              "items": {
-                "description": "PodDNSConfigOption defines DNS resolver options of a pod.",
-                "properties": {
-                  "name": {
-                    "description": "Name is this DNS resolver option's name.\nRequired.",
-                    "type": "string"
-                  },
-                  "value": {
-                    "description": "Value is this DNS resolver option's value.",
-                    "type": "string"
-                  }
-                },
-                "type": "object",
-                "additionalProperties": false
-              },
-              "type": "array",
-              "x-kubernetes-list-type": "atomic"
-            },
-            "searches": {
-              "description": "A list of DNS search domains for host-name lookup.\nThis will be appended to the base search paths generated from DNSPolicy.\nDuplicated search paths will be removed.",
-              "items": {
-                "type": "string"
-              },
-              "type": "array",
-              "x-kubernetes-list-type": "atomic"
-            }
-          },
           "type": "object",
-          "additionalProperties": false
+          "x-kubernetes-preserve-unknown-fields": true
         },
         "dnsPolicy": {
           "description": "DNSPolicy sets DNS policy for the pod",
           "type": "string"
+        },
+        "enableServiceLinks": {
+          "description": "EnableServiceLinks indicates whether information about services should be injected into pod's\nenvironment variables, matching the syntax of Docker links.\nOptional: Defaults to true.",
+          "type": "boolean"
         },
         "extraArgs": {
           "additionalProperties": {
@@ -563,7 +579,7 @@
               "type": "string"
             },
             "tag": {
-              "description": "Tag contains desired docker image version",
+              "description": "Tag contains desired docker image version.\nIt may be a regular tag (e.g. \"v1.96.0\") or a digest\n(e.g. \"sha256:<hex>\"); a digest is joined to the repository with \"@\"\ninstead of \":\", allowing images to be pinned by digest.",
               "type": "string"
             }
           },
@@ -571,7 +587,7 @@
           "additionalProperties": false
         },
         "imagePullSecrets": {
-          "description": "ImagePullSecrets An optional list of references to secrets in the same namespace\nto use for pulling images from registries\nsee https://kubernetes.io/docs/concepts/containers/images/#referring-to-an-imagepullsecrets-on-a-pod",
+          "description": "ImagePullSecrets An optional list of references to secrets in the same namespace\nto use for pulling images from registries\nsee https://kubernetes.io/docs/concepts/containers/images/#specifying-imagepullsecrets-on-a-pod",
           "items": {
             "description": "LocalObjectReference contains enough information to let you locate the\nreferenced object inside the same namespace.",
             "properties": {
@@ -599,8 +615,133 @@
           },
           "type": "array"
         },
+        "k8sCollector": {
+          "description": "K8sCollector configures VLAgent logs collection from K8s pods",
+          "properties": {
+            "checkpointsPath": {
+              "description": "CheckpointsPath configures path to file where logs checkpoints are stored.\nBy default it's stored at host's /var/lib/vlagent-data/checkpoints.json.",
+              "type": "string"
+            },
+            "decolorizeFields": {
+              "description": "DecolorizeFields defines fields to remove ANSI color codes across logs ingested from Kubernetes",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "enabled": {
+              "description": "Enabled switches VLAgent to log collection mode.\nNote, for this purpose operator uses DaemonSet, while by default VLAgent uses StatefulSet.\nSwitching this option will drop all persisted data.",
+              "type": "boolean"
+            },
+            "excludeFilter": {
+              "description": "ExcludeFilter defines logsql expression that allows to filter out containers to collect logs from",
+              "type": "string"
+            },
+            "extraFields": {
+              "description": "ExtraFields defines extra fields as JSON string which should be added to each collected log line\nExample: '{\"env\":\"dev\",\"cluster\":\"staging\"}'",
+              "type": "string"
+            },
+            "ignoreFields": {
+              "description": "IgnoreFields defines fields to ignore across logs ingested from Kubernetes",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "includeNodeAnnotations": {
+              "description": "IncludeNodeAnnotations enables attachment of node annotations to log entries",
+              "type": "boolean"
+            },
+            "includeNodeLabels": {
+              "description": "IncludeNodeLabels enables attachment of node labels to log entries",
+              "type": "boolean"
+            },
+            "includePodAnnotations": {
+              "description": "IncludePodAnnotations enables attachment of pod annotations to log entries",
+              "type": "boolean"
+            },
+            "includePodLabels": {
+              "description": "IncludePodLabels enables attachment of pod labels to log entries",
+              "type": "boolean"
+            },
+            "logsPath": {
+              "description": "LogsPath configures root for logs path\nBy default VLAgent collects logs from /var/log/containers",
+              "type": "string"
+            },
+            "msgFields": {
+              "description": "MsgField defines fields that may contain the _msg field",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "streamFields": {
+              "description": "StreamFields defines list of fields to use as log stream fields for logs ingested from Kubernetes Pods",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "tenantID": {
+              "description": "TenantID defines default tenant ID to use for logs collected from pods in format: <accountID>:<projectID>",
+              "type": "string"
+            },
+            "timeFields": {
+              "description": "TimeFields defines fields that may contain the _time field",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "license": {
+          "description": "License allows to configure license key to be used for enterprise features.\nSee [here](https://docs.victoriametrics.com/victoriametrics/enterprise/#victorialogs-enterprise-features)",
+          "properties": {
+            "forceOffline": {
+              "description": "Enforce offline verification of the license key.",
+              "type": "boolean"
+            },
+            "key": {
+              "description": "Enterprise license key. This flag is available only in [VictoriaMetrics enterprise](https://docs.victoriametrics.com/victoriametrics/enterprise/).\nTo request a trial license, [go to](https://victoriametrics.com/products/enterprise/trial)",
+              "type": "string"
+            },
+            "keyRef": {
+              "description": "KeyRef is reference to secret with license key for enterprise features.",
+              "properties": {
+                "key": {
+                  "description": "The key of the secret to select from.  Must be a valid secret key.",
+                  "type": "string"
+                },
+                "name": {
+                  "default": "",
+                  "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                  "type": "string"
+                },
+                "optional": {
+                  "description": "Specify whether the Secret or its key must be defined",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "key"
+              ],
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            },
+            "reloadInterval": {
+              "description": "Interval to be used for checking for license key changes. Note that this is only applicable when using KeyRef.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "livenessProbe": {
-          "description": "LivenessProbe that will be added CRD pod",
+          "description": "LivenessProbe that will be added to CR pod",
           "type": "object",
           "x-kubernetes-preserve-unknown-fields": true
         },
@@ -648,6 +789,357 @@
           "description": "MinReadySeconds defines a minimum number of seconds to wait before starting update next pod\nif previous in healthy state\nHas no effect for VLogs and VMSingle",
           "format": "int32",
           "type": "integer"
+        },
+        "networkPolicy": {
+          "description": "NetworkPolicy defines network access rules for pods created by this CR.",
+          "properties": {
+            "egress": {
+              "description": "Egress defines the list of egress rules applied to pods selected by this CR.",
+              "items": {
+                "description": "NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods\nmatched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.\nThis type is beta-level in 1.8",
+                "properties": {
+                  "ports": {
+                    "description": "ports is a list of destination ports for outgoing traffic.\nEach item in this list is combined using a logical OR. If this field is\nempty or missing, this rule matches all ports (traffic not restricted by port).\nIf this field is present and contains at least one item, then this rule allows\ntraffic only if the traffic matches at least one port in the list.",
+                    "items": {
+                      "description": "NetworkPolicyPort describes a port to allow traffic on",
+                      "properties": {
+                        "endPort": {
+                          "description": "endPort indicates that the range of ports from port to endPort if set, inclusive,\nshould be allowed by the policy. This field cannot be defined if the port field\nis not defined or if the port field is defined as a named (string) port.\nThe endPort must be equal or greater than port.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "port": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "port represents the port on the given protocol. This can either be a numerical or named\nport on a pod. If this field is not provided, this matches all port names and\nnumbers.\nIf present, only traffic on the specified protocol AND port will be matched.",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "protocol": {
+                          "description": "protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.\nIf not specified, this field defaults to TCP.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "to": {
+                    "description": "to is a list of destinations for outgoing traffic of pods selected for this rule.\nItems in this list are combined using a logical OR operation. If this field is\nempty or missing, this rule matches all destinations (traffic not restricted by\ndestination). If this field is present and contains at least one item, this rule\nallows traffic only if the traffic matches at least one item in the to list.",
+                    "items": {
+                      "description": "NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of\nfields are allowed",
+                      "properties": {
+                        "ipBlock": {
+                          "description": "ipBlock defines policy on a particular IPBlock. If this field is set then\nneither of the other fields can be.",
+                          "properties": {
+                            "cidr": {
+                              "description": "cidr is a string representing the IPBlock\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
+                              "type": "string"
+                            },
+                            "except": {
+                              "description": "except is a slice of CIDRs that should not be included within an IPBlock\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"\nExcept values will be rejected if they are outside the cidr range",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            }
+                          },
+                          "required": [
+                            "cidr"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "namespaceSelector": {
+                          "description": "namespaceSelector selects namespaces using cluster-scoped labels. This field follows\nstandard label selector semantics; if present but empty, it selects all namespaces.\n\nIf podSelector is also set, then the NetworkPolicyPeer as a whole selects\nthe pods matching podSelector in the namespaces selected by namespaceSelector.\nOtherwise it selects all pods in the namespaces selected by namespaceSelector.",
+                          "properties": {
+                            "matchExpressions": {
+                              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                              "items": {
+                                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                "properties": {
+                                  "key": {
+                                    "description": "key is the label key that the selector applies to.",
+                                    "type": "string"
+                                  },
+                                  "operator": {
+                                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "atomic"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "operator"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "podSelector": {
+                          "description": "podSelector is a label selector which selects pods. This field follows standard label\nselector semantics; if present but empty, it selects all pods.\n\nIf namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects\nthe pods matching podSelector in the Namespaces selected by NamespaceSelector.\nOtherwise it selects the pods matching podSelector in the policy's own namespace.",
+                          "properties": {
+                            "matchExpressions": {
+                              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                              "items": {
+                                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                "properties": {
+                                  "key": {
+                                    "description": "key is the label key that the selector applies to.",
+                                    "type": "string"
+                                  },
+                                  "operator": {
+                                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "atomic"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "operator"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "ingress": {
+              "description": "Ingress defines the list of ingress rules applied to pods selected by this CR.\nEach rule allows traffic which matches both the from and ports sections.",
+              "items": {
+                "description": "NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods\nmatched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.",
+                "properties": {
+                  "from": {
+                    "description": "from is a list of sources which should be able to access the pods selected for this rule.\nItems in this list are combined using a logical OR operation. If this field is\nempty or missing, this rule matches all sources (traffic not restricted by\nsource). If this field is present and contains at least one item, this rule\nallows traffic only if the traffic matches at least one item in the from list.",
+                    "items": {
+                      "description": "NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of\nfields are allowed",
+                      "properties": {
+                        "ipBlock": {
+                          "description": "ipBlock defines policy on a particular IPBlock. If this field is set then\nneither of the other fields can be.",
+                          "properties": {
+                            "cidr": {
+                              "description": "cidr is a string representing the IPBlock\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"",
+                              "type": "string"
+                            },
+                            "except": {
+                              "description": "except is a slice of CIDRs that should not be included within an IPBlock\nValid examples are \"192.168.1.0/24\" or \"2001:db8::/64\"\nExcept values will be rejected if they are outside the cidr range",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            }
+                          },
+                          "required": [
+                            "cidr"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "namespaceSelector": {
+                          "description": "namespaceSelector selects namespaces using cluster-scoped labels. This field follows\nstandard label selector semantics; if present but empty, it selects all namespaces.\n\nIf podSelector is also set, then the NetworkPolicyPeer as a whole selects\nthe pods matching podSelector in the namespaces selected by namespaceSelector.\nOtherwise it selects all pods in the namespaces selected by namespaceSelector.",
+                          "properties": {
+                            "matchExpressions": {
+                              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                              "items": {
+                                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                "properties": {
+                                  "key": {
+                                    "description": "key is the label key that the selector applies to.",
+                                    "type": "string"
+                                  },
+                                  "operator": {
+                                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "atomic"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "operator"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "podSelector": {
+                          "description": "podSelector is a label selector which selects pods. This field follows standard label\nselector semantics; if present but empty, it selects all pods.\n\nIf namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects\nthe pods matching podSelector in the Namespaces selected by NamespaceSelector.\nOtherwise it selects the pods matching podSelector in the policy's own namespace.",
+                          "properties": {
+                            "matchExpressions": {
+                              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                              "items": {
+                                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                                "properties": {
+                                  "key": {
+                                    "description": "key is the label key that the selector applies to.",
+                                    "type": "string"
+                                  },
+                                  "operator": {
+                                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array",
+                                    "x-kubernetes-list-type": "atomic"
+                                  }
+                                },
+                                "required": [
+                                  "key",
+                                  "operator"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-type": "atomic"
+                            },
+                            "matchLabels": {
+                              "additionalProperties": {
+                                "type": "string"
+                              },
+                              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "ports": {
+                    "description": "ports is a list of ports which should be made accessible on the pods selected for\nthis rule. Each item in this list is combined using a logical OR. If this field is\nempty or missing, this rule matches all ports (traffic not restricted by port).\nIf this field is present and contains at least one item, then this rule allows\ntraffic only if the traffic matches at least one port in the list.",
+                    "items": {
+                      "description": "NetworkPolicyPort describes a port to allow traffic on",
+                      "properties": {
+                        "endPort": {
+                          "description": "endPort indicates that the range of ports from port to endPort if set, inclusive,\nshould be allowed by the policy. This field cannot be defined if the port field\nis not defined or if the port field is defined as a named (string) port.\nThe endPort must be equal or greater than port.",
+                          "format": "int32",
+                          "type": "integer"
+                        },
+                        "port": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "description": "port represents the port on the given protocol. This can either be a numerical or named\nport on a pod. If this field is not provided, this matches all port names and\nnumbers.\nIf present, only traffic on the specified protocol AND port will be matched.",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "protocol": {
+                          "description": "protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.\nIf not specified, this field defaults to TCP.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "nodeSelector": {
           "additionalProperties": {
@@ -710,7 +1202,7 @@
               "type": "object"
             },
             "unhealthyPodEvictionPolicy": {
-              "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods\n\nValid policies are IfHealthyBudget and AlwaysAllow.\nIf no policy is specified, the default behavior will be used,\nwhich corresponds to the IfHealthyBudget policy.\nAvailable from operator v0.64.0",
+              "description": "UnhealthyPodEvictionPolicy defines the criteria for when unhealthy pods\n\nValid policies are IfHealthyBudget and AlwaysAllow.\nIf no policy is specified, the default behavior will be used,\nwhich corresponds to the IfHealthyBudget policy.",
               "enum": [
                 "IfHealthyBudget",
                 "AlwaysAllow"
@@ -750,6 +1242,11 @@
           "description": "Port listen address",
           "type": "string"
         },
+        "preStopSleepSeconds": {
+          "description": "PreStopSleepSeconds defines the number of seconds to sleep in the preStop lifecycle hook.\nIt gives time for load balancers to remove the pod from rotation before the pod is terminated.\nDefaults to 15 for applicable components. Set to 0 to disable.",
+          "format": "int32",
+          "type": "integer"
+        },
         "priorityClassName": {
           "description": "PriorityClassName class assigned to the Pods",
           "type": "string"
@@ -773,7 +1270,7 @@
           "type": "array"
         },
         "readinessProbe": {
-          "description": "ReadinessProbe that will be added CRD pod",
+          "description": "ReadinessProbe that will be added to CR pod",
           "type": "object",
           "x-kubernetes-preserve-unknown-fields": true
         },
@@ -782,6 +1279,65 @@
           "items": {
             "description": "VLAgentRemoteWriteSpec defines the remote storage configuration for VmAgent",
             "properties": {
+              "basicAuth": {
+                "description": "BasicAuth allow an endpoint to authenticate over basic authentication.\nAvailable starting vlagent v1.52.0.",
+                "properties": {
+                  "password": {
+                    "description": "Password defines reference for secret with password value\nThe secret needs to be in the same namespace as scrape object",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  },
+                  "password_file": {
+                    "description": "PasswordFile defines path to password file at disk\nmust be pre-mounted",
+                    "type": "string"
+                  },
+                  "username": {
+                    "description": "Username defines reference for secret with username value\nThe secret needs to be in the same namespace as scrape object",
+                    "properties": {
+                      "key": {
+                        "description": "The key of the secret to select from.  Must be a valid secret key.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "default": "",
+                        "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                        "type": "string"
+                      },
+                      "optional": {
+                        "description": "Specify whether the Secret or its key must be defined",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "additionalProperties": false
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
               "bearerTokenPath": {
                 "description": "Optional bearer auth token to use for -remoteWrite.url",
                 "type": "string"
@@ -1053,7 +1609,7 @@
               "type": "boolean"
             },
             "tmpDataPath": {
-              "description": "Path to directory where temporary data for remote write component is stored (default /vlagent_pq/vlagent-remotewrite-data)\nIf defined, operator ignores spec.storage field and skips adding volume and volumeMount for pq",
+              "description": "Path to directory where temporary data for remote write component is stored.\nDefaults to /vlagent-data/vlagent-remotewrite-data or /var/lib/vlagent-data/vlagent-remotewrite-data in collector mode",
               "type": "string"
             }
           },
@@ -1136,7 +1692,7 @@
           "type": "integer"
         },
         "rollingUpdateStrategy": {
-          "description": "StatefulRollingUpdateStrategy allows configuration for strategyType\nset it to RollingUpdate for disabling operator statefulSet rollingUpdate",
+          "description": "RollingUpdateStrategy allows configuration for strategyType\nset it to RollingUpdate for disabling operator statefulSet rollingUpdate",
           "type": "string"
         },
         "runtimeClassName": {
@@ -1165,9 +1721,6 @@
         },
         "serviceScrapeSpec": {
           "description": "ServiceScrapeSpec that will be added to vlagent VMServiceScrape spec",
-          "required": [
-            "endpoints"
-          ],
           "type": "object",
           "x-kubernetes-preserve-unknown-fields": true
         },
@@ -1216,23 +1769,24 @@
           "additionalProperties": false
         },
         "startupProbe": {
-          "description": "StartupProbe that will be added to CRD pod",
+          "description": "StartupProbe that will be added to CR pod",
           "type": "object",
           "x-kubernetes-preserve-unknown-fields": true
         },
         "storage": {
-          "description": "StatefulStorage configures storage for StatefulSet",
+          "description": "Storage configures storage for StatefulSet",
           "properties": {
-            "disableMountSubPath": {
-              "description": "Deprecated: subPath usage will be disabled by default in a future release, this option will become unnecessary.\nDisableMountSubPath allows to remove any subPath usage in volume mounts.",
-              "type": "boolean"
-            },
             "emptyDir": {
               "description": "EmptyDirVolumeSource to be used by the Prometheus StatefulSets. If specified, used in place of any volumeClaimTemplate. More\ninfo: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir",
               "properties": {
                 "medium": {
                   "description": "medium represents what type of storage medium should back this directory.\nThe default is \"\" which means to use the node's default medium.\nMust be an empty string (default) or Memory.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                   "type": "string"
+                },
+                "mode": {
+                  "description": "mode specifies the permission bits for the emptyDir directory, in numeric\nnotation (e.g., 0755, 01777). Must be a value between 0000 and 01777.\nIf not specified, defaults to 0777.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup. If fsGroup is specified, the fsGroup permissions\nwill override the mode specified here.\nThis field has no effect on Windows.\nThis field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+                  "format": "int32",
+                  "type": "integer"
                 },
                 "sizeLimit": {
                   "anyOf": [
@@ -1299,7 +1853,7 @@
                       "x-kubernetes-list-type": "atomic"
                     },
                     "dataSource": {
-                      "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                      "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                       "properties": {
                         "apiGroup": {
                           "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -1323,7 +1877,7 @@
                       "additionalProperties": false
                     },
                     "dataSourceRef": {
-                      "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                      "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                       "properties": {
                         "apiGroup": {
                           "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -1350,7 +1904,7 @@
                       "additionalProperties": false
                     },
                     "resources": {
-                      "description": "resources represents the minimum resources the volume should have.\nIf RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
+                      "description": "resources represents the minimum resources the volume should have.\nUsers are allowed to specify resource requirements\nthat are lower than previous value but must still be higher than capacity recorded in the\nstatus field of the claim.\nMore info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
                       "properties": {
                         "limits": {
                           "additionalProperties": {
@@ -1471,7 +2025,7 @@
                         "description": "When a controller receives persistentvolume claim update with ClaimResourceStatus for a resource\nthat it does not recognizes, then it should ignore that update and let other controllers\nhandle it.",
                         "type": "string"
                       },
-                      "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+                      "description": "allocatedResourceStatuses stores status of resource being resized for the given PVC.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nClaimResourceStatus can be in any of following states:\n\t- ControllerResizeInProgress:\n\t\tState set when resize controller starts resizing the volume in control-plane.\n\t- ControllerResizeFailed:\n\t\tState set when resize has failed in resize controller with a terminal error.\n\t- NodeResizePending:\n\t\tState set when resize controller has finished resizing the volume but further resizing of\n\t\tvolume is needed on the node.\n\t- NodeResizeInProgress:\n\t\tState set when kubelet starts resizing the volume.\n\t- NodeResizeFailed:\n\t\tState set when resizing has failed in kubelet with a terminal error. Transient errors don't set\n\t\tNodeResizeFailed.\nFor example: if expanding a PVC for more capacity - this field can be one of the following states:\n\t- pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"ControllerResizeFailed\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizePending\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeInProgress\"\n     - pvc.status.allocatedResourceStatus['storage'] = \"NodeResizeFailed\"\nWhen this field is not set, it means that no resize operation is in progress for the given PVC.\n\nA controller that receives PVC update with previously unknown resourceName or ClaimResourceStatus\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.",
                       "type": "object",
                       "x-kubernetes-map-type": "granular"
                     },
@@ -1488,7 +2042,7 @@
                         "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
                         "x-kubernetes-int-or-string": true
                       },
-                      "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.\n\nThis is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
+                      "description": "allocatedResources tracks the resources allocated to a PVC including its capacity.\nKey names follow standard Kubernetes label syntax. Valid values are either:\n\t* Un-prefixed keys:\n\t\t- storage - the capacity of the volume.\n\t* Custom resources must use implementation-defined prefixed names such as \"example.com/my-custom-resource\"\nApart from above values - keys that are unprefixed or have kubernetes.io prefix are considered\nreserved and hence may not be used.\n\nCapacity reported here may be larger than the actual capacity when a volume expansion operation\nis requested.\nFor storage quota, the larger value from allocatedResources and PVC.spec.resources is used.\nIf allocatedResources is not set, PVC.spec.resources alone is used for quota calculation.\nIf a volume expansion capacity request is lowered, allocatedResources is only\nlowered if there are no expansion operations in progress and if the actual volume capacity\nis equal or lower than the requested capacity.\n\nA controller that receives PVC update with previously unknown resourceName\nshould ignore the update for the purpose it was designed. For example - a controller that\nonly is responsible for resizing capacity of the volume, should ignore PVC updates that change other valid\nresources associated with PVC.",
                       "type": "object"
                     },
                     "capacity": {
@@ -1555,6 +2109,55 @@
                     "currentVolumeAttributesClassName": {
                       "description": "currentVolumeAttributesClassName is the current name of the VolumeAttributesClass the PVC is using.\nWhen unset, there is no VolumeAttributeClass applied to this PersistentVolumeClaim",
                       "type": "string"
+                    },
+                    "healthStatus": {
+                      "description": "healthStatus contains the latest controller-reported health information\nfor the volume bound to this claim.",
+                      "properties": {
+                        "healthConditions": {
+                          "description": "conditions is the set of adverse conditions reported by\nthe CSI controller plugin. An empty list means no adverse condition.\nAt most 16 conditions may be reported.",
+                          "items": {
+                            "description": "VolumeHealthCondition represents an adverse health condition reported for a volume.",
+                            "properties": {
+                              "message": {
+                                "description": "message is a human-readable description.\nMaximum permitted length of a message is 1024 bytes.",
+                                "type": "string"
+                              },
+                              "reason": {
+                                "description": "reason is a brief CamelCase machine-parseable reason.\nTogether with status it forms the unique identity of a condition entry.\nMaximum permitted length of a reason is 256 bytes.",
+                                "type": "string"
+                              },
+                              "status": {
+                                "description": "status is the machine-parseable health category.\nPossible values:\n- \"Inaccessible\": the volume cannot be accessed.\n- \"DataLoss\": data loss has been detected on the volume.\n- \"Degraded\": the volume is functioning with reduced capability.",
+                                "enum": [
+                                  "DataLoss",
+                                  "Degraded",
+                                  "Inaccessible"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "reason",
+                              "status"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-map-keys": [
+                            "status",
+                            "reason"
+                          ],
+                          "x-kubernetes-list-type": "map"
+                        },
+                        "lastTransitionTime": {
+                          "description": "lastTransitionTime is when the current set of conditions first appeared.",
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
                     },
                     "modifyVolumeStatus": {
                       "description": "ModifyVolumeStatus represents the status object of ControllerModifyVolume operation.\nWhen this is unset, there is no ModifyVolume operation being attempted.",
@@ -1655,6 +2258,13 @@
                         "x-kubernetes-map-type": "atomic",
                         "additionalProperties": false
                       },
+                      "cipherSuites": {
+                        "description": "CipherSuites is an optional list of TLS cipher suites for the server.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
                       "keyFile": {
                         "description": "KeyFile defines path to the pre-mounted file with certificate key\nmutually exclusive with KeySecretRef",
                         "type": "string"
@@ -1682,6 +2292,16 @@
                         "type": "object",
                         "x-kubernetes-map-type": "atomic",
                         "additionalProperties": false
+                      },
+                      "minVersion": {
+                        "description": "MinVersion is the minimum TLS version to use for the server.",
+                        "enum": [
+                          "TLS10",
+                          "TLS11",
+                          "TLS12",
+                          "TLS13"
+                        ],
+                        "type": "string"
                       }
                     },
                     "type": "object",
@@ -1745,6 +2365,10 @@
           "format": "int64",
           "type": "integer"
         },
+        "tmpDataPath": {
+          "description": "Path to directory where temporary data for vlagent stored\nDefaults to /vlagent-data or /var/lib/vlagent-data in collector mode\nIf defined, operator ignores spec.storage field and skips adding volume and volumeMount for tmp data",
+          "type": "string"
+        },
         "tolerations": {
           "description": "Tolerations If specified, the pod's tolerations.",
           "items": {
@@ -1759,7 +2383,7 @@
                 "type": "string"
               },
               "operator": {
-                "description": "Operator represents a key's relationship to the value.\nValid operators are Exists and Equal. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a pod can\ntolerate all taints of a particular category.",
+                "description": "Operator represents a key's relationship to the value.\nValid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.\nExists is equivalent to wildcard for value, so that a pod can\ntolerate all taints of a particular category.\nLt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).",
                 "type": "string"
               },
               "tolerationSeconds": {
@@ -1795,6 +2419,10 @@
           "description": "UseDefaultResources controls resource settings\nBy default, operator sets built-in resource requirements",
           "type": "boolean"
         },
+        "useLegacyNaming": {
+          "description": "UseLegacyNaming uses standalone Helm chart naming for managed resources:\nthe CR name is used directly instead of the default \"<type>-<name>\" convention.",
+          "type": "boolean"
+        },
         "useStrictSecurity": {
           "description": "UseStrictSecurity enables strict security mode for component\nit restricts disk writes access\nuses non-root user out of the box\ndrops not needed security permissions",
           "type": "boolean"
@@ -1804,8 +2432,16 @@
           "items": {
             "description": "VolumeMount describes a mounting of a Volume within a container.",
             "properties": {
+              "bindMountOptions": {
+                "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
               "mountPath": {
-                "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                "description": "Path within the container at which the volume should be mounted.",
                 "type": "string"
               },
               "mountPropagation": {
@@ -1843,7 +2479,7 @@
           "type": "array"
         },
         "volumes": {
-          "description": "Volumes allows configuration of additional volumes on the output Deployment/StatefulSet definition.\nVolumes specified will be appended to other volumes that are generated.\n/ +optional",
+          "description": "Volumes allows configuration of additional volumes on the output Deployment/StatefulSet definition.\nVolumes specified will be appended to other volumes that are generated.",
           "items": {
             "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
             "required": [
@@ -1853,6 +2489,266 @@
             "x-kubernetes-preserve-unknown-fields": true
           },
           "type": "array"
+        },
+        "vpa": {
+          "description": "Configures vertical pod autoscaling.",
+          "properties": {
+            "recommenders": {
+              "description": "Recommenders specifies custom VPA recommender names.",
+              "items": {
+                "description": "VerticalPodAutoscalerRecommenderSelector points to a specific Vertical Pod Autoscaler recommender.\nIn the future it might pass parameters to the recommender.",
+                "properties": {
+                  "name": {
+                    "description": "Name of the recommender responsible for generating recommendation for this object.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array"
+            },
+            "resourcePolicy": {
+              "description": "ResourcePolicy controls how the autoscaler computes recommended resources per container.",
+              "properties": {
+                "containerPolicies": {
+                  "description": "Per-container resource policies.",
+                  "items": {
+                    "description": "ContainerResourcePolicy controls how autoscaler computes the recommended\nresources for a specific container.",
+                    "properties": {
+                      "containerName": {
+                        "description": "Name of the container or DefaultContainerResourcePolicy, in which\ncase the policy is used by the containers that don't have their own\npolicy specified.",
+                        "type": "string"
+                      },
+                      "controlledResources": {
+                        "description": "Specifies the type of recommendations that will be computed\n(and possibly applied) by VPA.\nIf not specified, the default of [ResourceCPU, ResourceMemory] will be used.",
+                        "items": {
+                          "description": "ResourceName is the name identifying various resources in a ResourceList.",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "controlledValues": {
+                        "description": "Specifies which resource values should be controlled.\nThe default is \"RequestsAndLimits\".",
+                        "enum": [
+                          "RequestsAndLimits",
+                          "RequestsOnly"
+                        ],
+                        "type": "string"
+                      },
+                      "maxAllowed": {
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "description": "Specifies the maximum amount of resources that will be recommended\nfor the container. The default is no maximum.",
+                        "type": "object"
+                      },
+                      "memoryAggregationIntervalCount": {
+                        "description": "memoryAggregationIntervalCount is the number of consecutive\nmemoryAggregationIntervals which make up the memory aggregation window.\nThe total window length is:\nMemoryAggregationIntervalSeconds * MemoryAggregationIntervalCount.",
+                        "format": "int64",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "memoryAggregationIntervalSeconds": {
+                        "description": "memoryAggregationIntervalSeconds is the length of a single interval\n(in seconds) for which the peak memory usage is computed.\nMemory usage peaks are aggregated in multiples of this interval.\nIn other words, there is one memory usage sample per interval\n(the maximum usage over that interval).",
+                        "format": "int32",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "minAllowed": {
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "string"
+                            }
+                          ],
+                          "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                          "x-kubernetes-int-or-string": true
+                        },
+                        "description": "Specifies the minimal amount of resources that will be recommended\nfor the container. The default is no minimum.",
+                        "type": "object"
+                      },
+                      "mode": {
+                        "description": "Whether autoscaler is enabled for the container. The default is \"Auto\".",
+                        "enum": [
+                          "Auto",
+                          "Off"
+                        ],
+                        "type": "string"
+                      },
+                      "oomBumpUpRatio": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "description": "oomBumpUpRatio is the ratio to increase memory when OOM is detected.",
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "oomMinBumpUp": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ],
+                        "description": "oomMinBumpUp is the minimum increase in memory when OOM is detected.",
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
+                      },
+                      "startupBoost": {
+                        "description": "startupBoost specifies the startup boost policy for the container.\nThis overrides any pod-level startup boost policy.\nThe startup boost policy takes precedence over the rest of the fields in\nthis struct, except for ContainerName and ControlledValues.",
+                        "properties": {
+                          "cpu": {
+                            "description": "cpu specifies the CPU startup boost policy.\nIf this field is not set, no startup boost is applied.",
+                            "properties": {
+                              "durationSeconds": {
+                                "description": "durationSeconds indicates for how long to keep the pod boosted after it goes to Ready.\nDefaults to 0.",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "factor": {
+                                "description": "factor specifies the factor to apply to the resource request.\nThis field is required when Type is \"Factor\".",
+                                "format": "int32",
+                                "type": "integer"
+                              },
+                              "quantity": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "description": "quantity specifies the absolute resource quantity to be used as the\nresource request and limit during the boost phase.\nThis field is required when Type is \"Quantity\".",
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
+                              },
+                              "type": {
+                                "description": "type specifies the kind of boost to apply.\nSupported values are: \"Factor\", \"Quantity\".\nNo startupboost will be applied for unrecognized values.",
+                                "enum": [
+                                  "Factor",
+                                  "Quantity"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type"
+                            ],
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "factor is required when type is Factor and forbidden otherwise",
+                                "rule": "(self.type == 'Factor') == has(self.factor)"
+                              },
+                              {
+                                "message": "quantity is required when type is Quantity and forbidden otherwise",
+                                "rule": "(self.type == 'Quantity') == has(self.quantity)"
+                              }
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "updatePolicy": {
+              "description": "UpdatePolicy controls how the autoscaler applies changes to pod resources.",
+              "properties": {
+                "evictAfterOOMSeconds": {
+                  "description": "evictAfterOOMSeconds specifies the time in seconds to wait after an OOM event before\nconsidering the pod for eviction. Pods that have OOMed in less than this time\nsince start will be evicted.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "evictionRequirements": {
+                  "description": "EvictionRequirements is a list of EvictionRequirements that need to\nevaluate to true in order for a Pod to be evicted. If more than one\nEvictionRequirement is specified, all of them need to be fulfilled to allow eviction.",
+                  "items": {
+                    "description": "EvictionRequirement defines a single condition which needs to be true in\norder to evict a Pod",
+                    "properties": {
+                      "changeRequirement": {
+                        "description": "EvictionChangeRequirement refers to the relationship between the new target recommendation for a Pod and its current requests, what kind of change is necessary for the Pod to be evicted",
+                        "enum": [
+                          "TargetHigherThanRequests",
+                          "TargetLowerThanRequests"
+                        ],
+                        "type": "string"
+                      },
+                      "resources": {
+                        "description": "Resources is a list of one or more resources that the condition applies\nto. If more than one resource is given, the EvictionRequirement is fulfilled\nif at least one resource meets `changeRequirement`.",
+                        "items": {
+                          "description": "ResourceName is the name identifying various resources in a ResourceList.",
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "changeRequirement",
+                      "resources"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "minReplicas": {
+                  "description": "Minimal number of replicas which need to be alive for Updater to attempt\npod eviction (pending other checks like PDB). Only positive values are\nallowed. Overrides global '--min-replicas' flag.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "updateMode": {
+                  "description": "Controls when autoscaler applies changes to the pod resources.\nThe default is 'Recreate'.",
+                  "enum": [
+                    "Off",
+                    "Initial",
+                    "Recreate",
+                    "InPlaceOrRecreate",
+                    "InPlace",
+                    "Auto"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1926,6 +2822,9 @@
             "type"
           ],
           "x-kubernetes-list-type": "map"
+        },
+        "lastAppliedSpec": {
+          "x-kubernetes-preserve-unknown-fields": true
         },
         "observedGeneration": {
           "description": "ObservedGeneration defines current generation picked by operator for the\nreconcile",

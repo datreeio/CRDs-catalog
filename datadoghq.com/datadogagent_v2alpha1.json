@@ -116,7 +116,7 @@
                                       "description": "Selects a key of a ConfigMap.",
                                       "properties": {
                                         "key": {
-                                          "description": "The key to select.",
+                                          "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                           "type": "string"
                                         },
                                         "name": {
@@ -378,7 +378,7 @@
                                 "type": "boolean"
                               },
                               "procMount": {
-                                "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                                "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                                 "type": "string"
                               },
                               "readOnlyRootFilesystem": {
@@ -485,7 +485,7 @@
                     "selectors": {
                       "description": "Selectors define the pod selector for sidecar injection. Only one rule is supported.",
                       "items": {
-                        "description": "Selectors define a pod selector for sidecar injection.",
+                        "description": "Selector defines a pod selector for sidecar injection.",
                         "properties": {
                           "namespaceSelector": {
                             "description": "NamespaceSelector specifies the label selector for namespaces.",
@@ -810,7 +810,7 @@
                                       "description": "Selects a key of a ConfigMap.",
                                       "properties": {
                                         "key": {
-                                          "description": "The key to select.",
+                                          "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                           "type": "string"
                                         },
                                         "name": {
@@ -1091,6 +1091,208 @@
               "type": "object",
               "additionalProperties": false
             },
+            "appsec": {
+              "description": "Appsec configuration.",
+              "properties": {
+                "injector": {
+                  "description": "Configures the AppSec injector.\nSetting this block replaces the deprecated `agent.datadoghq.com/appsec.*` annotations\nentirely: while it is present no annotation is read, so port the whole configuration\nrather than a single field.",
+                  "properties": {
+                    "autoDetect": {
+                      "description": "Controls automatic proxy detection.\nDefault: true",
+                      "type": "boolean"
+                    },
+                    "enabled": {
+                      "description": "Enables the AppSec injector.\nDefault: false",
+                      "type": "boolean"
+                    },
+                    "gke": {
+                      "description": "Configures GKE Gateway injection.",
+                      "properties": {
+                        "gatewayClasses": {
+                          "description": "Lists GKE GatewayClasses for AppSec injection.\nConfiguration is create-only with no drift reconciliation, so deleting a GCPTrafficExtension while its Gateway still exists does not recreate it.\nThe extension has no ownerReferences; if the cluster-agent is down or not leader when the Gateway is deleted, it can be orphaned.\nAfter disabling AppSec, teardown can take about 5-7 minutes and traffic remains inspected or blocked during that period.\nA pre-existing GCPTrafficExtension without the app.kubernetes.io/managed-by: datadog-cluster-agent label is left alone.\nA Gateway labeled appsec.datadoghq.com/enabled=false is skipped.\nGKE injection requires cluster-agent version 7.82.0 or later.\nThe `mode: external` setting is required only when `gke-gateway` is explicitly listed in `proxies`; a `gatewayClasses`-only configuration relying on agent-side autoDetect remains valid in any mode.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "mode": {
+                      "description": "Selects the AppSec injection mode.\nWhen unset, this uses the agent default sidecar.",
+                      "enum": [
+                        "sidecar",
+                        "external"
+                      ],
+                      "type": "string"
+                    },
+                    "nginx": {
+                      "description": "Configures nginx injection.",
+                      "properties": {
+                        "moduleMountPath": {
+                          "description": "Sets the nginx module mount path.\nDefault: /modules_mount",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "processor": {
+                      "description": "Configures the external processor.",
+                      "properties": {
+                        "address": {
+                          "description": "Sets the processor address.",
+                          "type": "string"
+                        },
+                        "port": {
+                          "description": "Sets the processor port.\nDefault: 443",
+                          "format": "int32",
+                          "maximum": 65535,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "service": {
+                          "description": "Configures the processor Service.",
+                          "properties": {
+                            "name": {
+                              "description": "Sets the processor Service name.",
+                              "type": "string"
+                            },
+                            "namespace": {
+                              "description": "Sets the processor Service namespace.\nThis is ignored for gke-gateway because the callout Service is resolved in each Gateway's own namespace; deploy the Service in every AppSec-enabled Gateway namespace.",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "proxies": {
+                      "description": "Lists proxies for AppSec injection.\nDefault: []",
+                      "items": {
+                        "enum": [
+                          "envoy-gateway",
+                          "istio",
+                          "istio-gateway",
+                          "ingress-nginx",
+                          "gke-gateway"
+                        ],
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "sidecar": {
+                      "description": "Configures the injected sidecar.",
+                      "properties": {
+                        "bodyParsingSizeLimit": {
+                          "description": "Sets the sidecar body parsing size limit.\nDefault: 0",
+                          "format": "int64",
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "healthPort": {
+                          "description": "Sets the sidecar health port.\nDefault: 8081",
+                          "format": "int32",
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "image": {
+                          "description": "Sets the sidecar image.\nDefault: ghcr.io/datadog/dd-trace-go/service-extensions-callout",
+                          "type": "string"
+                        },
+                        "imageTag": {
+                          "description": "Sets the sidecar image tag.\nWhen unset, the tag defaults to a value determined by the cluster-agent image in use.",
+                          "type": "string"
+                        },
+                        "port": {
+                          "description": "Sets the sidecar port.\nDefault: 8080",
+                          "format": "int32",
+                          "maximum": 65535,
+                          "minimum": 1,
+                          "type": "integer"
+                        },
+                        "resources": {
+                          "description": "Configures sidecar resources.\nOnly requests and limits for cpu and memory are honored.",
+                          "properties": {
+                            "claims": {
+                              "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                              "items": {
+                                "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                                "properties": {
+                                  "name": {
+                                    "description": "Name must match the name of one entry in pod.spec.resourceClaims of\nthe Pod where this field is used. It makes that resource available\ninside a container.",
+                                    "type": "string"
+                                  },
+                                  "request": {
+                                    "description": "Request is the name chosen for a request in the referenced claim.\nIf empty, everything from the claim is made available, otherwise\nonly the result of this request.",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name"
+                                ],
+                                "type": "object",
+                                "additionalProperties": false
+                              },
+                              "type": "array",
+                              "x-kubernetes-list-map-keys": [
+                                "name"
+                              ],
+                              "x-kubernetes-list-type": "map"
+                            },
+                            "limits": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
+                              },
+                              "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                              "type": "object"
+                            },
+                            "requests": {
+                              "additionalProperties": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer"
+                                  },
+                                  {
+                                    "type": "string"
+                                  }
+                                ],
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
+                              },
+                              "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                              "type": "object"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
             "asm": {
               "description": "ASM (Application Security Management) configuration.",
               "properties": {
@@ -1242,6 +1444,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -1322,6 +1529,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -1473,6 +1685,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -1698,7 +1915,7 @@
                   "type": "boolean"
                 },
                 "privilegedMode": {
-                  "description": "PrivilegedMode enables GPU Probe module in System Probe.\nDefault: false",
+                  "description": "PrivilegedMode enables GPU Probe module in System Probe. The module's eBPF\nprobes are disabled; privileged mode is retained for cgroup permission patching.\nTo re-enable the eBPF probes, set DD_GPU_MONITORING_ENABLE_EBPF_PROBES=true on the\ncore agent and system-probe containers via spec.override.nodeAgent.containers.\nDefault: false",
                   "type": "boolean"
                 },
                 "requiredRuntimeClassName": {
@@ -1813,7 +2030,7 @@
                                       "type": "boolean"
                                     },
                                     "path": {
-                                      "description": "Path is the path to to generate metric(s) for.",
+                                      "description": "Path is the path to generate metric(s) for.",
                                       "items": {
                                         "type": "string"
                                       },
@@ -1851,7 +2068,7 @@
                                       "type": "object"
                                     },
                                     "path": {
-                                      "description": "Path is the path to to generate metric(s) for.",
+                                      "description": "Path is the path to generate metric(s) for.",
                                       "items": {
                                         "type": "string"
                                       },
@@ -1889,7 +2106,7 @@
                                       "type": "array"
                                     },
                                     "path": {
-                                      "description": "Path is the path to to generate metric(s) for.",
+                                      "description": "Path is the path to generate metric(s) for.",
                                       "items": {
                                         "type": "string"
                                       },
@@ -1979,6 +2196,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -2009,6 +2231,14 @@
                 "enabled": {
                   "description": "Enabled enables Kube State Metrics Core.\nDefault: true",
                   "type": "boolean"
+                },
+                "podCollectionMode": {
+                  "description": "PodCollectionMode controls where the KSM check collects pod metrics.\n\nWhen set to \"node_kubelet\" the operator splits the kubernetes_state_core\ncheck into two: the cluster-side instance keeps every collector except\nscheduled pods (only unscheduled pods are kept on that side), and a\ndedicated pods-only instance is deployed on every node agent to read pods\nlocally from its Kubelet via workloadmeta. In the generated agent check\nYAML this corresponds to the snake_case check options\n`pod_collection_mode: cluster_unassigned` on the cluster side and\n`pod_collection_mode: node_kubelet` (with `collectors: [pods]`) on the\nnode side; this CRD field itself is the camelCase `podCollectionMode`\nper Kubernetes API convention.\n\nUseful in large clusters where a single KSM instance is a bottleneck.\nThe cluster-aggregate `.total` metrics\n(kubernetes_state.{container,initcontainer}.<resource>_{requested,limit}.total)\ncarry a reduced tag set with no host or node, so they cannot be collected\ncorrectly by every node agent independently without colliding at\ningestion. To avoid this, the operator also enables\n`cluster_aggregates_enabled` on the cluster-side and node-side instances,\nwhich silences those aggregate metrics on both, and schedules a\ndedicated `cluster_aggregates_only` instance on the cluster-side\ncomponent to collect them instead.\nRequires Agent / Cluster Agent 7.82+.\n\nWhen `features.kubeStateMetricsCore.conf` is also set, the operator\ndeploys the node-side check but does NOT modify the user-supplied\ncluster-side config. To avoid double pod collection in that case, the\nuser's cluster-side instance must either omit `pods` from its\n`collectors` list OR set the `pod_collection_mode: cluster_unassigned`\ncheck option themselves. Omitting `collectors` entirely falls back to\nupstream KSM defaults, which include `pods`.\n\nDefault behavior is unchanged when this field is unset.",
+                  "enum": [
+                    "default",
+                    "node_kubelet"
+                  ],
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -2159,6 +2389,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -2248,6 +2483,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -2355,6 +2595,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -2579,7 +2824,7 @@
               "description": "SBOM collection configuration.",
               "properties": {
                 "containerImage": {
-                  "description": "SBOMTypeConfig contains configuration for a SBOM collection type.",
+                  "description": "SBOMContainerImageConfig contains configuration for container image SBOM collection.",
                   "properties": {
                     "analyzers": {
                       "description": "Analyzers to use for SBOM collection.",
@@ -2628,7 +2873,7 @@
                   "additionalProperties": false
                 },
                 "host": {
-                  "description": "SBOMTypeConfig contains configuration for a SBOM collection type.",
+                  "description": "SBOMHostConfig contains configuration for host SBOM collection.",
                   "properties": {
                     "analyzers": {
                       "description": "Analyzers to use for SBOM collection.",
@@ -2790,6 +3035,31 @@
             "csi": {
               "description": "CSI contains configuration for Datadog CSI Driver",
               "properties": {
+                "apm": {
+                  "description": "APM configures APM/Single Step Instrumentation settings for the managed CSI driver.",
+                  "properties": {
+                    "pullSecrets": {
+                      "description": "PullSecrets are kubernetes.io/dockerconfigjson Secrets used to download APM\nlibraries from private registries. Propagated to the managed DatadogCSIDriver as\nspec.apm.pullSecrets. Restart the CSI DaemonSet after rotating these Secrets.\nNot supported on GKE Autopilot.",
+                      "items": {
+                        "description": "LocalObjectReference contains enough information to let you locate the\nreferenced object inside the same namespace.",
+                        "properties": {
+                          "name": {
+                            "default": "",
+                            "description": "Name of the referent.\nThis field is effectively required, but due to backwards compatibility is\nallowed to be empty. Instances of this type with an empty value here are\nalmost certainly wrong.\nMore info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic",
+                        "additionalProperties": false
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "autoManage": {
                   "description": "AutoManage controls whether the operator automatically manages the DatadogCSIDriver\ncustom resource on behalf of this DatadogAgent. Set to false to hand ownership over to a\nDatadogCSIDriver CR that you maintain yourself (useful for migrations where you need\ncustomizations not exposed on the DatadogAgent spec). When toggled from true to false,\nthe operator cleans up the DDA-owned DatadogCSIDriver CR; you are then responsible for\nproviding a replacement so CSI continues to work.\nDefault: true",
                   "type": "boolean"
@@ -3120,7 +3390,7 @@
                         "description": "Selects a key of a ConfigMap.",
                         "properties": {
                           "key": {
-                            "description": "The key to select.",
+                            "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                             "type": "string"
                           },
                           "name": {
@@ -3292,6 +3562,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -3464,7 +3739,7 @@
                       "description": "Selects a key of a ConfigMap.",
                       "properties": {
                         "key": {
-                          "description": "The key to select.",
+                          "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                           "type": "string"
                         },
                         "name": {
@@ -4770,7 +5045,7 @@
                                 "description": "Selects a key of a ConfigMap.",
                                 "properties": {
                                   "key": {
-                                    "description": "The key to select.",
+                                    "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                     "type": "string"
                                   },
                                   "name": {
@@ -4943,6 +5218,10 @@
                         "grpc": {
                           "description": "GRPC specifies a GRPC HealthCheckRequest.",
                           "properties": {
+                            "mode": {
+                              "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                              "type": "string"
+                            },
                             "port": {
                               "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                               "format": "int32",
@@ -5006,6 +5285,10 @@
                               ],
                               "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                               "x-kubernetes-int-or-string": true
+                            },
+                            "protocol": {
+                              "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                              "type": "string"
                             },
                             "scheme": {
                               "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5145,6 +5428,10 @@
                         "grpc": {
                           "description": "GRPC specifies a GRPC HealthCheckRequest.",
                           "properties": {
+                            "mode": {
+                              "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                              "type": "string"
+                            },
                             "port": {
                               "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                               "format": "int32",
@@ -5208,6 +5495,10 @@
                               ],
                               "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                               "x-kubernetes-int-or-string": true
+                            },
+                            "protocol": {
+                              "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                              "type": "string"
                             },
                             "scheme": {
                               "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5370,6 +5661,11 @@
                                       "path": {
                                         "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                         "type": "string"
+                                      },
+                                      "user": {
+                                        "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                        "format": "int64",
+                                        "type": "integer"
                                       }
                                     },
                                     "required": [
@@ -5460,7 +5756,7 @@
                           "type": "boolean"
                         },
                         "procMount": {
-                          "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                          "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                           "type": "string"
                         },
                         "readOnlyRootFilesystem": {
@@ -5575,6 +5871,10 @@
                         "grpc": {
                           "description": "GRPC specifies a GRPC HealthCheckRequest.",
                           "properties": {
+                            "mode": {
+                              "description": "mode specifies the connection mode for the gRPC health probe.\nSet to \"TLS\" to use TLS without certificate verification.\nSet to \"Plaintext\" to use a plaintext (insecure) connection explicitly.\nIf not specified, the probe uses a plaintext (insecure) connection.",
+                              "type": "string"
+                            },
                             "port": {
                               "description": "Port number of the gRPC service. Number must be in the range 1 to 65535.",
                               "format": "int32",
@@ -5638,6 +5938,10 @@
                               ],
                               "description": "Name or number of the port to access on the container.\nNumber must be in the range 1 to 65535.\nName must be an IANA_SVC_NAME.",
                               "x-kubernetes-int-or-string": true
+                            },
+                            "protocol": {
+                              "description": "Protocol selects the wire protocol for the probe connection.\nNil defaults to HTTP/1.1.",
+                              "type": "string"
                             },
                             "scheme": {
                               "description": "Scheme to use for connecting to the host.\nDefaults to HTTP.",
@@ -5710,8 +6014,16 @@
                       "items": {
                         "description": "VolumeMount describes a mounting of a Volume within a container.",
                         "properties": {
+                          "bindMountOptions": {
+                            "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array",
+                            "x-kubernetes-list-type": "set"
+                          },
                           "mountPath": {
-                            "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                            "description": "Path within the container at which the volume should be mounted.",
                             "type": "string"
                           },
                           "mountPropagation": {
@@ -5796,6 +6108,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -5897,7 +6214,7 @@
                           "description": "Selects a key of a ConfigMap.",
                           "properties": {
                             "key": {
-                              "description": "The key to select.",
+                              "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                               "type": "string"
                             },
                             "name": {
@@ -6118,6 +6435,11 @@
                             "path": {
                               "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                               "type": "string"
+                            },
+                            "user": {
+                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                              "format": "int64",
+                              "type": "integer"
                             }
                           },
                           "required": [
@@ -6175,6 +6497,11 @@
                             "path": {
                               "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                               "type": "string"
+                            },
+                            "user": {
+                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                              "format": "int64",
+                              "type": "integer"
                             }
                           },
                           "required": [
@@ -6274,7 +6601,7 @@
                 "type": "string"
               },
               "replicas": {
-                "description": "Number of the replicas.\nNot applicable for a DaemonSet/ExtendedDaemonSet deployment",
+                "description": "Number of the replicas.\nNot applicable for a DaemonSet deployment",
                 "format": "int32",
                 "type": "integer"
               },
@@ -6327,7 +6654,7 @@
                     "type": "integer"
                   },
                   "seLinuxChangePolicy": {
-                    "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used.\nIf not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes\nand \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
+                    "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\nIf not specified, \"MountOption\" is used.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
                     "type": "string"
                   },
                   "seLinuxOptions": {
@@ -6805,6 +7132,11 @@
                           "format": "int32",
                           "type": "integer"
                         },
+                        "defaultUser": {
+                          "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
+                        },
                         "items": {
                           "description": "items if unspecified, each key-value pair in the Data field of the referenced\nConfigMap will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the ConfigMap,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                           "items": {
@@ -6822,6 +7154,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -6898,6 +7235,11 @@
                           "format": "int32",
                           "type": "integer"
                         },
+                        "defaultUser": {
+                          "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
+                        },
                         "items": {
                           "description": "Items is a list of downward API volume file",
                           "items": {
@@ -6962,6 +7304,11 @@
                                 "type": "object",
                                 "x-kubernetes-map-type": "atomic",
                                 "additionalProperties": false
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -6983,6 +7330,11 @@
                         "medium": {
                           "description": "medium represents what type of storage medium should back this directory.\nThe default is \"\" which means to use the node's default medium.\nMust be an empty string (default) or Memory.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                           "type": "string"
+                        },
+                        "mode": {
+                          "description": "mode specifies the permission bits for the emptyDir directory, in numeric\nnotation (e.g., 0755, 01777). Must be a value between 0000 and 01777.\nIf not specified, defaults to 0777.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup. If fsGroup is specified, the fsGroup permissions\nwill override the mode specified here.\nThis field has no effect on Windows.\nThis field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+                          "format": "int32",
+                          "type": "integer"
                         },
                         "sizeLimit": {
                           "anyOf": [
@@ -7023,7 +7375,7 @@
                                   "x-kubernetes-list-type": "atomic"
                                 },
                                 "dataSource": {
-                                  "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                                  "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                                   "properties": {
                                     "apiGroup": {
                                       "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -7047,7 +7399,7 @@
                                   "additionalProperties": false
                                 },
                                 "dataSourceRef": {
-                                  "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                                  "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                                   "properties": {
                                     "apiGroup": {
                                       "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -7374,7 +7726,7 @@
                       "additionalProperties": false
                     },
                     "image": {
-                      "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro) and non-executable files (noexec).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
+                      "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.\nThe volume is resolved at pod startup depending on which PullPolicy value is provided:\n\n- Always: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\n- Never: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\n- IfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\n\nThe volume gets re-resolved if the pod gets deleted and recreated, which means that new remote content will become available on pod recreation.\nA failure to resolve or pull the image during pod startup will block containers from starting and may add significant latency. Failures will be retried using normal volume backoff and will be reported on the pod reason and message.\nThe types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.\nThe OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.\nThe volume will be mounted read-only (ro).\nSub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.\nThe field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.",
                       "properties": {
                         "pullPolicy": {
                           "description": "Policy for pulling OCI objects. Possible values are:\nAlways: the kubelet always attempts to pull the reference. Container creation will fail If the pull fails.\nNever: the kubelet never pulls the reference and only uses a local image or artifact. Container creation will fail if the reference isn't present.\nIfNotPresent: the kubelet pulls if the reference isn't already present on disk. Container creation will fail if the reference isn't present and the pull fails.\nDefaults to Always if :latest tag is specified, or IfNotPresent otherwise.",
@@ -7523,7 +7875,7 @@
                       "additionalProperties": false
                     },
                     "portworxVolume": {
-                      "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver when the CSIMigrationPortworx feature-gate\nis on.",
+                      "description": "portworxVolume represents a portworx volume attached and mounted on kubelets host machine.\nDeprecated: PortworxVolume is deprecated. All operations for the in-tree portworxVolume type\nare redirected to the pxd.portworx.com CSI driver.",
                       "properties": {
                         "fsType": {
                           "description": "fSType represents the filesystem type to mount\nMust be a filesystem type supported by the host operating system.\nEx. \"ext4\", \"xfs\". Implicitly inferred to be \"ext4\" if unspecified.",
@@ -7550,6 +7902,11 @@
                         "defaultMode": {
                           "description": "defaultMode are the mode bits used to set permissions on created files by default.\nMust be an octal value between 0000 and 0777 or a decimal value between 0 and 511.\nYAML accepts both octal and decimal values, JSON requires decimal values for mode bits.\nDirectories within the path are not affected by this setting.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup, and the result can be other mode bits set.",
                           "format": "int32",
+                          "type": "integer"
+                        },
+                        "defaultUser": {
+                          "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
                           "type": "integer"
                         },
                         "sources": {
@@ -7622,6 +7979,11 @@
                                   "signerName": {
                                     "description": "Select all ClusterTrustBundles that match this signer name.\nMutually-exclusive with name.  The contents of all selected\nClusterTrustBundles will be unified and deduplicated.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -7650,6 +8012,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -7743,6 +8110,11 @@
                                           "type": "object",
                                           "x-kubernetes-map-type": "atomic",
                                           "additionalProperties": false
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -7786,6 +8158,11 @@
                                     "description": "Kubelet's generated CSRs will be addressed to this signer.",
                                     "type": "string"
                                   },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
+                                  },
                                   "userAnnotations": {
                                     "additionalProperties": {
                                       "type": "string"
@@ -7821,6 +8198,11 @@
                                         "path": {
                                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                           "type": "string"
+                                        },
+                                        "user": {
+                                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                          "format": "int64",
+                                          "type": "integer"
                                         }
                                       },
                                       "required": [
@@ -7862,6 +8244,11 @@
                                   "path": {
                                     "description": "path is the path relative to the mount point of the file to project the\ntoken into.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -8046,6 +8433,11 @@
                           "format": "int32",
                           "type": "integer"
                         },
+                        "defaultUser": {
+                          "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
+                        },
                         "items": {
                           "description": "items If unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                           "items": {
@@ -8063,6 +8455,11 @@
                               "path": {
                                 "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                 "type": "string"
+                              },
+                              "user": {
+                                "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                "format": "int64",
+                                "type": "integer"
                               }
                             },
                             "required": [
@@ -8177,7 +8574,7 @@
       "description": "DatadogAgentStatus defines the observed state of DatadogAgent.",
       "properties": {
         "agent": {
-          "description": "The combined actual state of all Agents as daemonsets or extended daemonsets.",
+          "description": "The combined actual state of all Agents as DaemonSets.",
           "properties": {
             "available": {
               "description": "Number of available pods in the DaemonSet.",
@@ -8237,7 +8634,7 @@
           "additionalProperties": false
         },
         "agentList": {
-          "description": "The actual state of the Agent as a daemonset or an extended daemonset.",
+          "description": "The actual state of the Agent as a DaemonSet.",
           "items": {
             "description": "DaemonSetStatus defines the observed state of Agent running as DaemonSet.",
             "properties": {
@@ -8674,7 +9071,7 @@
                                           "description": "Selects a key of a ConfigMap.",
                                           "properties": {
                                             "key": {
-                                              "description": "The key to select.",
+                                              "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                               "type": "string"
                                             },
                                             "name": {
@@ -8936,7 +9333,7 @@
                                     "type": "boolean"
                                   },
                                   "procMount": {
-                                    "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nThis requires the ProcMountType feature flag to be enabled.\nNote that this field cannot be set when spec.os.name is windows.",
+                                    "description": "procMount denotes the type of proc mount to use for the containers.\nThe default value is Default which uses the container runtime defaults for\nreadonly paths and masked paths.\nNote that this field cannot be set when spec.os.name is windows.",
                                     "type": "string"
                                   },
                                   "readOnlyRootFilesystem": {
@@ -9043,7 +9440,7 @@
                         "selectors": {
                           "description": "Selectors define the pod selector for sidecar injection. Only one rule is supported.",
                           "items": {
-                            "description": "Selectors define a pod selector for sidecar injection.",
+                            "description": "Selector defines a pod selector for sidecar injection.",
                             "properties": {
                               "namespaceSelector": {
                                 "description": "NamespaceSelector specifies the label selector for namespaces.",
@@ -9368,7 +9765,7 @@
                                           "description": "Selects a key of a ConfigMap.",
                                           "properties": {
                                             "key": {
-                                              "description": "The key to select.",
+                                              "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                                               "type": "string"
                                             },
                                             "name": {
@@ -9649,6 +10046,208 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "appsec": {
+                  "description": "Appsec configuration.",
+                  "properties": {
+                    "injector": {
+                      "description": "Configures the AppSec injector.\nSetting this block replaces the deprecated `agent.datadoghq.com/appsec.*` annotations\nentirely: while it is present no annotation is read, so port the whole configuration\nrather than a single field.",
+                      "properties": {
+                        "autoDetect": {
+                          "description": "Controls automatic proxy detection.\nDefault: true",
+                          "type": "boolean"
+                        },
+                        "enabled": {
+                          "description": "Enables the AppSec injector.\nDefault: false",
+                          "type": "boolean"
+                        },
+                        "gke": {
+                          "description": "Configures GKE Gateway injection.",
+                          "properties": {
+                            "gatewayClasses": {
+                              "description": "Lists GKE GatewayClasses for AppSec injection.\nConfiguration is create-only with no drift reconciliation, so deleting a GCPTrafficExtension while its Gateway still exists does not recreate it.\nThe extension has no ownerReferences; if the cluster-agent is down or not leader when the Gateway is deleted, it can be orphaned.\nAfter disabling AppSec, teardown can take about 5-7 minutes and traffic remains inspected or blocked during that period.\nA pre-existing GCPTrafficExtension without the app.kubernetes.io/managed-by: datadog-cluster-agent label is left alone.\nA Gateway labeled appsec.datadoghq.com/enabled=false is skipped.\nGKE injection requires cluster-agent version 7.82.0 or later.\nThe `mode: external` setting is required only when `gke-gateway` is explicitly listed in `proxies`; a `gatewayClasses`-only configuration relying on agent-side autoDetect remains valid in any mode.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "mode": {
+                          "description": "Selects the AppSec injection mode.\nWhen unset, this uses the agent default sidecar.",
+                          "enum": [
+                            "sidecar",
+                            "external"
+                          ],
+                          "type": "string"
+                        },
+                        "nginx": {
+                          "description": "Configures nginx injection.",
+                          "properties": {
+                            "moduleMountPath": {
+                              "description": "Sets the nginx module mount path.\nDefault: /modules_mount",
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "processor": {
+                          "description": "Configures the external processor.",
+                          "properties": {
+                            "address": {
+                              "description": "Sets the processor address.",
+                              "type": "string"
+                            },
+                            "port": {
+                              "description": "Sets the processor port.\nDefault: 443",
+                              "format": "int32",
+                              "maximum": 65535,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "service": {
+                              "description": "Configures the processor Service.",
+                              "properties": {
+                                "name": {
+                                  "description": "Sets the processor Service name.",
+                                  "type": "string"
+                                },
+                                "namespace": {
+                                  "description": "Sets the processor Service namespace.\nThis is ignored for gke-gateway because the callout Service is resolved in each Gateway's own namespace; deploy the Service in every AppSec-enabled Gateway namespace.",
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "proxies": {
+                          "description": "Lists proxies for AppSec injection.\nDefault: []",
+                          "items": {
+                            "enum": [
+                              "envoy-gateway",
+                              "istio",
+                              "istio-gateway",
+                              "ingress-nginx",
+                              "gke-gateway"
+                            ],
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "sidecar": {
+                          "description": "Configures the injected sidecar.",
+                          "properties": {
+                            "bodyParsingSizeLimit": {
+                              "description": "Sets the sidecar body parsing size limit.\nDefault: 0",
+                              "format": "int64",
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "healthPort": {
+                              "description": "Sets the sidecar health port.\nDefault: 8081",
+                              "format": "int32",
+                              "maximum": 65535,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "image": {
+                              "description": "Sets the sidecar image.\nDefault: ghcr.io/datadog/dd-trace-go/service-extensions-callout",
+                              "type": "string"
+                            },
+                            "imageTag": {
+                              "description": "Sets the sidecar image tag.\nWhen unset, the tag defaults to a value determined by the cluster-agent image in use.",
+                              "type": "string"
+                            },
+                            "port": {
+                              "description": "Sets the sidecar port.\nDefault: 8080",
+                              "format": "int32",
+                              "maximum": 65535,
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "resources": {
+                              "description": "Configures sidecar resources.\nOnly requests and limits for cpu and memory are honored.",
+                              "properties": {
+                                "claims": {
+                                  "description": "Claims lists the names of resources, defined in spec.resourceClaims,\nthat are used by this container.\n\nThis field depends on the\nDynamicResourceAllocation feature gate.\n\nThis field is immutable. It can only be set for containers.",
+                                  "items": {
+                                    "description": "ResourceClaim references one entry in PodSpec.ResourceClaims.",
+                                    "properties": {
+                                      "name": {
+                                        "description": "Name must match the name of one entry in pod.spec.resourceClaims of\nthe Pod where this field is used. It makes that resource available\ninside a container.",
+                                        "type": "string"
+                                      },
+                                      "request": {
+                                        "description": "Request is the name chosen for a request in the referenced claim.\nIf empty, everything from the claim is made available, otherwise\nonly the result of this request.",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "name"
+                                    ],
+                                    "type": "object",
+                                    "additionalProperties": false
+                                  },
+                                  "type": "array",
+                                  "x-kubernetes-list-map-keys": [
+                                    "name"
+                                  ],
+                                  "x-kubernetes-list-type": "map"
+                                },
+                                "limits": {
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "string"
+                                      }
+                                    ],
+                                    "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                    "x-kubernetes-int-or-string": true
+                                  },
+                                  "description": "Limits describes the maximum amount of compute resources allowed.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                                  "type": "object"
+                                },
+                                "requests": {
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "type": "string"
+                                      }
+                                    ],
+                                    "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                    "x-kubernetes-int-or-string": true
+                                  },
+                                  "description": "Requests describes the minimum amount of compute resources required.\nIf Requests is omitted for a container, it defaults to Limits if that is explicitly specified,\notherwise to an implementation-defined value. Requests cannot exceed Limits.\nMore info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+                                  "type": "object"
+                                }
+                              },
+                              "type": "object",
+                              "additionalProperties": false
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "asm": {
                   "description": "ASM (Application Security Management) configuration.",
                   "properties": {
@@ -9800,6 +10399,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -9880,6 +10484,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -10031,6 +10640,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -10256,7 +10870,7 @@
                       "type": "boolean"
                     },
                     "privilegedMode": {
-                      "description": "PrivilegedMode enables GPU Probe module in System Probe.\nDefault: false",
+                      "description": "PrivilegedMode enables GPU Probe module in System Probe. The module's eBPF\nprobes are disabled; privileged mode is retained for cgroup permission patching.\nTo re-enable the eBPF probes, set DD_GPU_MONITORING_ENABLE_EBPF_PROBES=true on the\ncore agent and system-probe containers via spec.override.nodeAgent.containers.\nDefault: false",
                       "type": "boolean"
                     },
                     "requiredRuntimeClassName": {
@@ -10371,7 +10985,7 @@
                                           "type": "boolean"
                                         },
                                         "path": {
-                                          "description": "Path is the path to to generate metric(s) for.",
+                                          "description": "Path is the path to generate metric(s) for.",
                                           "items": {
                                             "type": "string"
                                           },
@@ -10409,7 +11023,7 @@
                                           "type": "object"
                                         },
                                         "path": {
-                                          "description": "Path is the path to to generate metric(s) for.",
+                                          "description": "Path is the path to generate metric(s) for.",
                                           "items": {
                                             "type": "string"
                                           },
@@ -10447,7 +11061,7 @@
                                           "type": "array"
                                         },
                                         "path": {
-                                          "description": "Path is the path to to generate metric(s) for.",
+                                          "description": "Path is the path to generate metric(s) for.",
                                           "items": {
                                             "type": "string"
                                           },
@@ -10537,6 +11151,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -10567,6 +11186,14 @@
                     "enabled": {
                       "description": "Enabled enables Kube State Metrics Core.\nDefault: true",
                       "type": "boolean"
+                    },
+                    "podCollectionMode": {
+                      "description": "PodCollectionMode controls where the KSM check collects pod metrics.\n\nWhen set to \"node_kubelet\" the operator splits the kubernetes_state_core\ncheck into two: the cluster-side instance keeps every collector except\nscheduled pods (only unscheduled pods are kept on that side), and a\ndedicated pods-only instance is deployed on every node agent to read pods\nlocally from its Kubelet via workloadmeta. In the generated agent check\nYAML this corresponds to the snake_case check options\n`pod_collection_mode: cluster_unassigned` on the cluster side and\n`pod_collection_mode: node_kubelet` (with `collectors: [pods]`) on the\nnode side; this CRD field itself is the camelCase `podCollectionMode`\nper Kubernetes API convention.\n\nUseful in large clusters where a single KSM instance is a bottleneck.\nThe cluster-aggregate `.total` metrics\n(kubernetes_state.{container,initcontainer}.<resource>_{requested,limit}.total)\ncarry a reduced tag set with no host or node, so they cannot be collected\ncorrectly by every node agent independently without colliding at\ningestion. To avoid this, the operator also enables\n`cluster_aggregates_enabled` on the cluster-side and node-side instances,\nwhich silences those aggregate metrics on both, and schedules a\ndedicated `cluster_aggregates_only` instance on the cluster-side\ncomponent to collect them instead.\nRequires Agent / Cluster Agent 7.82+.\n\nWhen `features.kubeStateMetricsCore.conf` is also set, the operator\ndeploys the node-side check but does NOT modify the user-supplied\ncluster-side config. To avoid double pod collection in that case, the\nuser's cluster-side instance must either omit `pods` from its\n`collectors` list OR set the `pod_collection_mode: cluster_unassigned`\ncheck option themselves. Omitting `collectors` entirely falls back to\nupstream KSM defaults, which include `pods`.\n\nDefault behavior is unchanged when this field is unset.",
+                      "enum": [
+                        "default",
+                        "node_kubelet"
+                      ],
+                      "type": "string"
                     }
                   },
                   "type": "object",
@@ -10717,6 +11344,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -10806,6 +11438,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -10913,6 +11550,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -11137,7 +11779,7 @@
                   "description": "SBOM collection configuration.",
                   "properties": {
                     "containerImage": {
-                      "description": "SBOMTypeConfig contains configuration for a SBOM collection type.",
+                      "description": "SBOMContainerImageConfig contains configuration for container image SBOM collection.",
                       "properties": {
                         "analyzers": {
                           "description": "Analyzers to use for SBOM collection.",
@@ -11186,7 +11828,7 @@
                       "additionalProperties": false
                     },
                     "host": {
-                      "description": "SBOMTypeConfig contains configuration for a SBOM collection type.",
+                      "description": "SBOMHostConfig contains configuration for host SBOM collection.",
                       "properties": {
                         "analyzers": {
                           "description": "Analyzers to use for SBOM collection.",

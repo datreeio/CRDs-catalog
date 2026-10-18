@@ -1,0 +1,553 @@
+{
+  "description": "InterceptorRoute configures request routing and autoscaling for a target service.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "InterceptorRouteSpec defines the desired state of InterceptorRoute.",
+      "properties": {
+        "coldStart": {
+          "description": "Cold start behavior when scaling from zero.",
+          "properties": {
+            "fallback": {
+              "description": "Fallback target to route to when the primary backend does not become\nready within the readiness timeout.",
+              "properties": {
+                "service": {
+                  "description": "Kubernetes Service to use as the fallback target.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the Kubernetes Service.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "port": {
+                      "description": "Port number on the Service. Mutually exclusive with portName.",
+                      "format": "int32",
+                      "maximum": 65535,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "portName": {
+                      "description": "Named port on the Service. Mutually exclusive with port.",
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "exactly one of 'port' or 'portName' must be set",
+                      "rule": "has(self.port) != has(self.portName)"
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "service"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "maxPendingRequests": {
+              "description": "Maximum number of pending requests held while the backend is not\nready (e.g. during scale-from-zero). Requests arriving when the limit\nis reached are handled according to overflow. Unset: uses the\ninterceptor's KEDA_HTTP_COLD_START_MAX_PENDING_REQUESTS (default:\nunlimited). When set together with a placeholder and\noverflow: Placeholder, requests are held up to this limit instead of\nreceiving the placeholder immediately; only overflowing requests\nreceive it.\nThe limit applies per interceptor replica: the effective cluster-wide\ncapacity is maxPendingRequests multiplied by the number of\ninterceptor replicas.",
+              "format": "int32",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "overflow": {
+              "default": "Reject",
+              "description": "How to handle requests arriving when the pending request limit is\nreached. Reject: return HTTP 503. Placeholder: serve the configured\nplaceholder response.",
+              "enum": [
+                "Reject",
+                "Placeholder"
+              ],
+              "type": "string"
+            },
+            "placeholder": {
+              "description": "Placeholder response to serve while the target has no ready endpoints.",
+              "properties": {
+                "response": {
+                  "description": "Static response to return immediately when the backend has no ready endpoints.",
+                  "properties": {
+                    "body": {
+                      "description": "Inline response body.",
+                      "maxLength": 32768,
+                      "type": "string"
+                    },
+                    "bodyFromConfigMap": {
+                      "description": "Response body from a ConfigMap in the same namespace. The ConfigMap must\ncarry the label \"http.keda.sh/response-body: true\". A missing ConfigMap\nor a missing explicit key returns HTTP 500.",
+                      "properties": {
+                        "key": {
+                          "description": "Key within the ConfigMap. When omitted, the key is the request path\nwithout the leading \"/\" (defaulting to \"index.html\" for \"/\").\nThe Content-Type header is auto-detected from the key's file extension\nunless explicitly set in headers.",
+                          "type": "string"
+                        },
+                        "name": {
+                          "description": "Name of the ConfigMap.",
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "headers": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "HTTP response headers.",
+                      "type": "object"
+                    },
+                    "statusCode": {
+                      "description": "HTTP status code.",
+                      "format": "int32",
+                      "maximum": 599,
+                      "minimum": 100,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "at most one of 'body' or 'bodyFromConfigMap' may be set",
+                      "rule": "!(has(self.body) && has(self.bodyFromConfigMap))"
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "response"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of 'fallback', 'placeholder' or 'maxPendingRequests' must be set",
+              "rule": "has(self.fallback) || has(self.placeholder) || has(self.maxPendingRequests)"
+            },
+            {
+              "message": "'placeholder' must be set when 'overflow' is 'Placeholder'",
+              "rule": "self.overflow != 'Placeholder' || has(self.placeholder)"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "rules": {
+          "description": "Routing rules that define how requests are matched to this target.",
+          "items": {
+            "description": "RoutingRule defines a set of matching criteria for routing requests.",
+            "properties": {
+              "headers": {
+                "description": "All listed headers must match the request (AND semantics).\nIf a header's Value is omitted, the header must be present but any\nvalue is accepted.",
+                "items": {
+                  "description": "HeaderMatch defines a header matching rule.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the HTTP header.",
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Value to match against (exact match). If omitted, matches any value for given header name.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-map-keys": [
+                  "name"
+                ],
+                "x-kubernetes-list-type": "map"
+              },
+              "hosts": {
+                "description": "Match any of these hostnames. Wildcard patterns (e.g. \"*.example.com\")\nare supported. A single \"*\" acts as a catch-all. Exact matches take\npriority over wildcards; more specific wildcards (e.g. \"*.bar.example.com\")\ntake priority over less specific ones.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
+              "paths": {
+                "description": "Match any of these path prefixes. When multiple paths match,\nthe longest prefix wins.",
+                "items": {
+                  "description": "PathMatch defines a path matching rule.",
+                  "properties": {
+                    "value": {
+                      "description": "Path prefix to match against. The longest matching prefix wins.",
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "scalingMetric": {
+          "description": "Metric configuration for autoscaling.",
+          "properties": {
+            "concurrency": {
+              "description": "Scale based on concurrent request count.",
+              "properties": {
+                "targetValue": {
+                  "description": "Target concurrent request count per replica.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "targetValue"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "requestRate": {
+              "description": "Scale based on request rate.",
+              "properties": {
+                "granularity": {
+                  "default": "1s",
+                  "description": "Bucket size for rate calculation within the window.",
+                  "type": "string"
+                },
+                "targetValue": {
+                  "description": "Target request rate per replica.",
+                  "format": "int32",
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "window": {
+                  "default": "1m",
+                  "description": "Sliding time window over which the request rate is calculated.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "targetValue"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of 'concurrency' or 'requestRate' must be set",
+              "rule": "has(self.concurrency) || has(self.requestRate)"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "staticRoutes": {
+          "description": "Sub-routes that serve static responses without affecting scaling.\nEvaluated in list order (first match wins).",
+          "items": {
+            "description": "StaticRoute defines a sub-route excluded from scaling metrics.\nMultiple rules within a StaticRoute use OR semantics.\nMultiple StaticRoute entries use first-match-wins ordering.",
+            "properties": {
+              "response": {
+                "description": "Static response configuration.",
+                "properties": {
+                  "body": {
+                    "description": "Inline response body.",
+                    "maxLength": 32768,
+                    "type": "string"
+                  },
+                  "bodyFromConfigMap": {
+                    "description": "Response body from a ConfigMap in the same namespace. The ConfigMap must\ncarry the label \"http.keda.sh/response-body: true\". A missing ConfigMap\nor a missing explicit key returns HTTP 500.",
+                    "properties": {
+                      "key": {
+                        "description": "Key within the ConfigMap. When omitted, the key is the request path\nwithout the leading \"/\" (defaulting to \"index.html\" for \"/\").\nThe Content-Type header is auto-detected from the key's file extension\nunless explicitly set in headers.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Name of the ConfigMap.",
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "headers": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "HTTP response headers.",
+                    "type": "object"
+                  },
+                  "statusCode": {
+                    "description": "HTTP status code.",
+                    "format": "int32",
+                    "maximum": 599,
+                    "minimum": 100,
+                    "type": "integer"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "at most one of 'body' or 'bodyFromConfigMap' may be set",
+                    "rule": "!(has(self.body) && has(self.bodyFromConfigMap))"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "responseMode": {
+                "default": "WhenUnavailable",
+                "description": "Determines when the static response is served.\nAlways: the response is always returned, the backend is never contacted.\nWhenUnavailable: the request is forwarded to the backend when it has\nready endpoints; the static response is returned only when unavailable.",
+                "enum": [
+                  "Always",
+                  "WhenUnavailable"
+                ],
+                "type": "string"
+              },
+              "rules": {
+                "description": "Matching rules for this static route. A request matching any rule\nis handled by this static route.",
+                "items": {
+                  "description": "RoutingRule defines a set of matching criteria for routing requests.",
+                  "properties": {
+                    "headers": {
+                      "description": "All listed headers must match the request (AND semantics).\nIf a header's Value is omitted, the header must be present but any\nvalue is accepted.",
+                      "items": {
+                        "description": "HeaderMatch defines a header matching rule.",
+                        "properties": {
+                          "name": {
+                            "description": "Name of the HTTP header.",
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "Value to match against (exact match). If omitted, matches any value for given header name.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-map-keys": [
+                        "name"
+                      ],
+                      "x-kubernetes-list-type": "map"
+                    },
+                    "hosts": {
+                      "description": "Match any of these hostnames. Wildcard patterns (e.g. \"*.example.com\")\nare supported. A single \"*\" acts as a catch-all. Exact matches take\npriority over wildcards; more specific wildcards (e.g. \"*.bar.example.com\")\ntake priority over less specific ones.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "set"
+                    },
+                    "paths": {
+                      "description": "Match any of these path prefixes. When multiple paths match,\nthe longest prefix wins.",
+                      "items": {
+                        "description": "PathMatch defines a path matching rule.",
+                        "properties": {
+                          "value": {
+                            "description": "Path prefix to match against. The longest matching prefix wins.",
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "value"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array",
+                      "x-kubernetes-list-type": "atomic"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "type": "array",
+                "x-kubernetes-list-type": "atomic"
+              }
+            },
+            "required": [
+              "response",
+              "rules"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "target": {
+          "description": "Backend service to route traffic to.",
+          "properties": {
+            "port": {
+              "description": "Port number on the Service. Mutually exclusive with portName.",
+              "format": "int32",
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "portName": {
+              "description": "Named port on the Service. Mutually exclusive with port.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "service": {
+              "description": "Name of the Kubernetes Service.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "service"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of 'port' or 'portName' must be set",
+              "rule": "has(self.port) != has(self.portName)"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "timeouts": {
+          "description": "Timeout configuration for request handling.",
+          "properties": {
+            "readiness": {
+              "description": "Time to wait for the backend to become ready (e.g. scale-from-zero).\nUnset: uses the global KEDA_HTTP_READINESS_TIMEOUT (default: disabled).\nSet to \"0s\" to disable the dedicated readiness deadline so the full\nrequest budget is available for cold starts. When a fallback service\nis configured and this is \"0s\", a 30s default is applied.",
+              "type": "string"
+            },
+            "request": {
+              "description": "Total time allowed for the entire request lifecycle.\nUnset: uses the global KEDA_HTTP_REQUEST_TIMEOUT (default: disabled).\nSet to \"0s\" to disable the request deadline.",
+              "type": "string"
+            },
+            "responseHeader": {
+              "description": "Max time to wait for the response headers from the backend after the\nrequest has been fully sent. Does not include cold-start wait time.\nUnset: uses the global KEDA_HTTP_RESPONSE_HEADER_TIMEOUT (default: 300s).\nSet to \"0s\" to disable the response header deadline.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "scalingMetric",
+        "target"
+      ],
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "InterceptorRouteStatus defines the observed state of InterceptorRoute.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions of the InterceptorRoute.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "metadata",
+    "spec"
+  ],
+  "type": "object"
+}

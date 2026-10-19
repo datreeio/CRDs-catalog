@@ -14,6 +14,49 @@
     "spec": {
       "description": "RenovateJobSpec defines the desired state of RenovateJob",
       "properties": {
+        "access": {
+          "description": "Access control for this RenovateJob in the web UI when authentication is\nenabled. If empty or not set, the job is hidden from all users.",
+          "properties": {
+            "adminGroups": {
+              "description": "Groups allowed to view this RenovateJob and to trigger, cancel and\nreconfigure its runs.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "adminUsers": {
+              "description": "Individual users allowed to view this RenovateJob and to trigger, cancel\nand reconfigure its runs. See ReaderUsers for how a user is matched.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "anonymousRead": {
+              "description": "If true, this RenovateJob is readable without a session. Grants read access\nto every visitor, which group matches can only extend.",
+              "type": "boolean"
+            },
+            "anonymousReadLogs": {
+              "description": "If true, visitors that only hold anonymous read access may also stream\nRenovate logs. Has no effect unless AnonymousRead is in effect. Renovate\nlogs are unredacted, so this is opt-in separately from AnonymousRead.",
+              "type": "boolean"
+            },
+            "readerGroups": {
+              "description": "Groups allowed to view this RenovateJob without triggering, cancelling or\nreconfiguring anything.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "readerUsers": {
+              "description": "Individual users allowed to view this RenovateJob, named by the email or\nusername their identity provider reports. Compared case-insensitively.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "affinity": {
           "description": "Affinity settings for scheduling the resulting pod",
           "properties": {
@@ -804,7 +847,7 @@
           "additionalProperties": false
         },
         "allowedGroups": {
-          "description": "Groups allowed to view this RenovateJob when authentication is enabled.\nIf empty or not set, the job is hidden from all users.",
+          "description": "Deprecated: use Access.AdminGroups. Groups granted full access to this\nRenovateJob when authentication is enabled. Mutually exclusive with Access.",
           "items": {
             "type": "string"
           },
@@ -848,7 +891,7 @@
                     "description": "Selects a key of a ConfigMap.",
                     "properties": {
                       "key": {
-                        "description": "The key to select.",
+                        "description": "The key to select from the ConfigMap's Data field.\nKeys in the BinaryData field are not currently propagated to container env vars.",
                         "type": "string"
                       },
                       "name": {
@@ -1040,8 +1083,16 @@
           "items": {
             "description": "VolumeMount describes a mounting of a Volume within a container.",
             "properties": {
+              "bindMountOptions": {
+                "description": "bindMountOptions is the list of additional bind mount options to apply when\nmounting this volume into the container. Allowed values are noexec,\nnodev, and nosuid. These are Linux mount options and have no effect on\nWindows nodes.\nThis field is not supported with image volumes.\nThis is an alpha field and requires enabling the VolumeBindMountOptions feature gate.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "x-kubernetes-list-type": "set"
+              },
               "mountPath": {
-                "description": "Path within the container at which the volume should be mounted.  Must\nnot contain ':'.",
+                "description": "Path within the container at which the volume should be mounted.",
                 "type": "string"
               },
               "mountPropagation": {
@@ -1076,10 +1127,11 @@
             "type": "object",
             "additionalProperties": false
           },
+          "maxItems": 64,
           "type": "array"
         },
         "extraVolumes": {
-          "description": "Additional volumes to mount in the renovate pods",
+          "description": "Additional volumes to mount in the renovate pods.\nhostPath is rejected: it would give the pod the node's filesystem",
           "items": {
             "description": "Volume represents a named volume in a pod that may be accessed by any container in the pod.",
             "properties": {
@@ -1260,6 +1312,11 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "defaultUser": {
+                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
                   "items": {
                     "description": "items if unspecified, each key-value pair in the Data field of the referenced\nConfigMap will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the ConfigMap,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                     "items": {
@@ -1277,6 +1334,11 @@
                         "path": {
                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                           "type": "string"
+                        },
+                        "user": {
+                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -1353,6 +1415,11 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "defaultUser": {
+                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
                   "items": {
                     "description": "Items is a list of downward API volume file",
                     "items": {
@@ -1417,6 +1484,11 @@
                           "type": "object",
                           "x-kubernetes-map-type": "atomic",
                           "additionalProperties": false
+                        },
+                        "user": {
+                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -1438,6 +1510,11 @@
                   "medium": {
                     "description": "medium represents what type of storage medium should back this directory.\nThe default is \"\" which means to use the node's default medium.\nMust be an empty string (default) or Memory.\nMore info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
                     "type": "string"
+                  },
+                  "mode": {
+                    "description": "mode specifies the permission bits for the emptyDir directory, in numeric\nnotation (e.g., 0755, 01777). Must be a value between 0000 and 01777.\nIf not specified, defaults to 0777.\nThis might be in conflict with other options that affect the file\nmode, like fsGroup. If fsGroup is specified, the fsGroup permissions\nwill override the mode specified here.\nThis field has no effect on Windows.\nThis field is alpha and requires EmptyDirVolumeMode featuregate to be enabled.",
+                    "format": "int32",
+                    "type": "integer"
                   },
                   "sizeLimit": {
                     "anyOf": [
@@ -1478,7 +1555,7 @@
                             "x-kubernetes-list-type": "atomic"
                           },
                           "dataSource": {
-                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                            "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                             "properties": {
                               "apiGroup": {
                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -1502,7 +1579,7 @@
                             "additionalProperties": false
                           },
                           "dataSourceRef": {
-                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                            "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                             "properties": {
                               "apiGroup": {
                                 "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -2007,6 +2084,11 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "defaultUser": {
+                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
                   "sources": {
                     "description": "sources is the list of volume projections. Each entry in this list\nhandles one source.",
                     "items": {
@@ -2077,6 +2159,11 @@
                             "signerName": {
                               "description": "Select all ClusterTrustBundles that match this signer name.\nMutually-exclusive with name.  The contents of all selected\nClusterTrustBundles will be unified and deduplicated.",
                               "type": "string"
+                            },
+                            "user": {
+                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                              "format": "int64",
+                              "type": "integer"
                             }
                           },
                           "required": [
@@ -2105,6 +2192,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -2198,6 +2290,11 @@
                                     "type": "object",
                                     "x-kubernetes-map-type": "atomic",
                                     "additionalProperties": false
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -2241,6 +2338,11 @@
                               "description": "Kubelet's generated CSRs will be addressed to this signer.",
                               "type": "string"
                             },
+                            "user": {
+                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                              "format": "int64",
+                              "type": "integer"
+                            },
                             "userAnnotations": {
                               "additionalProperties": {
                                 "type": "string"
@@ -2276,6 +2378,11 @@
                                   "path": {
                                     "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                                     "type": "string"
+                                  },
+                                  "user": {
+                                    "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                                    "format": "int64",
+                                    "type": "integer"
                                   }
                                 },
                                 "required": [
@@ -2317,6 +2424,11 @@
                             "path": {
                               "description": "path is the path relative to the mount point of the file to project the\ntoken into.",
                               "type": "string"
+                            },
+                            "user": {
+                              "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                              "format": "int64",
+                              "type": "integer"
                             }
                           },
                           "required": [
@@ -2501,6 +2613,11 @@
                     "format": "int32",
                     "type": "integer"
                   },
+                  "defaultUser": {
+                    "description": "defaultUser is Optional: The owner UID of the created files by default.\nThe defaultUser field is only used as a fallback when the item-level user field is unset.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
                   "items": {
                     "description": "items If unspecified, each key-value pair in the Data field of the referenced\nSecret will be projected into the volume as a file whose name is the\nkey and content is the value. If specified, the listed keys will be\nprojected into the specified paths, and unlisted keys will not be\npresent. If a key is specified which is not present in the Secret,\nthe volume setup will error unless it is marked optional. Paths must be\nrelative and may not contain the '..' path or start with '..'.",
                     "items": {
@@ -2518,6 +2635,11 @@
                         "path": {
                           "description": "path is the relative path of the file to map the key to.\nMay not be an absolute path.\nMay not contain the path element '..'.\nMay not start with the string '..'.",
                           "type": "string"
+                        },
+                        "user": {
+                          "description": "user is Optional: The owner UID of the created file.\nIf specified, the item-level user field takes precedence over defaultUser.\n(Alpha) This field requires the AtomicWriteVolumeUserFields feature gate to be enabled.",
+                          "format": "int64",
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -2611,7 +2733,14 @@
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
+          "maxItems": 64,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "hostPath volumes are not allowed on RenovateJob pods",
+              "rule": "self.all(v, !has(v.hostPath))"
+            }
+          ]
         },
         "githubAppReference": {
           "description": "Reference to a Github App for authentication, this will automatically mount a secret with\nRENOVATE_TOKEN",
@@ -2639,7 +2768,7 @@
           "additionalProperties": false
         },
         "image": {
-          "description": "Renovate Docker image to use",
+          "description": "Renovate Docker image to use. Required, but may be inherited from templateRef,\nso it can be left unset here.",
           "type": "string"
         },
         "imagePullSecrets": {
@@ -2686,7 +2815,7 @@
           "type": "object"
         },
         "parallelism": {
-          "description": "Maximum number of projects to process in parallel",
+          "description": "Maximum number of projects to process in parallel. Required, but may be\ninherited from templateRef, so it can be left unset here.",
           "format": "int32",
           "type": "integer"
         },
@@ -2695,16 +2824,19 @@
           "type": "string"
         },
         "provider": {
-          "description": "Renovate Provider Information to fill \"RENOVATE_ENDPOINT\" and \"RENOVATE_PLATFORM\" environment variables in the renovate container",
+          "description": "Renovate Provider Information to fill \"RENOVATE_ENDPOINT\" and \"RENOVATE_PLATFORM\" environment variables in the renovate container.\nRequired, but may be inherited from templateRef, so it can be left unset here.",
           "properties": {
             "endpoint": {
+              "description": "Endpoint is the platform API base URL. Its host must be listed in the\noperator's policy.allowedHosts, otherwise the job is refused.",
+              "pattern": "^https?://[^?#]+$",
               "type": "string"
             },
             "name": {
               "type": "string"
             },
             "publicEndpoint": {
-              "description": "PublicEndpoint is the externally reachable URL for the provider, used only for UI links.\nWhen set, this overrides Endpoint for dashboard links while Endpoint continues to be\nused for Renovate API calls and cloning. Defaults to Endpoint when omitted.",
+              "description": "PublicEndpoint is the externally reachable URL for the provider, used only for UI links.\nWhen set, this overrides Endpoint for dashboard links while Endpoint continues to be\nused for Renovate API calls and cloning. Defaults to Endpoint when omitted.\nIts host must be listed in the operator's policy.allowedHosts.",
+              "pattern": "^https?://[^?#]+$",
               "type": "string"
             }
           },
@@ -2712,6 +2844,54 @@
             "name"
           ],
           "type": "object",
+          "additionalProperties": false
+        },
+        "renovateConfig": {
+          "description": "Renovate configuration file for the job pods",
+          "properties": {
+            "configMapRef": {
+              "description": "Reference to a key in an existing ConfigMap holding the configuration file",
+              "properties": {
+                "key": {
+                  "description": "Key holding the configuration file, also used as the mounted file name",
+                  "maxLength": 253,
+                  "pattern": "^[a-zA-Z0-9._-]+\\.(js|cjs|mjs|json|json5)$",
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "fileName": {
+              "description": "File name the inline configuration is mounted as; the extension tells Renovate the format. Defaults to \"config.js\". Ignored with configMapRef.",
+              "maxLength": 253,
+              "pattern": "^[a-zA-Z0-9._-]+\\.(js|cjs|mjs|json|json5)$",
+              "type": "string"
+            },
+            "inline": {
+              "description": "Inline Renovate configuration, written to a ConfigMap owned by the RenovateJob",
+              "maxLength": 262144,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "exactly one of inline and configMapRef must be set",
+              "rule": "has(self.inline) != has(self.configMapRef)"
+            }
+          ],
           "additionalProperties": false
         },
         "resources": {
@@ -2784,7 +2964,7 @@
           "type": "string"
         },
         "schedule": {
-          "description": "Cron schedule in standard cron format",
+          "description": "Cron schedule in standard cron format. Required, but may be inherited from\ntemplateRef, so it can be left unset here.",
           "type": "string"
         },
         "scratchVolume": {
@@ -2817,7 +2997,7 @@
                           "x-kubernetes-list-type": "atomic"
                         },
                         "dataSource": {
-                          "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\nWhen the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,\nand dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+                          "description": "dataSource field can be used to specify either:\n* An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)\n* An existing PVC (PersistentVolumeClaim)\nIf the provisioner or an external controller can support the specified data source,\nit will create a new volume based on the contents of the specified data source.\ndataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be\ncopied to dataSource when dataSourceRef.namespace is not specified.\nIf the namespace is specified, then dataSourceRef will not be copied to dataSource.",
                           "properties": {
                             "apiGroup": {
                               "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -2841,7 +3021,7 @@
                           "additionalProperties": false
                         },
                         "dataSourceRef": {
-                          "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+                          "description": "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty\nvolume is desired. This may be any object from a non-empty API group (non\ncore object) or a PersistentVolumeClaim object.\nWhen this field is specified, volume binding will only succeed if the type of\nthe specified object matches some installed volume populator or dynamic\nprovisioner.\nThis field will replace the functionality of the dataSource field and as such\nif both fields are non-empty, they must have the same value. For backwards\ncompatibility, when namespace isn't specified in dataSourceRef,\nboth fields (dataSource and dataSourceRef) will be set to the same\nvalue automatically if one of them is empty and the other is non-empty.\nWhen namespace is specified in dataSourceRef,\ndataSource isn't set to the same value and must be empty.\nThere are three important differences between dataSource and dataSourceRef:\n* While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
                           "properties": {
                             "apiGroup": {
                               "description": "APIGroup is the group for the resource being referenced.\nIf APIGroup is not specified, the specified Kind must be in the core API group.\nFor any other third-party types, APIGroup is required.",
@@ -3018,7 +3198,7 @@
           "description": "Security context for the resulting pod and container",
           "properties": {
             "container": {
-              "description": "SecurityContext holds security configuration that will be applied to a container.\nSome fields are present in both SecurityContext and PodSecurityContext.  When both\nare set, the values in SecurityContext take precedence.",
+              "description": "Container security context. privileged and allowPrivilegeEscalation are rejected\noutright: both hand the pod a route off the node, which no Renovate use case\nneeds. Running as root is governed by the operator's policy.allowRootUser\ninstead, since a custom image may legitimately need it.",
               "properties": {
                 "allowPrivilegeEscalation": {
                   "description": "AllowPrivilegeEscalation controls whether a process can gain more\nprivileges than its parent process. This bool directly controls if\nthe no_new_privs flag will be set on the container process.\nAllowPrivilegeEscalation is true always when the container is:\n1) run as Privileged\n2) has CAP_SYS_ADMIN\nNote that this field cannot be set when spec.os.name is windows.",
@@ -3159,6 +3339,16 @@
                 }
               },
               "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "privileged containers are not allowed on RenovateJob pods",
+                  "rule": "!has(self.privileged) || !self.privileged"
+                },
+                {
+                  "message": "allowPrivilegeEscalation is not allowed on RenovateJob pods",
+                  "rule": "!has(self.allowPrivilegeEscalation) || !self.allowPrivilegeEscalation"
+                }
+              ],
               "additionalProperties": false
             },
             "pod": {
@@ -3206,7 +3396,7 @@
                   "type": "integer"
                 },
                 "seLinuxChangePolicy": {
-                  "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\"MountOption\" value is allowed only when SELinuxMount feature gate is enabled.\n\nIf not specified and SELinuxMount feature gate is enabled, \"MountOption\" is used.\nIf not specified and SELinuxMount feature gate is disabled, \"MountOption\" is used for ReadWriteOncePod volumes\nand \"Recursive\" for all other volumes.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
+                  "description": "seLinuxChangePolicy defines how the container's SELinux label is applied to all volumes used by the Pod.\nIt has no effect on nodes that do not support SELinux or to volumes does not support SELinux.\nValid values are \"MountOption\" and \"Recursive\".\n\n\"Recursive\" means relabeling of all files on all Pod volumes by the container runtime.\nThis may be slow for large volumes, but allows mixing privileged and unprivileged Pods sharing the same volume on the same node.\n\n\"MountOption\" mounts all eligible Pod volumes with `-o context` mount option.\nThis requires all Pods that share the same volume to use the same SELinux label.\nIt is not possible to share the same volume among privileged and unprivileged Pods.\nEligible volumes are in-tree FibreChannel and iSCSI volumes, and all CSI volumes\nwhose CSI driver announces SELinux support by setting spec.seLinuxMount: true in their\nCSIDriver instance. Other volumes are always re-labelled recursively.\n\nIf not specified, \"MountOption\" is used.\n\nThis field affects only Pods that have SELinux label set, either in PodSecurityContext or in SecurityContext of all containers.\n\nAll Pods that use the same volume should use the same seLinuxChangePolicy, otherwise some pods can get stuck in ContainerCreating state.\nNote that this field cannot be set when spec.os.name is windows.",
                   "type": "string"
                 },
                 "seLinuxOptions": {
@@ -3332,12 +3522,41 @@
           "additionalProperties": false
         },
         "skipForks": {
-          "description": "If true, forked repositories discovered during autodiscovery will be excluded by querying the platform API",
+          "description": "If true, forked repositories discovered during autodiscovery will be excluded by querying the platform API.\nA pointer so an unset value inherits from templateRef while an explicit false overrides an inherited true.",
           "type": "boolean"
         },
         "skipPendingDeletion": {
-          "description": "If true, repositories marked for delayed deletion (pending deletion) will be excluded by querying the platform API. Only GitLab exposes this state.",
+          "description": "If true, repositories marked for delayed deletion (pending deletion) will be excluded by querying the platform API. Only GitLab exposes this state.\nA pointer so an unset value inherits from templateRef while an explicit false overrides an inherited true.",
           "type": "boolean"
+        },
+        "suspend": {
+          "description": "If true, the operator starts no new run for this RenovateJob: the schedule\ndoes not fire, discovery is refused and queued projects are not dispatched.\nRuns already in progress finish. Projects queued meanwhile, by webhooks,\nthe UI or annotation triggers, stay Scheduled and run once it is resumed.\nA pointer so an unset value inherits from templateRef while an explicit false overrides an inherited true.",
+          "type": "boolean"
+        },
+        "templateRef": {
+          "description": "TemplateRef inherits shared configuration from a RenovateJobTemplate (in the\nsame namespace) or a cluster-scoped ClusterRenovateJobTemplate. Fields set on\nthis RenovateJob override the template's per field; fields left unset are\ninherited. A templateRef set on a template itself is ignored: templates do not\nnest.",
+          "properties": {
+            "kind": {
+              "default": "RenovateJobTemplate",
+              "description": "Kind of the referenced template. Defaults to RenovateJobTemplate.",
+              "enum": [
+                "RenovateJobTemplate",
+                "ClusterRenovateJobTemplate"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of the referenced template.",
+              "maxLength": 253,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "additionalProperties": false
         },
         "tolerations": {
           "description": "Tolerations for scheduling the resulting pod",
@@ -3540,161 +3759,77 @@
           "additionalProperties": false
         }
       },
-      "required": [
-        "image",
-        "parallelism",
-        "provider",
-        "schedule"
-      ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "allowedGroups and access are mutually exclusive; migrate allowedGroups to access.adminGroups",
+          "rule": "!(has(self.allowedGroups) && has(self.access))"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
       "description": "RenovateJobStatus defines the observed state of RenovateJob",
       "properties": {
-        "executionOptions": {
-          "properties": {
-            "debug": {
-              "description": "If true, the renovate job will be executed with RENOVATE_LOG_LEVEL=debug",
-              "type": "boolean"
-            }
-          },
-          "type": "object",
-          "additionalProperties": false
-        },
-        "projects": {
+        "conditions": {
+          "description": "Conditions holds the observed state of the RenovateJob. The operator sets the\n\"Accepted\" condition to False when the job violates the operator's policy, with\na reason and a message naming the value to fix; nothing runs while it is False.",
           "items": {
-            "description": "Status of a single project within a RenovateJob",
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
             "properties": {
-              "duration": {
-                "type": "string"
-              },
-              "lastTransition": {
-                "description": "LastTransition records when the project most recently changed state.",
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
                 "format": "date-time",
                 "type": "string"
               },
-              "logIssues": {
-                "description": "LogIssues contains aggregate counts and individual issue messages from a Renovate run.",
-                "properties": {
-                  "errorCount": {
-                    "type": "integer"
-                  },
-                  "issues": {
-                    "items": {
-                      "description": "LogIssue represents a single warning or error from Renovate logs.",
-                      "properties": {
-                        "level": {
-                          "type": "integer"
-                        },
-                        "message": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "level",
-                        "message"
-                      ],
-                      "type": "object",
-                      "additionalProperties": false
-                    },
-                    "type": "array"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "warnCount": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "errorCount",
-                  "warnCount"
-                ],
-                "type": "object",
-                "additionalProperties": false
-              },
-              "name": {
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
                 "type": "string"
               },
-              "prActivity": {
-                "description": "PRActivity contains aggregate counts and individual details of PR activity from a run.",
-                "properties": {
-                  "automerged": {
-                    "type": "integer"
-                  },
-                  "created": {
-                    "type": "integer"
-                  },
-                  "needsApproval": {
-                    "type": "integer"
-                  },
-                  "prs": {
-                    "items": {
-                      "description": "PRDetail represents a single PR found in Renovate logs.",
-                      "properties": {
-                        "action": {
-                          "description": "PRAction represents what happened to a PR in a Renovate run.",
-                          "type": "string"
-                        },
-                        "branch": {
-                          "type": "string"
-                        },
-                        "number": {
-                          "type": "integer"
-                        },
-                        "title": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "action",
-                        "branch"
-                      ],
-                      "type": "object",
-                      "additionalProperties": false
-                    },
-                    "type": "array"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "unchanged": {
-                    "type": "integer"
-                  },
-                  "updated": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "automerged",
-                  "created",
-                  "needsApproval",
-                  "unchanged",
-                  "updated"
-                ],
-                "type": "object",
-                "additionalProperties": false
-              },
-              "priority": {
-                "format": "int32",
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
                 "type": "integer"
               },
-              "renovateResultStatus": {
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
                 "type": "string"
               },
               "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
                 "type": "string"
               }
             },
             "required": [
-              "name",
-              "status"
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
             ],
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
         }
       },
       "type": "object",

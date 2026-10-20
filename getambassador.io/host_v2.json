@@ -29,11 +29,13 @@
               "description": "Specifies the Kubernetes Secret to use to store the private key of the ACME account (essentially, where to store the auto-generated password for the auto-created ACME account).  You should not normally need to set this--the default value is based on a combination of the ACME authority being registered wit and the email address associated with the account. \n Note that this is a native-Kubernetes-style core.v1.LocalObjectReference, not an Ambassador-style `{name}.{namespace}` string.  Because we're opinionated, it does not support referencing a Secret in another namespace (because most native Kubernetes resources don't support that), but if we ever abandon that opinion and decide to support non-local references it, it would be by adding a `namespace:` field by changing it from a core.v1.LocalObjectReference to a core.v1.SecretReference, not by adopting the `{name}.{namespace}` notation.",
               "properties": {
                 "name": {
-                  "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?",
+                  "default": "",
+                  "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. TODO: Add other useful fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
                   "type": "string"
                 }
               },
               "type": "object",
+              "x-kubernetes-map-type": "atomic",
               "additionalProperties": false
             },
             "registration": {
@@ -43,6 +45,34 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "ambassador_id": {
+          "description": "Common to all Ambassador objects (and optional).",
+          "items": {
+            "type": "string"
+          },
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array"
+            }
+          ]
+        },
+        "ambassadorId": {
+          "description": "A compatibility alias for \"ambassador_id\"; because Host used to be specified with protobuf, and jsonpb allowed either \"ambassador_id\" or \"ambassadorId\", and even though we didn't tell people about \"ambassadorId\" it's what the web policy console generated because of jsonpb.  So Hosts with 'ambassadorId' exist in the wild.",
+          "items": {
+            "type": "string"
+          },
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array"
+            }
+          ]
         },
         "hostname": {
           "description": "Hostname by which the Ambassador can be reached.",
@@ -111,7 +141,8 @@
                     "items": {
                       "type": "string"
                     },
-                    "type": "array"
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
                   }
                 },
                 "required": [
@@ -121,7 +152,8 @@
                 "type": "object",
                 "additionalProperties": false
               },
-              "type": "array"
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
             },
             "matchLabels": {
               "additionalProperties": {
@@ -132,6 +164,7 @@
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
         "tls": {
@@ -190,31 +223,34 @@
           "description": "Name of the TLSContext the Host resource is linked with. It is not valid to specify both `tlsContext` and `tls`. \n Note that this is a native-Kubernetes-style core.v1.LocalObjectReference, not an Ambassador-style `{name}.{namespace}` string.  Because we're opinionated, it does not support referencing a Secret in another namespace (because most native Kubernetes resources don't support that), but if we ever abandon that opinion and decide to support non-local references it, it would be by adding a `namespace:` field by changing it from a core.v1.LocalObjectReference to a core.v1.SecretReference, not by adopting the `{name}.{namespace}` notation.",
           "properties": {
             "name": {
-              "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?",
+              "default": "",
+              "description": "Name of the referent. This field is effectively required, but due to backwards compatibility is allowed to be empty. Instances of this type with an empty value here are almost certainly wrong. TODO: Add other useful fields. apiVersion, kind, uid? More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.",
               "type": "string"
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         },
         "tlsSecret": {
           "description": "Name of the Kubernetes secret into which to save generated certificates.  If ACME is enabled (see $acmeProvider), then the default is $hostname; otherwise the default is \"\".  If the value is \"\", then we do not do TLS for this Host.",
           "properties": {
             "name": {
-              "description": "Name is unique within a namespace to reference a secret resource.",
+              "description": "name is unique within a namespace to reference a secret resource.",
               "type": "string"
             },
             "namespace": {
-              "description": "Namespace defines the space within which the secret name must be unique.",
+              "description": "namespace defines the space within which the secret name must be unique.",
               "type": "string"
             }
           },
           "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         }
       },
       "type": "object",
-      "x-kubernetes-preserve-unknown-fields": true
+      "additionalProperties": false
     },
     "status": {
       "description": "HostStatus defines the observed state of Host",
@@ -253,7 +289,6 @@
           "type": "string"
         },
         "state": {
-          "description": "The first value listed in the Enum marker becomes the \"zero\" value, and it would be great if \"Pending\" could be the default value; but it's Important that the \"zero\" value be able to be shown as empty/omitted from display, and we really do want `kubectl get hosts` to say \"Pending\" in the \"STATE\" column, and not leave the column empty.",
           "enum": [
             "Initial",
             "Pending",

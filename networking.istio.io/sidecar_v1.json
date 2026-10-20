@@ -82,6 +82,33 @@
                   "format": "int32",
                   "type": "integer"
                 },
+                "http2KeepAlive": {
+                  "description": "Configure HTTP/2 PING frames for upstream connections.",
+                  "properties": {
+                    "interval": {
+                      "description": "Send HTTP/2 PING frames at this interval.",
+                      "type": "string",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must be a valid duration greater than 1ms",
+                          "rule": "duration(self) >= duration('1ms')"
+                        }
+                      ]
+                    },
+                    "timeout": {
+                      "description": "How long to wait for a response to an HTTP/2 PING frame before closing the connection.",
+                      "type": "string",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must be a valid duration greater than 1ms",
+                          "rule": "duration(self) >= duration('1ms')"
+                        }
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "http2MaxRequests": {
                   "description": "Maximum number of active requests to a destination.",
                   "format": "int32",
@@ -230,6 +257,33 @@
                         "format": "int32",
                         "type": "integer"
                       },
+                      "http2KeepAlive": {
+                        "description": "Configure HTTP/2 PING frames for upstream connections.",
+                        "properties": {
+                          "interval": {
+                            "description": "Send HTTP/2 PING frames at this interval.",
+                            "type": "string",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "must be a valid duration greater than 1ms",
+                                "rule": "duration(self) >= duration('1ms')"
+                              }
+                            ]
+                          },
+                          "timeout": {
+                            "description": "How long to wait for a response to an HTTP/2 PING frame before closing the connection.",
+                            "type": "string",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "must be a valid duration greater than 1ms",
+                                "rule": "duration(self) >= duration('1ms')"
+                              }
+                            ]
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
                       "http2MaxRequests": {
                         "description": "Maximum number of active requests to a destination.",
                         "format": "int32",
@@ -374,6 +428,10 @@
               "tls": {
                 "description": "Set of TLS related options that will enable TLS termination on the sidecar for requests originating from outside the mesh.",
                 "properties": {
+                  "caCertCredentialName": {
+                    "description": "For mutual TLS, the name of the secret or the configmap that holds CA certificates.",
+                    "type": "string"
+                  },
                   "caCertificates": {
                     "description": "REQUIRED if mode is `MUTUAL` or `OPTIONAL_MUTUAL`.",
                     "type": "string"
@@ -393,8 +451,22 @@
                     "description": "For gateways running on Kubernetes, the name of the secret that holds the TLS certs including the CA certificates.",
                     "type": "string"
                   },
+                  "credentialNames": {
+                    "description": "Same as CredentialName but for multiple certificates.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 2,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "httpsRedirect": {
                     "description": "If set to true, the load balancer will send a 301 redirect for all http connections, asking the clients to use HTTPS.",
+                    "type": "boolean"
+                  },
+                  "insecureSkipVerify": {
+                    "description": "Optional: If set to true, the proxy will try to validate the certificate, but even if the validation fails, it will allow the connection through.",
+                    "nullable": true,
                     "type": "boolean"
                   },
                   "maxProtocolVersion": {
@@ -446,6 +518,29 @@
                     },
                     "type": "array"
                   },
+                  "tlsCertificates": {
+                    "description": "Only one of `server_certificate`, `private_key` or `credential_name` or `credential_names` or `tls_certificates` should be specified.",
+                    "items": {
+                      "properties": {
+                        "caCertificates": {
+                          "type": "string"
+                        },
+                        "privateKey": {
+                          "description": "REQUIRED if mode is `SIMPLE` or `MUTUAL`.",
+                          "type": "string"
+                        },
+                        "serverCertificate": {
+                          "description": "REQUIRED if mode is `SIMPLE` or `MUTUAL`.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "maxItems": 2,
+                    "minItems": 1,
+                    "type": "array"
+                  },
                   "verifyCertificateHash": {
                     "description": "An optional list of hex-encoded SHA-256 hashes of the authorized client certificates.",
                     "items": {
@@ -462,6 +557,20 @@
                   }
                 },
                 "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "only one of credentialNames or tlsCertificates can be set",
+                    "rule": "(has(self.tlsCertificates) ? 1 : 0) + (has(self.credentialNames) ? 1 : 0) <= 1"
+                  },
+                  {
+                    "message": "only one of credentialName or credentialNames can be set",
+                    "rule": "(has(self.credentialName) ? 1 : 0) + (has(self.credentialNames) ? 1 : 0) <= 1"
+                  },
+                  {
+                    "message": "only one of credentialName or tlsCertificates can be set",
+                    "rule": "(has(self.credentialNames) ? 1 : 0) + (has(self.tlsCertificates) ? 1 : 0) <= 1"
+                  }
+                ],
                 "additionalProperties": false
               }
             },

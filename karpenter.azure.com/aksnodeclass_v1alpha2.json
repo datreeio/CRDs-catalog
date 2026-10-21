@@ -13,22 +13,77 @@
       "type": "object"
     },
     "spec": {
-      "description": "AKSNodeClassSpec is the top level specification for the AKS Karpenter Provider.\nThis will contain configuration necessary to launch instances in AKS.",
+      "description": "spec is the top level specification for the AKS Karpenter Provider.\nThis will contain configuration necessary to launch instances in AKS.",
       "properties": {
-        "imageFamily": {
-          "default": "Ubuntu2204",
-          "description": "ImageFamily is the image family that instances use.",
+        "artifactStreaming": {
+          "description": "artifactStreaming configures artifact streaming for provisioned nodes.\nArtifact streaming allows container images to be streamed on demand to nodes rather than fully downloaded before starting.",
+          "properties": {
+            "enabled": {
+              "description": "enabled controls the artifact streaming mode. Artifact streaming speeds up the cold-start of containers on a node through on-demand image loading. To use this feature, container images must also enable artifact streaming on ACR.\nIf not specified, defaults to false.",
+              "type": "boolean"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "capacityReservation": {
+          "description": "capacityReservation configures the Capacity Reservation Group that instances\nprovisioned by this NodeClass target.",
+          "properties": {
+            "groupID": {
+              "description": "groupID is the ARM resource ID of the Capacity Reservation Group.\nThe group must be in the same subscription and region as the cluster, and\nmust be of the Targeted reservation type. When set, every instance from\nthis NodeClass targets the reservation group. Azure may allocate instances beyond the\nreserved quantity, in which case the excess is ordinary On-Demand capacity\nthat is not covered by the capacity reservation SLA.",
+              "pattern": "(?i)^\\/subscriptions\\/[^\\/]+\\/resourceGroups\\/[a-zA-Z0-9_\\-().]{0,89}[a-zA-Z0-9_\\-()]\\/providers\\/Microsoft\\.Compute\\/capacityReservationGroups\\/[^\\/]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "groupID"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "fipsMode": {
+          "description": "fipsMode controls FIPS compliance for the provisioned nodes",
           "enum": [
+            "FIPS",
+            "Disabled"
+          ],
+          "type": "string"
+        },
+        "gpu": {
+          "description": "gpu contains configuration for GPU-enabled nodes.",
+          "properties": {
+            "mode": {
+              "default": "Driver",
+              "description": "mode controls GPU driver management on GPU-enabled nodes.\nWhen set to Driver (or not specified), GPU drivers are installed by AKS\nand only GPU SKUs with managed driver installation support are considered for scheduling.\nCurrently, only NVIDIA GPUs support managed driver installation.\nWhen set to None, GPU driver installation is skipped \u2014 use this when\nmanaging GPU drivers via a GPU Operator or other external mechanism.\nAll GPU SKUs are available for scheduling in this mode.\nThis field is ignored for non-GPU VM sizes.",
+              "enum": [
+                "Driver",
+                "None"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "imageFamily": {
+          "default": "Ubuntu",
+          "description": "imageFamily is the image family that instances use.\nAzureContainerLinux requires an AKS Machine API provision mode with shared image gallery (SIG) access.\nWindows node support for the Windows2022 and Windows2025 image families is in preview and\nisn't meant for production. Support is best effort, and changes to APIs or behavior may result\nin unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+          "enum": [
+            "Ubuntu",
             "Ubuntu2204",
-            "AzureLinux"
+            "Ubuntu2404",
+            "AzureLinux",
+            "Windows2022",
+            "Windows2025",
+            "AzureContainerLinux"
           ],
           "type": "string"
         },
         "kubelet": {
-          "description": "Kubelet defines args to be used when configuring kubelet on provisioned nodes.\nThey are a subset of the upstream types, recognizing not all options may be supported.\nWherever possible, the types and names should reflect the upstream kubelet types.",
+          "description": "kubelet defines args to be used when configuring kubelet on provisioned nodes.\nThey are a subset of the upstream types, recognizing not all options may be supported.\nWherever possible, the types and names should reflect the upstream kubelet types.",
           "properties": {
             "allowedUnsafeSysctls": {
-              "description": "A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in `*`).\nUnsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`,\nand `net.*`. For example: \"`kernel.msg*,net.ipv4.route.min_pmtu`\"\nDefault: []",
+              "description": "allowedUnsafeSysctls is a comma separated whitelist of unsafe sysctls or sysctl patterns (ending in `*`).\nUnsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`,\nand `net.*`. For example: \"`kernel.msg*,net.ipv4.route.min_pmtu`\"",
               "items": {
                 "type": "string"
               },
@@ -36,25 +91,25 @@
             },
             "containerLogMaxFiles": {
               "default": 5,
-              "description": "containerLogMaxFiles specifies the maximum number of container log files that can be present for a container.\nDefault: 5",
+              "description": "containerLogMaxFiles specifies the maximum number of container log files that can be present for a container.",
               "format": "int32",
               "minimum": 2,
               "type": "integer"
             },
             "containerLogMaxSize": {
               "default": "50Mi",
-              "description": "containerLogMaxSize is a quantity defining the maximum size of the container log\nfile before it is rotated. For example: \"5Mi\" or \"256Ki\".\nDefault: \"10Mi\"\nAKS CustomKubeletConfig has containerLogMaxSizeMB (with units), defaults to 50",
+              "description": "containerLogMaxSize is a quantity defining the maximum size of the container log\nfile before it is rotated. For example: \"5Mi\" or \"256Ki\".\nAKS CustomKubeletConfig has containerLogMaxSizeMB (with units), defaults to 50",
               "pattern": "^\\d+(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$",
               "type": "string"
             },
             "cpuCFSQuota": {
               "default": true,
-              "description": "CPUCFSQuota enables CPU CFS quota enforcement for containers that specify CPU limits.\nNote: AKS CustomKubeletConfig uses cpuCfsQuota (camelCase)",
+              "description": "cpuCFSQuota enables CPU CFS quota enforcement for containers that specify CPU limits.\nNote: AKS CustomKubeletConfig uses cpuCfsQuota (camelCase)",
               "type": "boolean"
             },
             "cpuCFSQuotaPeriod": {
               "default": "100ms",
-              "description": "cpuCfsQuotaPeriod sets the CPU CFS quota period value, `cpu.cfs_period_us`.\nThe value must be between 1 ms and 1 second, inclusive.\nDefault: \"100ms\"",
+              "description": "cpuCFSQuotaPeriod sets the CPU CFS quota period value, `cpu.cfs_period_us`.\nThe value must be between 1 ms and 1 second, inclusive.",
               "type": "string"
             },
             "cpuManagerPolicy": {
@@ -66,19 +121,137 @@
               ],
               "type": "string"
             },
+            "evictionHard": {
+              "description": "evictionHard configures hard eviction thresholds and overrides Karpenter's computed defaults per field.\nKubelet configuration overrides are in preview and aren't meant for production. Support is best effort,\nand changes to APIs or behavior may result in unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+              "properties": {
+                "memoryAvailable": {
+                  "description": "memoryAvailable is the available-memory threshold as an integer Ki, Mi, or Gi quantity or percentage of total node memory capacity.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+(Ki|Mi|Gi)|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                },
+                "nodeFsAvailable": {
+                  "description": "nodeFsAvailable is the available-node-filesystem threshold as an integer Ki, Mi, or Gi quantity or percentage of total node filesystem capacity.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+(Ki|Mi|Gi)|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                },
+                "nodeFsInodesFree": {
+                  "description": "nodeFsInodesFree is the free-inodes threshold as an integer count or percentage of total node filesystem inodes.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "evictionMaxPodGracePeriod": {
+              "description": "evictionMaxPodGracePeriod is the maximum grace period (in seconds) kubelet honors when terminating pods for soft eviction.\nKubelet configuration overrides are in preview and aren't meant for production. Support is best effort,\nand changes to APIs or behavior may result in unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "evictionSoft": {
+              "description": "evictionSoft configures soft eviction thresholds and overrides Karpenter's computed defaults per field.\nEach configured threshold must have a matching field in evictionSoftGracePeriod.\nKubelet configuration overrides are in preview and aren't meant for production. Support is best effort,\nand changes to APIs or behavior may result in unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+              "properties": {
+                "memoryAvailable": {
+                  "description": "memoryAvailable is the available-memory threshold as an integer Ki, Mi, or Gi quantity or percentage of total node memory capacity.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+(Ki|Mi|Gi)|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                },
+                "nodeFsAvailable": {
+                  "description": "nodeFsAvailable is the available-node-filesystem threshold as an integer Ki, Mi, or Gi quantity or percentage of total node filesystem capacity.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+(Ki|Mi|Gi)|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                },
+                "nodeFsInodesFree": {
+                  "description": "nodeFsInodesFree is the free-inodes threshold as an integer count or percentage of total node filesystem inodes.",
+                  "maxLength": 20,
+                  "pattern": "^([0-9]+|([0-9]|[1-9][0-9]|100)%)$",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "evictionSoftGracePeriod": {
+              "description": "evictionSoftGracePeriod configures grace periods for soft eviction signals.\nEach configured grace period must have a matching field in evictionSoft.\nKubelet configuration overrides are in preview and aren't meant for production. Support is best effort,\nand changes to APIs or behavior may result in unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+              "properties": {
+                "memoryAvailable": {
+                  "description": "memoryAvailable is the grace period for the memoryAvailable signal.",
+                  "type": "string",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "memoryAvailable must be a valid duration of at least 30s",
+                      "rule": "duration(self) >= duration('30s')"
+                    }
+                  ]
+                },
+                "nodeFsAvailable": {
+                  "description": "nodeFsAvailable is the grace period for the nodeFsAvailable signal.",
+                  "type": "string",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "nodeFsAvailable must be a valid duration of at least 30s",
+                      "rule": "duration(self) >= duration('30s')"
+                    }
+                  ]
+                },
+                "nodeFsInodesFree": {
+                  "description": "nodeFsInodesFree is the grace period for the nodeFsInodesFree signal.",
+                  "type": "string",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "nodeFsInodesFree must be a valid duration of at least 30s",
+                      "rule": "duration(self) >= duration('30s')"
+                    }
+                  ]
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "failSwapOn": {
+              "description": "failSwapOn tells the kubelet to fail to start if swap is enabled on the node.\nMust be set to false to allow linuxOSConfig.swapFileSize to take effect.",
+              "type": "boolean"
+            },
             "imageGCHighThresholdPercent": {
-              "description": "ImageGCHighThresholdPercent is the percent of disk usage after which image\ngarbage collection is always run. The percent is calculated by dividing this\nfield value by 100, so this field must be between 0 and 100, inclusive.\nWhen specified, the value must be greater than ImageGCLowThresholdPercent.\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
+              "description": "imageGCHighThresholdPercent is the percent of disk usage after which image\ngarbage collection is always run. The percent is calculated by dividing this\nfield value by 100, so this field must be between 0 and 100, inclusive.\nWhen specified, the value must be greater than ImageGCLowThresholdPercent.\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
               "format": "int32",
               "maximum": 100,
               "minimum": 0,
               "type": "integer"
             },
             "imageGCLowThresholdPercent": {
-              "description": "ImageGCLowThresholdPercent is the percent of disk usage before which image\ngarbage collection is never run. Lowest disk usage to garbage collect to.\nThe percent is calculated by dividing this field value by 100,\nso the field value must be between 0 and 100, inclusive.\nWhen specified, the value must be less than imageGCHighThresholdPercent\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
+              "description": "imageGCLowThresholdPercent is the percent of disk usage before which image\ngarbage collection is never run. Lowest disk usage to garbage collect to.\nThe percent is calculated by dividing this field value by 100,\nso the field value must be between 0 and 100, inclusive.\nWhen specified, the value must be less than imageGCHighThresholdPercent\nNote: AKS CustomKubeletConfig does not have \"Percent\" in the field name",
               "format": "int32",
               "maximum": 100,
               "minimum": 0,
               "type": "integer"
+            },
+            "kubeReserved": {
+              "description": "kubeReserved configures resources reserved for Kubernetes system daemons and overrides Karpenter's computed defaults per field.\nKubelet configuration overrides are in preview and aren't meant for production. Support is best effort,\nand changes to APIs or behavior may result in unstable clusters or downtime. For details, see\nhttps://learn.microsoft.com/azure/aks/support-policies#preview-features-or-feature-flags.",
+              "properties": {
+                "cpuMillicores": {
+                  "description": "cpuMillicores is the CPU reservation in millicores.",
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "memoryMB": {
+                  "description": "memoryMB is the memory reservation in MiB.",
+                  "format": "int32",
+                  "maximum": 2147483647,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             },
             "podPidsLimit": {
               "description": "podPidsLimit is the maximum number of PIDs in any pod.\nAKS CustomKubeletConfig uses PodMaxPids, int32 (!)\nDefault: -1",
@@ -102,45 +275,852 @@
             {
               "message": "imageGCHighThresholdPercent must be greater than imageGCLowThresholdPercent",
               "rule": "has(self.imageGCHighThresholdPercent) && has(self.imageGCLowThresholdPercent) ?  self.imageGCHighThresholdPercent > self.imageGCLowThresholdPercent  : true"
+            },
+            {
+              "message": "evictionSoft.memoryAvailable and evictionSoftGracePeriod.memoryAvailable must be configured together",
+              "rule": "has(self.evictionSoft) && has(self.evictionSoft.memoryAvailable) ? has(self.evictionSoftGracePeriod) && has(self.evictionSoftGracePeriod.memoryAvailable) : !has(self.evictionSoftGracePeriod) || !has(self.evictionSoftGracePeriod.memoryAvailable)"
+            },
+            {
+              "message": "evictionSoft.nodeFsAvailable and evictionSoftGracePeriod.nodeFsAvailable must be configured together",
+              "rule": "has(self.evictionSoft) && has(self.evictionSoft.nodeFsAvailable) ? has(self.evictionSoftGracePeriod) && has(self.evictionSoftGracePeriod.nodeFsAvailable) : !has(self.evictionSoftGracePeriod) || !has(self.evictionSoftGracePeriod.nodeFsAvailable)"
+            },
+            {
+              "message": "evictionSoft.nodeFsInodesFree and evictionSoftGracePeriod.nodeFsInodesFree must be configured together",
+              "rule": "has(self.evictionSoft) && has(self.evictionSoft.nodeFsInodesFree) ? has(self.evictionSoftGracePeriod) && has(self.evictionSoftGracePeriod.nodeFsInodesFree) : !has(self.evictionSoftGracePeriod) || !has(self.evictionSoftGracePeriod.nodeFsInodesFree)"
             }
           ],
           "additionalProperties": false
         },
+        "linuxOSConfig": {
+          "description": "linuxOSConfig specifies OS settings for Linux agent nodes.\nThese map to the AKS Custom Linux OS Configuration feature.\nFor more information, see:\nhttps://learn.microsoft.com/en-us/azure/aks/custom-node-configuration",
+          "properties": {
+            "swapFileSize": {
+              "description": "swapFileSize specifies the size of a swap file that will be created on each node.\nFor example: \"1500Mi\" or \"2Gi\".\nThe value will be rounded to the nearest megabyte due to system limitations.",
+              "pattern": "^\\d+(E|P|T|G|M|K|Ei|Pi|Ti|Gi|Mi|Ki)$",
+              "type": "string"
+            },
+            "sysctls": {
+              "description": "sysctls specifies sysctl settings for Linux agent nodes.",
+              "properties": {
+                "fsAioMaxNr": {
+                  "description": "fsAioMaxNr specifies the maximum number of AIO (Asynchronous I/O) requests.\nMaps to fs.aio-max-nr.",
+                  "format": "int32",
+                  "maximum": 6553500,
+                  "minimum": 65536,
+                  "type": "integer"
+                },
+                "fsFileMax": {
+                  "description": "fsFileMax specifies the maximum number of file handles the kernel will allocate.\nMaps to fs.file-max.",
+                  "format": "int32",
+                  "maximum": 12000500,
+                  "minimum": 8192,
+                  "type": "integer"
+                },
+                "fsInotifyMaxUserWatches": {
+                  "description": "fsInotifyMaxUserWatches specifies the maximum number of inotify watches per user.\nMaps to fs.inotify.max_user_watches.",
+                  "format": "int32",
+                  "maximum": 2097152,
+                  "minimum": 781250,
+                  "type": "integer"
+                },
+                "fsNrOpen": {
+                  "description": "fsNrOpen specifies the maximum number of file handles that can be allocated.\nMaps to fs.nr_open.",
+                  "format": "int32",
+                  "maximum": 20000500,
+                  "minimum": 8192,
+                  "type": "integer"
+                },
+                "kernelThreadsMax": {
+                  "description": "kernelThreadsMax specifies the maximum number of threads that can be created.\nMaps to kernel.threads-max.",
+                  "format": "int32",
+                  "maximum": 513785,
+                  "minimum": 20,
+                  "type": "integer"
+                },
+                "netCoreNetdevMaxBacklog": {
+                  "description": "netCoreNetdevMaxBacklog specifies the maximum number of packets queued on the INPUT side.\nMaps to net.core.netdev_max_backlog.",
+                  "format": "int32",
+                  "maximum": 3240000,
+                  "minimum": 1000,
+                  "type": "integer"
+                },
+                "netCoreOptmemMax": {
+                  "description": "netCoreOptmemMax specifies the maximum ancillary buffer size (option memory buffer) allowed per socket.\nMaps to net.core.optmem_max.",
+                  "format": "int32",
+                  "maximum": 4194304,
+                  "minimum": 20480,
+                  "type": "integer"
+                },
+                "netCoreRmemDefault": {
+                  "description": "netCoreRmemDefault specifies the default receive socket buffer size in bytes.\nMaps to net.core.rmem_default.",
+                  "format": "int32",
+                  "maximum": 134217728,
+                  "minimum": 212992,
+                  "type": "integer"
+                },
+                "netCoreRmemMax": {
+                  "description": "netCoreRmemMax specifies the maximum receive socket buffer size in bytes.\nMaps to net.core.rmem_max.",
+                  "format": "int32",
+                  "maximum": 134217728,
+                  "minimum": 212992,
+                  "type": "integer"
+                },
+                "netCoreSomaxconn": {
+                  "description": "netCoreSomaxconn specifies the maximum number of connection requests that can be queued for any given listening socket.\nMaps to net.core.somaxconn.",
+                  "format": "int32",
+                  "maximum": 3240000,
+                  "minimum": 4096,
+                  "type": "integer"
+                },
+                "netCoreWmemDefault": {
+                  "description": "netCoreWmemDefault specifies the default send socket buffer size in bytes.\nMaps to net.core.wmem_default.",
+                  "format": "int32",
+                  "maximum": 134217728,
+                  "minimum": 212992,
+                  "type": "integer"
+                },
+                "netCoreWmemMax": {
+                  "description": "netCoreWmemMax specifies the maximum send socket buffer size in bytes.\nMaps to net.core.wmem_max.",
+                  "format": "int32",
+                  "maximum": 134217728,
+                  "minimum": 212992,
+                  "type": "integer"
+                },
+                "netIPv4IPLocalPortRange": {
+                  "description": "netIPv4IPLocalPortRange specifies the local port range that is used by TCP and UDP traffic.\nMust be in the format \"first last\", where first is in the range 1024-60999 and last is in the range 32768-65535.\nMaps to net.ipv4.ip_local_port_range.",
+                  "pattern": "^\\d+ \\d+$",
+                  "type": "string"
+                },
+                "netIPv4NeighDefaultGcThresh1": {
+                  "description": "netIPv4NeighDefaultGcThresh1 specifies the minimum number of entries that may be in the ARP cache.\nMaps to net.ipv4.neigh.default.gc_thresh1.",
+                  "format": "int32",
+                  "maximum": 80000,
+                  "minimum": 128,
+                  "type": "integer"
+                },
+                "netIPv4NeighDefaultGcThresh2": {
+                  "description": "netIPv4NeighDefaultGcThresh2 specifies the soft maximum number of entries that may be in the ARP cache.\nMaps to net.ipv4.neigh.default.gc_thresh2.",
+                  "format": "int32",
+                  "maximum": 90000,
+                  "minimum": 512,
+                  "type": "integer"
+                },
+                "netIPv4NeighDefaultGcThresh3": {
+                  "description": "netIPv4NeighDefaultGcThresh3 specifies the hard maximum number of entries in the ARP cache.\nMaps to net.ipv4.neigh.default.gc_thresh3.",
+                  "format": "int32",
+                  "maximum": 100000,
+                  "minimum": 1024,
+                  "type": "integer"
+                },
+                "netIPv4TCPFinTimeout": {
+                  "description": "netIPv4TCPFinTimeout specifies the length of time an orphaned connection will remain in the FIN_WAIT_2 state before being aborted.\nMaps to net.ipv4.tcp_fin_timeout.",
+                  "format": "int32",
+                  "maximum": 120,
+                  "minimum": 5,
+                  "type": "integer"
+                },
+                "netIPv4TCPKeepaliveIntvl": {
+                  "description": "netIPv4TCPKeepaliveIntvl specifies the frequency of the probes sent out. Measured in seconds.\nMaps to net.ipv4.tcp_keepalive_intvl.",
+                  "format": "int32",
+                  "maximum": 90,
+                  "minimum": 10,
+                  "type": "integer"
+                },
+                "netIPv4TCPKeepaliveProbes": {
+                  "description": "netIPv4TCPKeepaliveProbes specifies the number of keepalive probes TCP sends out until it decides a connection is broken.\nMaps to net.ipv4.tcp_keepalive_probes.",
+                  "format": "int32",
+                  "maximum": 15,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "netIPv4TCPKeepaliveTime": {
+                  "description": "netIPv4TCPKeepaliveTime specifies the rate at which TCP sends keepalive probes. Measured in seconds.\nMaps to net.ipv4.tcp_keepalive_time.",
+                  "format": "int32",
+                  "maximum": 432000,
+                  "minimum": 30,
+                  "type": "integer"
+                },
+                "netIPv4TCPMaxSynBacklog": {
+                  "description": "netIPv4TCPMaxSynBacklog specifies the maximum number of queued connection requests that have still not received\nan acknowledgment from the connecting client. If this number is exceeded, the kernel will begin dropping requests.\nMaps to net.ipv4.tcp_max_syn_backlog.",
+                  "format": "int32",
+                  "maximum": 3240000,
+                  "minimum": 128,
+                  "type": "integer"
+                },
+                "netIPv4TCPMaxTwBuckets": {
+                  "description": "netIPv4TCPMaxTwBuckets specifies the maximum number of sockets in TIME_WAIT state.\nMaps to net.ipv4.tcp_max_tw_buckets.",
+                  "format": "int32",
+                  "maximum": 1440000,
+                  "minimum": 8000,
+                  "type": "integer"
+                },
+                "netIPv4TCPTwReuse": {
+                  "description": "netIPv4TCPTwReuse enables/disables reuse of TIME_WAIT sockets for new connections.\nMaps to net.ipv4.tcp_tw_reuse.",
+                  "type": "boolean"
+                },
+                "netNetfilterNfConntrackBuckets": {
+                  "description": "netNetfilterNfConntrackBuckets specifies the size of the hash table used by nf_conntrack module.\nMaps to net.netfilter.nf_conntrack_buckets.",
+                  "format": "int32",
+                  "maximum": 524288,
+                  "minimum": 65536,
+                  "type": "integer"
+                },
+                "netNetfilterNfConntrackMax": {
+                  "description": "netNetfilterNfConntrackMax specifies the maximum number of connections tracked by the nf_conntrack module.\nMaps to net.netfilter.nf_conntrack_max.",
+                  "format": "int32",
+                  "maximum": 2097152,
+                  "minimum": 131072,
+                  "type": "integer"
+                },
+                "vmMaxMapCount": {
+                  "description": "vmMaxMapCount specifies the maximum number of memory map areas a process may have.\nMaps to vm.max_map_count.",
+                  "format": "int32",
+                  "maximum": 262144,
+                  "minimum": 65530,
+                  "type": "integer"
+                },
+                "vmSwappiness": {
+                  "description": "vmSwappiness specifies the kernel's tendency to swap memory pages. Higher values increase aggressiveness, lower values decrease it.\nMaps to vm.swappiness.",
+                  "format": "int32",
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "vmVfsCachePressure": {
+                  "description": "vmVfsCachePressure specifies the tendency of the kernel to reclaim the memory which is used for caching of directory and inode objects.\nMaps to vm.vfs_cache_pressure.",
+                  "format": "int32",
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "netCoreRmemDefault must be <= netCoreRmemMax",
+                  "rule": "has(self.netCoreRmemDefault) && has(self.netCoreRmemMax) ? self.netCoreRmemDefault <= self.netCoreRmemMax : true"
+                },
+                {
+                  "message": "netCoreWmemDefault must be <= netCoreWmemMax",
+                  "rule": "has(self.netCoreWmemDefault) && has(self.netCoreWmemMax) ? self.netCoreWmemDefault <= self.netCoreWmemMax : true"
+                },
+                {
+                  "message": "netIPv4NeighDefaultGcThresh1 must be <= netIPv4NeighDefaultGcThresh2",
+                  "rule": "has(self.netIPv4NeighDefaultGcThresh1) && has(self.netIPv4NeighDefaultGcThresh2) ? self.netIPv4NeighDefaultGcThresh1 <= self.netIPv4NeighDefaultGcThresh2 : true"
+                },
+                {
+                  "message": "netIPv4NeighDefaultGcThresh2 must be <= netIPv4NeighDefaultGcThresh3",
+                  "rule": "has(self.netIPv4NeighDefaultGcThresh2) && has(self.netIPv4NeighDefaultGcThresh3) ? self.netIPv4NeighDefaultGcThresh2 <= self.netIPv4NeighDefaultGcThresh3 : true"
+                },
+                {
+                  "message": "netIPv4IPLocalPortRange first port must be in [1024, 60999]",
+                  "rule": "!has(self.netIPv4IPLocalPortRange) || (int(self.netIPv4IPLocalPortRange.split(' ')[0]) >= 1024 && int(self.netIPv4IPLocalPortRange.split(' ')[0]) <= 60999)"
+                },
+                {
+                  "message": "netIPv4IPLocalPortRange last port must be in [32768, 65535]",
+                  "rule": "!has(self.netIPv4IPLocalPortRange) || (int(self.netIPv4IPLocalPortRange.split(' ')[1]) >= 32768 && int(self.netIPv4IPLocalPortRange.split(' ')[1]) <= 65535)"
+                },
+                {
+                  "message": "netIPv4IPLocalPortRange first port must be <= last port",
+                  "rule": "!has(self.netIPv4IPLocalPortRange) || int(self.netIPv4IPLocalPortRange.split(' ')[0]) <= int(self.netIPv4IPLocalPortRange.split(' ')[1])"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "transparentHugePageDefrag": {
+              "description": "transparentHugePageDefrag sets the kernel's transparent_hugepage/defrag behavior.\nMaps to /sys/kernel/mm/transparent_hugepage/defrag.",
+              "enum": [
+                "always",
+                "defer",
+                "defer+madvise",
+                "madvise",
+                "never"
+              ],
+              "type": "string"
+            },
+            "transparentHugePageEnabled": {
+              "description": "transparentHugePageEnabled sets the kernel's transparent_hugepage/enabled behavior.\nMaps to /sys/kernel/mm/transparent_hugepage/enabled.",
+              "enum": [
+                "always",
+                "madvise",
+                "never"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "localDNS": {
+          "description": "localDNS configures the per-node local DNS, with VnetDNS and KubeDNS overrides.\nLocalDNS helps improve performance and reliability of DNS resolution in an AKS cluster.\nFor more details see aka.ms/aks/localdns.",
+          "properties": {
+            "kubeDNSOverrides": {
+              "description": "kubeDNSOverrides apply to DNS traffic from pods with dnsPolicy:ClusterFirst (referred to as KubeDNS traffic).",
+              "items": {
+                "description": "LocalDNSZoneOverride specifies DNS override configuration for a specific zone",
+                "properties": {
+                  "cacheDuration": {
+                    "description": "Cache max TTL. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "pattern": "^([0-9]+(s|m|h))+$",
+                    "type": "string"
+                  },
+                  "forwardDestination": {
+                    "description": "forwardDestination is the destination server for DNS queries to be forwarded from localDNS.",
+                    "enum": [
+                      "ClusterCoreDNS",
+                      "VnetDNS"
+                    ],
+                    "type": "string"
+                  },
+                  "forwardPolicy": {
+                    "description": "forwardPolicy is the forward policy for selecting upstream DNS server. See [forward plugin](https://coredns.io/plugins/forward) for more information.",
+                    "enum": [
+                      "Sequential",
+                      "RoundRobin",
+                      "Random"
+                    ],
+                    "type": "string"
+                  },
+                  "maxConcurrent": {
+                    "description": "maxConcurrent is the maximum number of concurrent queries. See [forward plugin](https://coredns.io/plugins/forward) for more information.",
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "protocol": {
+                    "description": "protocol enforces TCP or prefers UDP protocol for connections from localDNS to upstream DNS server.",
+                    "enum": [
+                      "PreferUDP",
+                      "ForceTCP"
+                    ],
+                    "type": "string"
+                  },
+                  "queryLogging": {
+                    "description": "queryLogging is the log level for DNS queries in localDNS.",
+                    "enum": [
+                      "Error",
+                      "Log"
+                    ],
+                    "type": "string"
+                  },
+                  "serveStale": {
+                    "description": "serveStale is the policy for serving stale data. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "enum": [
+                      "Verify",
+                      "Immediate",
+                      "Disable"
+                    ],
+                    "type": "string"
+                  },
+                  "serveStaleDuration": {
+                    "description": "Serve stale duration. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "pattern": "^([0-9]+(s|m|h))+$",
+                    "type": "string"
+                  },
+                  "zone": {
+                    "description": "zone is the DNS zone this override applies to (e.g., \".\", \"cluster.local\").",
+                    "maxLength": 254,
+                    "minLength": 1,
+                    "pattern": "^(\\.|[A-Za-z0-9]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?)*\\.?)$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "cacheDuration",
+                  "forwardDestination",
+                  "forwardPolicy",
+                  "maxConcurrent",
+                  "protocol",
+                  "queryLogging",
+                  "serveStale",
+                  "serveStaleDuration",
+                  "zone"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "'cluster.local' cannot be forwarded to VnetDNS",
+                    "rule": "!(self.zone.endsWith('cluster.local') && self.forwardDestination == 'VnetDNS')"
+                  },
+                  {
+                    "message": "serveStale Verify cannot be used with protocol ForceTCP",
+                    "rule": "!(self.serveStale == 'Verify' && self.protocol == 'ForceTCP')"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 100,
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "zone"
+              ],
+              "x-kubernetes-list-type": "map",
+              "x-kubernetes-validations": [
+                {
+                  "message": "must contain required zones '.' and 'cluster.local'",
+                  "rule": "['.', 'cluster.local'].all(z, self.exists(x, x.zone == z))"
+                }
+              ]
+            },
+            "mode": {
+              "description": "mode of enablement for localDNS.",
+              "enum": [
+                "Preferred",
+                "Required",
+                "Disabled"
+              ],
+              "type": "string"
+            },
+            "vnetDNSOverrides": {
+              "description": "vnetDNSOverrides apply to DNS traffic from pods with dnsPolicy:default or kubelet (referred to as VnetDNS traffic).",
+              "items": {
+                "description": "LocalDNSZoneOverride specifies DNS override configuration for a specific zone",
+                "properties": {
+                  "cacheDuration": {
+                    "description": "Cache max TTL. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "pattern": "^([0-9]+(s|m|h))+$",
+                    "type": "string"
+                  },
+                  "forwardDestination": {
+                    "description": "forwardDestination is the destination server for DNS queries to be forwarded from localDNS.",
+                    "enum": [
+                      "ClusterCoreDNS",
+                      "VnetDNS"
+                    ],
+                    "type": "string"
+                  },
+                  "forwardPolicy": {
+                    "description": "forwardPolicy is the forward policy for selecting upstream DNS server. See [forward plugin](https://coredns.io/plugins/forward) for more information.",
+                    "enum": [
+                      "Sequential",
+                      "RoundRobin",
+                      "Random"
+                    ],
+                    "type": "string"
+                  },
+                  "maxConcurrent": {
+                    "description": "maxConcurrent is the maximum number of concurrent queries. See [forward plugin](https://coredns.io/plugins/forward) for more information.",
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "protocol": {
+                    "description": "protocol enforces TCP or prefers UDP protocol for connections from localDNS to upstream DNS server.",
+                    "enum": [
+                      "PreferUDP",
+                      "ForceTCP"
+                    ],
+                    "type": "string"
+                  },
+                  "queryLogging": {
+                    "description": "queryLogging is the log level for DNS queries in localDNS.",
+                    "enum": [
+                      "Error",
+                      "Log"
+                    ],
+                    "type": "string"
+                  },
+                  "serveStale": {
+                    "description": "serveStale is the policy for serving stale data. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "enum": [
+                      "Verify",
+                      "Immediate",
+                      "Disable"
+                    ],
+                    "type": "string"
+                  },
+                  "serveStaleDuration": {
+                    "description": "Serve stale duration. See [cache plugin](https://coredns.io/plugins/cache) for more information.",
+                    "pattern": "^([0-9]+(s|m|h))+$",
+                    "type": "string"
+                  },
+                  "zone": {
+                    "description": "zone is the DNS zone this override applies to (e.g., \".\", \"cluster.local\").",
+                    "maxLength": 254,
+                    "minLength": 1,
+                    "pattern": "^(\\.|[A-Za-z0-9]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9_-]{0,61}[A-Za-z0-9])?)*\\.?)$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "cacheDuration",
+                  "forwardDestination",
+                  "forwardPolicy",
+                  "maxConcurrent",
+                  "protocol",
+                  "queryLogging",
+                  "serveStale",
+                  "serveStaleDuration",
+                  "zone"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "'cluster.local' cannot be forwarded to VnetDNS",
+                    "rule": "!(self.zone.endsWith('cluster.local') && self.forwardDestination == 'VnetDNS')"
+                  },
+                  {
+                    "message": "serveStale Verify cannot be used with protocol ForceTCP",
+                    "rule": "!(self.serveStale == 'Verify' && self.protocol == 'ForceTCP')"
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 100,
+              "type": "array",
+              "x-kubernetes-list-map-keys": [
+                "zone"
+              ],
+              "x-kubernetes-list-type": "map",
+              "x-kubernetes-validations": [
+                {
+                  "message": "must contain required zones '.' and 'cluster.local'",
+                  "rule": "['.', 'cluster.local'].all(z, self.exists(x, x.zone == z))"
+                },
+                {
+                  "message": "root zone '.' cannot be forwarded to ClusterCoreDNS from vnetDNSOverrides",
+                  "rule": "!self.exists(x, x.zone == '.' && x.forwardDestination == 'ClusterCoreDNS')"
+                },
+                {
+                  "message": "external domains cannot be forwarded to ClusterCoreDNS from vnetDNSOverrides",
+                  "rule": "!self.exists(x, x.zone != '.' && !x.zone.endsWith('cluster.local') && x.forwardDestination == 'ClusterCoreDNS')"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kubeDNSOverrides",
+            "mode",
+            "vnetDNSOverrides"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "maxPods": {
-          "description": "MaxPods is an override for the maximum number of pods that can run on a worker node instance.\nSee minimum + maximum pods per node documentation: https://learn.microsoft.com/en-us/azure/aks/concepts-network-ip-address-planning#maximum-pods-per-node\nDefault behavior if this is not specified depends on the network plugin:\n  - If Network Plugin is Azure with \"\" (v1 or NodeSubnet), the default is 30.\n  - If Network Plugin is Azure with \"overlay\", the default is 250.\n  - If Network Plugin is None, the default is 250.\n  - Otherwise, the default is 110 (the usual Kubernetes default).",
+          "description": "maxPods is an override for the maximum number of pods that can run on a worker node instance.\nSee minimum + maximum pods per node documentation: https://learn.microsoft.com/en-us/azure/aks/concepts-network-ip-address-planning#maximum-pods-per-node\nDefault behavior if this is not specified depends on the network plugin:\n  - If Network Plugin is Azure with \"\" (v1 or NodeSubnet), the default is 30.\n  - If Network Plugin is Azure with \"overlay\", the default is 250.\n  - If Network Plugin is None, the default is 250.\n  - Otherwise, the default is 110 (the usual Kubernetes default).",
           "format": "int32",
           "maximum": 250,
           "minimum": 10,
           "type": "integer"
         },
+        "nodePublicIP": {
+          "description": "nodePublicIP configures an instance-level public IP address for each node\nprovisioned by this NodeClass.",
+          "properties": {
+            "enabled": {
+              "description": "enabled requests a dedicated public IP address for each node.\nIf omitted or false, nodes don't get a public IP address.\nNode public IP is supported only in the AKS Machine API provision modes\n(aksmachineapi and aksmachineapiheaderbatch). In other provision modes, setting\nenabled to true makes the NodeClass not ready, with the ValidationSucceeded\ncondition reporting the reason.",
+              "type": "boolean"
+            },
+            "ipTags": {
+              "description": "ipTags are the IP tags set on each node's public IP address, for example\n{ipTagType: RoutingPreference, tag: Internet}. They aren't Azure resource tags, and they\ncan't be changed on an existing address. Requires enabled to be true, and can't be\ncombined with prefixIDs.",
+              "items": {
+                "description": "IPTag is an IP tag on a public IP address.",
+                "properties": {
+                  "ipTagType": {
+                    "description": "ipTagType is the type of the IP tag, for example RoutingPreference.",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "tag": {
+                    "description": "tag is the value of the IP tag, for example Internet.",
+                    "maxLength": 256,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ipTagType",
+                  "tag"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "maxItems": 4,
+              "minItems": 1,
+              "type": "array",
+              "x-kubernetes-list-type": "atomic",
+              "x-kubernetes-validations": [
+                {
+                  "message": "nodePublicIP.ipTags entries must be unique",
+                  "rule": "self.all(t, self.exists_one(u, u.ipTagType == t.ipTagType && u.tag == t.tag))"
+                }
+              ]
+            },
+            "prefixIDs": {
+              "description": "prefixIDs are the ARM resource IDs of the public IP prefixes that node public IP\naddresses are allocated from. If omitted, each node gets a public IP address that\nisn't from a prefix. At most one prefix is supported, and it must be an IPv4 prefix\nin the cluster's subscription. Requires enabled to be true.\nA zonal prefix allocates addresses only for nodes in its zone; a zone-redundant\nprefix works for any node. Karpenter doesn't check this, so every NodePool using\na zonal prefix must restrict topology.kubernetes.io/zone to the prefix's zone.",
+              "items": {
+                "pattern": "(?i)^\\/subscriptions\\/[^\\/]+\\/resourceGroups\\/[a-zA-Z0-9_\\-().]{0,89}[a-zA-Z0-9_\\-()]\\/providers\\/Microsoft\\.Network\\/publicIPPrefixes\\/[^\\/]+$",
+                "type": "string"
+              },
+              "maxItems": 1,
+              "minItems": 1,
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "nodePublicIP.prefixIDs requires nodePublicIP.enabled to be true",
+              "rule": "!has(self.prefixIDs) || (has(self.enabled) && self.enabled)"
+            },
+            {
+              "message": "nodePublicIP.ipTags requires nodePublicIP.enabled to be true",
+              "rule": "!has(self.ipTags) || (has(self.enabled) && self.enabled)"
+            },
+            {
+              "message": "nodePublicIP.ipTags can't be combined with nodePublicIP.prefixIDs",
+              "rule": "!has(self.ipTags) || !has(self.prefixIDs)"
+            }
+          ],
+          "additionalProperties": false
+        },
         "osDiskSizeGB": {
-          "default": 128,
-          "description": "osDiskSizeGB is the size of the OS disk in GB.",
+          "description": "osDiskSizeGB is the size of the OS disk in GB.\nIf not specified, it is auto-sized per instance type: an ephemeral OS disk at the largest\nSKU-supported size (max 2040 GB) when possible, otherwise a managed OS disk sized by vCPU count.",
           "format": "int32",
+          "maximum": 2048,
           "minimum": 30,
           "type": "integer"
+        },
+        "osDiskType": {
+          "description": "osDiskType is the type of disk to use for the OS.\nIf unspecified, an ephemeral OS disk is used when the VM size supports an ephemeral OS disk\nof at least osDiskSizeGB, falling back to a managed disk otherwise. Managed always uses a managed disk.",
+          "enum": [
+            "Managed"
+          ],
+          "type": "string"
+        },
+        "security": {
+          "description": "security is a collection of security related karpenter fields",
+          "properties": {
+            "encryptionAtHost": {
+              "description": "encryptionAtHost specifies whether host-level encryption is enabled for provisioned nodes.\nFor more information, see:\nhttps://learn.microsoft.com/en-us/azure/aks/enable-host-encryption\nhttps://learn.microsoft.com/en-us/azure/virtual-machines/disk-encryption#encryption-at-host---end-to-end-encryption-for-your-vm-data",
+              "type": "boolean"
+            },
+            "trustedLaunch": {
+              "description": "trustedLaunch specifies Trusted Launch settings for provisioned nodes.",
+              "properties": {
+                "secureBoot": {
+                  "description": "secureBoot specifies whether Secure Boot should be enabled for provisioned nodes.\nAzureContainerLinux requires this field to be explicitly set to true.",
+                  "type": "boolean"
+                },
+                "vtpm": {
+                  "description": "vtpm specifies whether virtual TPM should be enabled for provisioned nodes.\nAzureContainerLinux requires this field to be explicitly set to true.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "tags": {
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Tags to be applied on Azure resources like instances.",
-          "type": "object"
+          "description": "tags to be applied on Azure resources like instances.",
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "tags keys must be less than 512 characters",
+              "rule": "self.all(k, size(k) <= 512)"
+            },
+            {
+              "message": "tags keys must not contain '<', '>', '%', '&', or '?'",
+              "rule": "self.all(k, !k.matches('[<>%&?]'))"
+            },
+            {
+              "message": "tags keys must not contain '\\'",
+              "rule": "self.all(k, !k.contains('\\\\'))"
+            },
+            {
+              "message": "tags values must be less than 256 characters",
+              "rule": "self.all(k, size(self[k]) <= 256)"
+            }
+          ]
+        },
+        "versions": {
+          "description": "versions controls the Kubernetes and node image versions for the NodeClass.\nIf omitted, both versions follow their automatic defaults.",
+          "properties": {
+            "kubernetesVersion": {
+              "description": "kubernetesVersion is the Kubernetes version to use for nodes provisioned for the NodeClass.\nIf omitted, the observed control plane version is used.",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+              "type": "string"
+            },
+            "nodeImageVersion": {
+              "description": "nodeImageVersion is the node image ID suffix to use for the NodeClass.\nIt must match the suffix of a currently resolved image in status.images,\nstatus.observedVersions.latestImageVersion, or a nodeImageVersion in status.observedVersions.recentlyUsedVersions.\nWhen set, kubernetesVersion must also be set. A recently used image version must be paired\nwith its recorded Kubernetes version.\nIf omitted, the latest compatible image is selected automatically, subject to maintenance windows.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "kubernetesVersion must be set when nodeImageVersion is set",
+              "rule": "!has(self.nodeImageVersion) || has(self.kubernetesVersion)"
+            }
+          ],
+          "additionalProperties": false
         },
         "vnetSubnetID": {
-          "description": "VNETSubnetID is the subnet used by nics provisioned with this nodeclass.\nIf not specified, we will use the default --vnet-subnet-id specified in karpenter's options config",
+          "description": "vnetSubnetID is the subnet used by nics provisioned with this nodeclass.\nIf not specified, we will use the default --vnet-subnet-id specified in karpenter's options config",
           "pattern": "(?i)^\\/subscriptions\\/[^\\/]+\\/resourceGroups\\/[a-zA-Z0-9_\\-().]{0,89}[a-zA-Z0-9_\\-()]\\/providers\\/Microsoft\\.Network\\/virtualNetworks\\/[^\\/]+\\/subnets\\/[^\\/]+$",
+          "type": "string"
+        },
+        "workloadRuntime": {
+          "default": "OCIContainer",
+          "description": "workloadRuntime determines the additional workload runtime a node can run.\nOCIContainer (the default) runs standard OCI containers only.\nKataVmIsolation enables AKS Pod Sandboxing alongside standard containers,\nso pods with runtimeClassName: kata-vm-isolation\nrun in lightweight VMs while other pods on the same node keep running as normal containers.\nPod Sandboxing requires imageFamily: AzureLinux, is incompatible with fipsMode: FIPS and Trusted Launch, and\nrequires a nested-virtualization-capable VM size.\nSee https://learn.microsoft.com/azure/aks/use-pod-sandboxing for more details.",
+          "enum": [
+            "OCIContainer",
+            "KataVmIsolation"
+          ],
           "type": "string"
         }
       },
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "FIPS is not yet supported for Ubuntu2404",
+          "rule": "has(self.fipsMode) && self.fipsMode == 'FIPS' ? (has(self.imageFamily) && self.imageFamily != 'Ubuntu2404') : true"
+        },
+        {
+          "message": "TrustedLaunch with FIPSMode FIPS is only supported for Ubuntu, Ubuntu2204, Windows2025, and AzureContainerLinux",
+          "rule": "has(self.fipsMode) && self.fipsMode == 'FIPS' && has(self.security) && has(self.security.trustedLaunch) && ((has(self.security.trustedLaunch.vtpm) && self.security.trustedLaunch.vtpm) || (has(self.security.trustedLaunch.secureBoot) && self.security.trustedLaunch.secureBoot)) ? (!has(self.imageFamily) || self.imageFamily == 'Ubuntu' || self.imageFamily == 'Ubuntu2204' || self.imageFamily == 'Windows2025' || self.imageFamily == 'AzureContainerLinux') : true"
+        },
+        {
+          "message": "FIPS is not supported for Windows2022",
+          "rule": "!has(self.fipsMode) || self.fipsMode != 'FIPS' || !has(self.imageFamily) || self.imageFamily != 'Windows2022'"
+        },
+        {
+          "message": "fipsMode must be FIPS or omitted for Windows2025",
+          "rule": "!has(self.imageFamily) || self.imageFamily != 'Windows2025' || !has(self.fipsMode) || self.fipsMode == 'FIPS'"
+        },
+        {
+          "message": "TrustedLaunch is not supported for Windows2022",
+          "rule": "!has(self.imageFamily) || self.imageFamily != 'Windows2022' || !has(self.security) || !has(self.security.trustedLaunch) || !((has(self.security.trustedLaunch.vtpm) && self.security.trustedLaunch.vtpm) || (has(self.security.trustedLaunch.secureBoot) && self.security.trustedLaunch.secureBoot))"
+        },
+        {
+          "message": "linuxOSConfig is not supported for Windows image families",
+          "rule": "!has(self.linuxOSConfig) || !has(self.imageFamily) || !(self.imageFamily in ['Windows2022','Windows2025'])"
+        },
+        {
+          "message": "artifactStreaming is not supported for Windows image families",
+          "rule": "!has(self.artifactStreaming) || !has(self.artifactStreaming.enabled) || self.artifactStreaming.enabled == false || !has(self.imageFamily) || !(self.imageFamily in ['Windows2022','Windows2025'])"
+        },
+        {
+          "message": "localDNS is not supported for Windows image families",
+          "rule": "!has(self.localDNS) || self.localDNS.mode == 'Disabled' || !has(self.imageFamily) || !(self.imageFamily in ['Windows2022','Windows2025'])"
+        },
+        {
+          "message": "AzureContainerLinux requires security.trustedLaunch.vtpm and security.trustedLaunch.secureBoot to be explicitly set to true",
+          "rule": "!has(self.imageFamily) || self.imageFamily != 'AzureContainerLinux' || (has(self.security) && has(self.security.trustedLaunch) && has(self.security.trustedLaunch.vtpm) && self.security.trustedLaunch.vtpm && has(self.security.trustedLaunch.secureBoot) && self.security.trustedLaunch.secureBoot)"
+        },
+        {
+          "message": "AzureContainerLinux requires an OS disk of at least 60 GB",
+          "rule": "!has(self.imageFamily) || self.imageFamily != 'AzureContainerLinux' || !has(self.osDiskSizeGB) || self.osDiskSizeGB >= 60"
+        },
+        {
+          "message": "kubelet.failSwapOn must be set to false when linuxOSConfig.swapFileSize is specified",
+          "rule": "!has(self.linuxOSConfig) || !has(self.linuxOSConfig.swapFileSize) || (has(self.kubelet) && has(self.kubelet.failSwapOn) && self.kubelet.failSwapOn == false)"
+        },
+        {
+          "message": "workloadRuntime KataVmIsolation requires imageFamily AzureLinux",
+          "rule": "has(self.workloadRuntime) && self.workloadRuntime == 'KataVmIsolation' ? (has(self.imageFamily) && self.imageFamily == 'AzureLinux') : true"
+        },
+        {
+          "message": "workloadRuntime KataVmIsolation is not supported with fipsMode FIPS",
+          "rule": "has(self.workloadRuntime) && self.workloadRuntime == 'KataVmIsolation' ? (!has(self.fipsMode) || self.fipsMode != 'FIPS') : true"
+        },
+        {
+          "message": "workloadRuntime KataVmIsolation is not supported with TrustedLaunch",
+          "rule": "has(self.workloadRuntime) && self.workloadRuntime == 'KataVmIsolation' ? (!has(self.security) || !has(self.security.trustedLaunch) || !((has(self.security.trustedLaunch.vtpm) && self.security.trustedLaunch.vtpm) || (has(self.security.trustedLaunch.secureBoot) && self.security.trustedLaunch.secureBoot))) : true"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {
-      "description": "AKSNodeClassStatus contains the resolved state of the AKSNodeClass",
+      "description": "status contains the resolved state of the AKSNodeClass.",
       "properties": {
+        "capacityReservationGroup": {
+          "description": "capacityReservationGroup is the resolved shape of the capacity reservation\ngroup named by spec.capacityReservation.groupID. It is unset when no group is\nconfigured.",
+          "properties": {
+            "capacityReservations": {
+              "description": "capacityReservations are the resolved member reservations of the group.",
+              "items": {
+                "description": "CapacityReservation is a resolved member reservation of the configured\nCapacity Reservation Group. Each member reserves one VM size in one\nplacement, which is what makes it eligible to back an offering.",
+                "properties": {
+                  "id": {
+                    "description": "id is the ARM resource ID of the capacity reservation.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "description": "name is the name of the capacity reservation within its group.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provisioningState": {
+                    "description": "provisioningState is the ARM provisioning state of the capacity reservation.\nOnly a reservation explicitly reported as Succeeded backs offerings. Members that\ncannot back offerings are still listed here, so that a NodePool authored against one\nshows why it stopped placing.",
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "description": "quantity is the number of instances reserved. Zero is valid: a zero-quantity\nreservation can be associated and intentionally overallocated. Unset means ARM\nreported no quantity, which is not the same as a reservation of zero.",
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "vmSize": {
+                    "description": "vmSize is the VM size reserved by this capacity reservation.",
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "zones": {
+                    "description": "zones are the ARM availability zones of this capacity reservation. Empty for\na regional reservation.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "vmSize"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "id": {
+              "description": "id is the ARM resource ID of the capacity reservation group.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "location": {
+              "description": "location is the Azure region of the capacity reservation group.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "zones": {
+              "description": "zones are the ARM availability zones of the group. An empty list means the\ngroup is regional, and consuming instances must omit zones.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "required": [
+            "id",
+            "location"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "conditions": {
-          "description": "Conditions contains signals for health and readiness",
+          "description": "conditions contains signals for health and readiness",
           "items": {
             "description": "Condition aliases the upstream type and adds additional helper methods",
             "properties": {
@@ -196,16 +1176,16 @@
           "type": "array"
         },
         "images": {
-          "description": "Images contains the current set of images available to use\nfor the NodeClass",
+          "description": "images contains the current set of images available to use\nfor the NodeClass",
           "items": {
             "description": "NodeImage contains resolved image selector values utilized for node launch",
             "properties": {
               "id": {
-                "description": "The ID of the image. Examples:\n- CIG: /CommunityGalleries/AKSUbuntu-38d80f77-467a-481f-a8d4-09b6d4220bd2/images/2204gen2containerd/versions/2022.10.03\n- SIG: /subscriptions/10945678-1234-1234-1234-123456789012/resourceGroups/AKS-Ubuntu/providers/Microsoft.Compute/galleries/AKSUbuntu/images/2204gen2containerd/versions/2022.10.03",
+                "description": "id is the ID of the image. Examples:\n- CIG: /CommunityGalleries/AKSUbuntu-38d80f77-467a-481f-a8d4-09b6d4220bd2/images/2204gen2containerd/versions/2022.10.03\n- SIG: /subscriptions/10945678-1234-1234-1234-123456789012/resourceGroups/AKS-Ubuntu/providers/Microsoft.Compute/galleries/AKSUbuntu/images/2204gen2containerd/versions/2022.10.03",
                 "type": "string"
               },
               "requirements": {
-                "description": "Requirements of the image to be utilized on an instance type",
+                "description": "requirements of the image to be utilized on an instance type",
                 "items": {
                   "description": "A node selector requirement is a selector that contains values, a key, and an operator\nthat relates the key and values.",
                   "properties": {
@@ -246,8 +1226,60 @@
           "type": "array"
         },
         "kubernetesVersion": {
-          "description": "KubernetesVersion contains the current kubernetes version which should be\nused for nodes provisioned for the NodeClass",
+          "description": "kubernetesVersion contains the current kubernetes version which should be\nused for nodes provisioned for the NodeClass",
           "type": "string"
+        },
+        "localDNSState": {
+          "description": "localDNSState is the resolved enable/disable decision for LocalDNS.\nIt is the source of truth for whether LocalDNS is enabled on nodes\nspawned from this NodeClass. When spec.mode=Required this is always Enabled;\nwhen spec.mode=Disabled this is always Disabled; when spec.mode=Preferred this is\ndetermined based on the current Kubernetes version and other cluster configuration.\nOnce Mode=Preferred resolves to Enabled,\nit remains Enabled as long as spec.mode stays Preferred; it does not flip back\nto Disabled if cluster-side conflicts later appear. The user can opt\nout by changing Mode to Disabled.",
+          "enum": [
+            "Enabled",
+            "Disabled"
+          ],
+          "type": "string"
+        },
+        "observedVersions": {
+          "description": "observedVersions contains observed version metadata and previously effective\nKubernetes and node image version pairs.",
+          "properties": {
+            "currentControlPlaneKubernetesVersion": {
+              "description": "currentControlPlaneKubernetesVersion is the current Kubernetes version of the control plane.\nIt can differ from status.kubernetesVersion when spec.versions.kubernetesVersion is pinned.",
+              "type": "string"
+            },
+            "latestImageVersion": {
+              "description": "latestImageVersion is the latest node image version resolved from the gallery.",
+              "type": "string"
+            },
+            "recentlyUsedVersions": {
+              "description": "recentlyUsedVersions contains previously effective node image versions.",
+              "items": {
+                "description": "RecentlyUsedVersion contains a previously effective node image version and the Kubernetes version it was paired with.",
+                "properties": {
+                  "kubernetesVersion": {
+                    "description": "kubernetesVersion is the Kubernetes version paired with the image version.",
+                    "type": "string"
+                  },
+                  "nodeImageVersion": {
+                    "description": "nodeImageVersion is the version suffix from the node image ID.",
+                    "type": "string"
+                  },
+                  "timeUsed": {
+                    "description": "timeUsed is when this image version was last effective.",
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kubernetesVersion",
+                  "nodeImageVersion"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "type": "object",

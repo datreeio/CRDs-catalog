@@ -14,7 +14,7 @@ MAX_FILE = 2 * 1024 * 1024
 MAX_TOTAL = 10 * 1024 * 1024
 MAX_SOURCE = 10 * 1024 * 1024
 MAX_SOURCE_TOTAL = 50 * 1024 * 1024
-PATH = re.compile(r"([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)/([a-z0-9]+)_(v[0-9]+(?:(?:alpha|beta)[0-9]+)?)\.json\Z")
+PATH = re.compile(r"([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)/([a-z0-9]+)_(v[0-9]+[a-z0-9]*)\.json\Z")
 SOURCE = re.compile(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/blob/([0-9a-f]{40})/([A-Za-z0-9_./-]+)\Z")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 

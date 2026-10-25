@@ -1,0 +1,275 @@
+{
+  "description": "ResourcePolicy is the Schema for the resourcepolicies API",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec defines the desired state of ResourcePolicy",
+      "properties": {
+        "behaviors": {
+          "description": "Behaviors defines thresholds and parameters for resize.",
+          "properties": {
+            "resize": {
+              "description": "Resize configures in-place pod resize behavior.",
+              "properties": {
+                "interval": {
+                  "description": "Interval is how often the ResourceAdjuster re-evaluates drift.\nOmitted defaults to \"15m\" at policy-resolve time.",
+                  "type": "string"
+                },
+                "maxChangePerCycle": {
+                  "description": "MaxChangePerCycle caps how much a single adjustment cycle can change a value,\nexpressed as a percentage of the gap between the current and recommended\nvalues. When a capped step would come within the drift threshold of the\nrecommendation, the recommendation is applied exactly instead.\nOmitted defaults to \"50%\" at policy-resolve time.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "thresholds": {
+              "description": "Thresholds defines drift thresholds that trigger actions.",
+              "properties": {
+                "default": {
+                  "description": "Default is the global fallback drift threshold for all behaviors and resources.\nOmitted defaults to \"10%\" at policy-resolve time.",
+                  "type": "string"
+                },
+                "resize": {
+                  "description": "Resize contains thresholds specific to the resize behavior.",
+                  "properties": {
+                    "default": {
+                      "description": "Default overrides the global default threshold for resize.\nOmitted defaults to \"10%\" at policy-resolve time.",
+                      "type": "string"
+                    },
+                    "resourceThresholds": {
+                      "additionalProperties": {
+                        "description": "ResourceFieldThresholds maps resource fields (request, limit) to drift thresholds.",
+                        "properties": {
+                          "limit": {
+                            "description": "Limit is the drift threshold for the limit field.",
+                            "type": "string"
+                          },
+                          "request": {
+                            "description": "Request is the drift threshold for the request field.",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "description": "ResourceThresholds provides per-resource per-field overrides.\nCoalesce order: resourceThresholds -> resize.default -> thresholds.default",
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "metrics": {
+          "description": "Metrics defines what resource fields to measure and recommend.",
+          "items": {
+            "description": "MetricConfig maps a resource usage measurement to a Kubernetes resource field.",
+            "properties": {
+              "aggregation": {
+                "description": "Aggregation is the usage percentile to use: p50, p75, p90, p95, p99, max, avg.",
+                "enum": [
+                  "p50",
+                  "p75",
+                  "p90",
+                  "p95",
+                  "p99",
+                  "max",
+                  "avg"
+                ],
+                "type": "string"
+              },
+              "field": {
+                "description": "Field is the Kubernetes resource field to set: \"request\" or \"limit\".",
+                "enum": [
+                  "request",
+                  "limit"
+                ],
+                "type": "string"
+              },
+              "headroom": {
+                "description": "Headroom is the multiplier applied to the aggregated usage value.\nExpressed as a decimal string (e.g. \"1.2\"); must be greater than 0.\nOmitted defaults to \"1.0\" at recommendation time.",
+                "type": "string"
+              },
+              "resource": {
+                "description": "Resource is the Kubernetes resource being measured (e.g. \"cpu\", \"memory\").",
+                "minLength": 1,
+                "type": "string"
+              },
+              "source": {
+                "description": "Source is the name of the MetricsSource to use.",
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "aggregation",
+              "field",
+              "resource",
+              "source"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "priority": {
+          "description": "Priority determines which policy wins when multiple match a workload.\nHigher value wins. Same-priority ties break alphabetically by name.\nOmitted means 0, the lowest priority.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "readiness": {
+          "description": "Readiness defines the conditions that must pass before Ballast acts.",
+          "properties": {
+            "cvMeanFloor": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "CVMeanFloor exempts a resource from the MaxCV check when its observed\nmean usage is below the given quantity (cpu in cores, others in bytes).\nCV is numerically unstable near a zero mean: quantization noise and rare\none-off spikes (e.g. process startup) produce huge CVs on workloads whose\nusage is negligible, which would otherwise leave the profile Accruing\nforever and block recommendations for every other resource. Usage below\nthe floor is too small for a mis-sized recommendation to matter. The\nfloors are deliberately tiny; resources without an entry (or set to \"0\")\nalways get the CV check.\nOmitted defaults to {\"cpu\": \"25m\", \"memory\": \"25Mi\", \"ephemeral-storage\":\n\"2Mi\"} at policy-resolve time; an explicit empty map ({}) disables all\nfloors so every resource gets the CV check.",
+              "type": "object"
+            },
+            "maxCV": {
+              "description": "MaxCV is the maximum coefficient of variation (stddev/mean) allowed.\nOmitted defaults to \"1.5\" at policy-resolve time.",
+              "type": "string"
+            },
+            "minDataPoints": {
+              "description": "MinDataPoints is the minimum number of samples required.\nOmitted defaults to 500 at policy-resolve time.",
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            },
+            "minTimeSpan": {
+              "description": "MinTimeSpan is the minimum duration of observed history required.\nOmitted defaults to \"24h\" at policy-resolve time.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
+        "selector": {
+          "description": "Selector controls which workloads this policy applies to.",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Annotations maps annotation keys to regex patterns that must match on the pod.\n\nAnnotation selectors decide which policy governs a pod, but they cannot\nscope *measurement*. A WorkloadProfile gathers its pods with a label\nselector served by the API server, and there is no equivalent query for\nannotations, so a profile cannot be narrowed to \"the annotated subset\" of\nits identity tuple. Where that distinction matters, use a label instead:\nlabelSelector and namespaces are both expressible server-side.",
+              "type": "object"
+            },
+            "kinds": {
+              "description": "Kinds lists the owner kinds this policy applies to (e.g. Deployment, StatefulSet).\nEmpty means all kinds.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "labelSelector": {
+              "description": "LabelSelector is a standard Kubernetes label selector applied to pod labels.",
+              "properties": {
+                "matchExpressions": {
+                  "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                  "items": {
+                    "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                    "properties": {
+                      "key": {
+                        "description": "key is the label key that the selector applies to.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "operator"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            },
+            "namespaces": {
+              "description": "Namespaces filters by namespace name patterns.",
+              "properties": {
+                "exclude": {
+                  "description": "Exclude is a list of patterns; the pod's namespace must NOT match any.\nUses the same /regex/ or exact syntax as Include.\nA namespace matching both Include and Exclude is excluded (logged at WARN).",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "include": {
+                  "description": "Include is a list of patterns; the pod's namespace must match at least one.\nPatterns wrapped in forward slashes are full-string regexes (e.g. /.*-prod/).\nAll other patterns are exact string matches. Absent means all namespaces pass.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "status defines the observed state of ResourcePolicy",
+      "properties": {
+        "profileDiscriminator": {
+          "description": "ProfileDiscriminator is the token this policy contributes to the name of\nevery WorkloadProfile it governs, in the form \"<policy-name>-<hash>\".\n\nA WorkloadProfile's identity includes the policy governing it, because the\npolicy decides which metrics sources are polled, how samples are\naggregated, and how much headroom is added; pods resolving to different\npolicies therefore cannot share one set of recommendations. This field\nmakes the resulting profile names traceable back to their policy without\nrecomputing a hash by hand:\n\n\tkubectl get workloadprofiles | grep \"$(kubectl get crp fleet \\\n\t  -o jsonpath='{.status.profileDiscriminator}')\"\n\nThe token is derived from the policy's kind, namespace, and name, so it is\nstable for the life of the object and identical across every profile that\nresolves to it. Renaming a policy produces a different token, and hence\nnew profiles.",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "spec"
+  ],
+  "type": "object"
+}

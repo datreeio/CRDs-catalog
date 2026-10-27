@@ -187,6 +187,11 @@ class PolicyTests(unittest.TestCase):
         for raw in [b'!!python/object/apply:os.system [echo nope]', b'a: *undefined']:
             self.expect_error('needs-contributor-input', p.source_identities, raw)
 
+    def test_yaml_unquoted_value_operator(self):
+        # controller-gen emits unquoted '=' in enums like [!=, =, =~], resolved as tag:yaml.org,2002:value.
+        raw = CRD + b'spec:\n  names:\n    kind: widget\n  group: example.io\n  versions:\n  - name: v1\n    schema:\n      openAPIV3Schema:\n        properties:\n          op:\n            enum:\n            - "!="\n            - =\n            - "=~"\n'
+        self.assertEqual(p.source_identities(raw), {('example.io', 'widget', 'v1')})
+
     def test_yaml_shared_aliases(self):
         raw = CRD + b'definition: &TypeStringBool {type: string}\nuses: [*TypeStringBool, *TypeStringBool]\n'
         self.assertEqual(p.source_identities(raw), {('example.io', 'widget', 'v1')})

@@ -14,6 +14,28 @@
     },
     "spec": {
       "properties": {
+        "allowFirstIP": {
+          "default": false,
+          "description": "AllowFirstIP allows the first IP of each allocated CIDR to be used. If\nunset or false, this IP is reserved. This field is ignored for /{31,32}\nand /{127,128} CIDRs since reserving the first and last IPs would make\nthe CIDRs unusable. This field is immutable.",
+          "type": "boolean",
+          "x-kubernetes-validations": [
+            {
+              "message": "allowFirstIP is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
+        },
+        "allowLastIP": {
+          "default": false,
+          "description": "AllowLastIP allows the last IP of each allocated CIDR to be used. If\nunset or false, this IP is reserved. This field is ignored for /{31,32}\nand /{127,128} CIDRs since reserving the first and last IPs would make\nthe CIDRs unusable. This field is immutable.",
+          "type": "boolean",
+          "x-kubernetes-validations": [
+            {
+              "message": "allowLastIP is immutable",
+              "rule": "self == oldSelf"
+            }
+          ]
+        },
         "ipv4": {
           "description": "IPv4 specifies the IPv4 CIDRs and mask sizes of the pool",
           "properties": {
@@ -31,7 +53,13 @@
               "description": "MaskSize is the mask size of the pool.",
               "maximum": 32,
               "minimum": 1,
-              "type": "integer"
+              "type": "integer",
+              "x-kubernetes-validations": [
+                {
+                  "message": "maskSize is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ]
             }
           },
           "required": [
@@ -58,7 +86,13 @@
               "description": "MaskSize is the mask size of the pool.",
               "maximum": 128,
               "minimum": 1,
-              "type": "integer"
+              "type": "integer",
+              "x-kubernetes-validations": [
+                {
+                  "message": "maskSize is immutable",
+                  "rule": "self == oldSelf"
+                }
+              ]
             }
           },
           "required": [
@@ -66,6 +100,118 @@
             "maskSize"
           ],
           "type": "object",
+          "additionalProperties": false
+        },
+        "namespaceSelector": {
+          "description": "NamespaceSelector selects the set of Namespaces that are eligible to use\nthis pool. If both PodSelector and NamespaceSelector are specified, a Pod\nmust match both selectors to be eligible for IP allocation from this pool.\n\nIf NamespaceSelector is empty, the pool can be used by Pods in any namespace\n(subject to PodSelector constraints).",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "enum": [
+                      "In",
+                      "NotIn",
+                      "Exists",
+                      "DoesNotExist"
+                    ],
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "description": "MatchLabelsValue represents the value from the MatchLabels {key,value} pair.",
+                "maxLength": 63,
+                "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "podSelector": {
+          "description": "PodSelector selects the set of Pods that are eligible to receive IPs from\nthis pool when neither the Pod nor its Namespace specify an explicit\n`ipam.cilium.io/*` annotation.\n\nThe selector can match on regular Pod labels and on the following synthetic\nlabels that Cilium adds for convenience:\n\nio.kubernetes.pod.namespace \u2013 the Pod's namespace\nio.kubernetes.pod.name      \u2013 the Pod's name\n\nA single Pod must not match more than one pool for the same IP family.\nIf multiple pools match, IP allocation fails for that Pod and a warning event\nis emitted in the namespace of the Pod.",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "enum": [
+                      "In",
+                      "NotIn",
+                      "Exists",
+                      "DoesNotExist"
+                    ],
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "description": "MatchLabelsValue represents the value from the MatchLabels {key,value} pair.",
+                "maxLength": 63,
+                "pattern": "^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$",
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
           "additionalProperties": false
         }
       },

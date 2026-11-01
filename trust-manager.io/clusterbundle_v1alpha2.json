@@ -1,0 +1,508 @@
+{
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "spec represents the desired state of the ClusterBundle resource.",
+      "minProperties": 1,
+      "properties": {
+        "defaultCAs": {
+          "description": "defaultCAs configures the use of a default CA bundle as a trust source.",
+          "properties": {
+            "provider": {
+              "description": "provider identifies the provider of the default CA bundle.\n\nValid values:\n- System: Uses the default CA package made available to trust-manager at startup.\n     The default CA bundle is available only if trust-manager was installed with\n\t\tdefault CA support enabled, either via the Helm chart or by starting the\n\t\ttrust-manager controller with the \"--default-package-location\" flag.\n\n\t\tIf no default CA package was configured at startup, specifying this source\n\t\twill result in reconciliation failure.\n\n\t\tThe version of the default CA package used for this Bundle is reported in\n\t\tstatus.defaultCAVersion.\n- Disabled: No default CAs are used as sources.",
+              "enum": [
+                "System",
+                "Disabled"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "provider"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
+        "inLineCAs": {
+          "description": "inLineCAs is a simple string to append as the source data.",
+          "maxLength": 1048576,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sourceRefs": {
+          "description": "sourceRefs is a list of references to resources whose data will be appended and synced into\nthe bundle target resources.",
+          "items": {
+            "description": "BundleSourceRef is a reference to source resource(s) whose data will be appended and synced into\nthe bundle target resources.",
+            "properties": {
+              "key": {
+                "description": "key specifies one or more keys in the object's data field to be used.\nThe \"*\" wildcard matches any sequence of characters within a key.\nA value of \"*\" matches all entries in the data field.",
+                "maxLength": 253,
+                "minLength": 1,
+                "pattern": "^[0-9A-Za-z_.\\-*]+$",
+                "type": "string"
+              },
+              "kind": {
+                "description": "kind is the kind of the source object.",
+                "enum": [
+                  "ConfigMap",
+                  "Secret"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "description": "name is the name of the source object in the trust namespace.\nThis field must be left empty when `selector` is set",
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              "selector": {
+                "description": "selector is the label selector to use to fetch a list of objects. Must not be set\nwhen `name` is set.",
+                "properties": {
+                  "matchExpressions": {
+                    "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                    "items": {
+                      "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                      "properties": {
+                        "key": {
+                          "description": "key is the label key that the selector applies to.",
+                          "type": "string"
+                        },
+                        "operator": {
+                          "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                          "type": "string"
+                        },
+                        "values": {
+                          "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array",
+                          "x-kubernetes-list-type": "atomic"
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "operator"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  },
+                  "matchLabels": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                    "type": "object"
+                  }
+                },
+                "type": "object",
+                "x-kubernetes-map-type": "atomic",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "key",
+              "kind"
+            ],
+            "type": "object",
+            "x-kubernetes-map-type": "atomic",
+            "x-kubernetes-validations": [
+              {
+                "message": "exactly one of the fields in [name selector] must be set",
+                "rule": "(has(self.name)?1:0)+(has(self.selector)?1:0) == 1"
+              }
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100,
+          "minItems": 0,
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "target": {
+          "description": "target is the target location in all namespaces to sync source data to.",
+          "properties": {
+            "configMap": {
+              "description": "configMap is the target ConfigMap in Namespaces that all Bundle source data will be synced to.",
+              "properties": {
+                "data": {
+                  "description": "data is the specification of the object's `data` field.",
+                  "items": {
+                    "description": "TargetKeyValue is the specification of a key with value in a key-value target resource.",
+                    "minProperties": 0,
+                    "properties": {
+                      "format": {
+                        "description": "format defines the format of the target value.\nThe default format is PEM.",
+                        "enum": [
+                          "PEM",
+                          "PKCS12"
+                        ],
+                        "type": "string"
+                      },
+                      "key": {
+                        "description": "key is the key of the entry in the object's `data` field to be used.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^[0-9A-Za-z_.\\-]+$",
+                        "type": "string"
+                      },
+                      "password": {
+                        "description": "password for PKCS12 trust store.\nBy default, no password is used (password-less PKCS#12).",
+                        "maxLength": 128,
+                        "minLength": 0,
+                        "type": "string"
+                      },
+                      "profile": {
+                        "description": "profile specifies the certificate encryption algorithms and the HMAC algorithm\nused to create the PKCS12 trust store.\n\nIf provided, allowed values are:\n`LegacyRC2`: Deprecated. Not supported by default in OpenSSL 3 or Java 20.\n`LegacyDES`: Less secure algorithm. Use this option for maximal compatibility.\n`Modern2023`: Secure algorithm. Use this option in case you have to always use secure algorithms (e.g. because of company policy).\n\nDefault value is `LegacyDES`.",
+                        "enum": [
+                          "LegacyRC2",
+                          "LegacyDES",
+                          "Modern2023"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "x-kubernetes-validations": [
+                      {
+                        "fieldPath": ".password",
+                        "message": "may only be set when format is 'PKCS12'",
+                        "reason": "FieldValueForbidden",
+                        "rule": "!has(self.password) || (has(self.format) && self.format == 'PKCS12')"
+                      },
+                      {
+                        "fieldPath": ".profile",
+                        "message": "may only be set when format is 'PKCS12'",
+                        "reason": "FieldValueForbidden",
+                        "rule": "!has(self.profile) || (has(self.format) && self.format == 'PKCS12')"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 10,
+                  "minItems": 1,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "key"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "metadata": {
+                  "description": "metadata is an optional set of labels and annotations to be copied to the target.",
+                  "minProperties": 1,
+                  "properties": {
+                    "annotations": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "annotations is a key value map to be copied to the target.",
+                      "minProperties": 1,
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must not use forbidden domains as prefixes (e.g., trust-manager.io)",
+                          "reason": "FieldValueForbidden",
+                          "rule": "self.all(k, !k.startsWith('trust-manager.io/'))"
+                        }
+                      ]
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "labels is a key value map to be copied to the target.",
+                      "minProperties": 1,
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must not use forbidden domains as prefixes (e.g., trust-manager.io)",
+                          "reason": "FieldValueForbidden",
+                          "rule": "self.all(k, !k.startsWith('trust-manager.io/'))"
+                        }
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            },
+            "namespaceSelector": {
+              "description": "namespaceSelector specifies the namespaces where target resources will be synced.",
+              "properties": {
+                "matchExpressions": {
+                  "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+                  "items": {
+                    "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                    "properties": {
+                      "key": {
+                        "description": "key is the label key that the selector applies to.",
+                        "type": "string"
+                      },
+                      "operator": {
+                        "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                        "type": "string"
+                      },
+                      "values": {
+                        "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "x-kubernetes-list-type": "atomic"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "operator"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array",
+                  "x-kubernetes-list-type": "atomic"
+                },
+                "matchLabels": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+                  "type": "object"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-map-type": "atomic",
+              "additionalProperties": false
+            },
+            "secret": {
+              "description": "secret is the target Secret in Namespaces that all Bundle source data will be synced to.\nUsing Secrets as targets is only supported if enabled at trust-manager startup.\nBy default, trust-manager has no permissions for writing to secrets and can only read secrets in the trust namespace.",
+              "properties": {
+                "data": {
+                  "description": "data is the specification of the object's `data` field.",
+                  "items": {
+                    "description": "TargetKeyValue is the specification of a key with value in a key-value target resource.",
+                    "minProperties": 0,
+                    "properties": {
+                      "format": {
+                        "description": "format defines the format of the target value.\nThe default format is PEM.",
+                        "enum": [
+                          "PEM",
+                          "PKCS12"
+                        ],
+                        "type": "string"
+                      },
+                      "key": {
+                        "description": "key is the key of the entry in the object's `data` field to be used.",
+                        "maxLength": 253,
+                        "minLength": 1,
+                        "pattern": "^[0-9A-Za-z_.\\-]+$",
+                        "type": "string"
+                      },
+                      "password": {
+                        "description": "password for PKCS12 trust store.\nBy default, no password is used (password-less PKCS#12).",
+                        "maxLength": 128,
+                        "minLength": 0,
+                        "type": "string"
+                      },
+                      "profile": {
+                        "description": "profile specifies the certificate encryption algorithms and the HMAC algorithm\nused to create the PKCS12 trust store.\n\nIf provided, allowed values are:\n`LegacyRC2`: Deprecated. Not supported by default in OpenSSL 3 or Java 20.\n`LegacyDES`: Less secure algorithm. Use this option for maximal compatibility.\n`Modern2023`: Secure algorithm. Use this option in case you have to always use secure algorithms (e.g. because of company policy).\n\nDefault value is `LegacyDES`.",
+                        "enum": [
+                          "LegacyRC2",
+                          "LegacyDES",
+                          "Modern2023"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-map-type": "atomic",
+                    "x-kubernetes-validations": [
+                      {
+                        "fieldPath": ".password",
+                        "message": "may only be set when format is 'PKCS12'",
+                        "reason": "FieldValueForbidden",
+                        "rule": "!has(self.password) || (has(self.format) && self.format == 'PKCS12')"
+                      },
+                      {
+                        "fieldPath": ".profile",
+                        "message": "may only be set when format is 'PKCS12'",
+                        "reason": "FieldValueForbidden",
+                        "rule": "!has(self.profile) || (has(self.format) && self.format == 'PKCS12')"
+                      }
+                    ],
+                    "additionalProperties": false
+                  },
+                  "maxItems": 10,
+                  "minItems": 1,
+                  "type": "array",
+                  "x-kubernetes-list-map-keys": [
+                    "key"
+                  ],
+                  "x-kubernetes-list-type": "map"
+                },
+                "metadata": {
+                  "description": "metadata is an optional set of labels and annotations to be copied to the target.",
+                  "minProperties": 1,
+                  "properties": {
+                    "annotations": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "annotations is a key value map to be copied to the target.",
+                      "minProperties": 1,
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must not use forbidden domains as prefixes (e.g., trust-manager.io)",
+                          "reason": "FieldValueForbidden",
+                          "rule": "self.all(k, !k.startsWith('trust-manager.io/'))"
+                        }
+                      ]
+                    },
+                    "labels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "labels is a key value map to be copied to the target.",
+                      "minProperties": 1,
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "must not use forbidden domains as prefixes (e.g., trust-manager.io)",
+                          "reason": "FieldValueForbidden",
+                          "rule": "self.all(k, !k.startsWith('trust-manager.io/'))"
+                        }
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "namespaceSelector"
+          ],
+          "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "at least one of the fields in [configMap secret] must be set",
+              "rule": "has(self.configMap)||has(self.secret)"
+            }
+          ],
+          "additionalProperties": false
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "status of the ClusterBundle. This is set and managed automatically.",
+      "minProperties": 1,
+      "properties": {
+        "conditions": {
+          "description": "conditions represent the latest available observations of the ClusterBundle's current state.",
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 10,
+          "minItems": 0,
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "defaultCAVersion": {
+          "description": "defaultCAVersion is the version of the default CA package used for this ClusterBundle\nwhen resolving default CAs, if applicable.\nThis field is populated only when default CAs are configured via spec.defaultCAs.\nClusterBundles resolved from identical sets of default CA certificates will report\nthe same defaultCAVersion value.",
+          "maxLength": 253,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

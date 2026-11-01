@@ -109,6 +109,14 @@ class PolicyTests(unittest.TestCase):
             api = FakeAPI(); api.files[0].update(status=status, filename=name)
             self.assertEqual(p.evaluate(api, 1, NOW)['decision'], 'manual-review')
 
+    def test_version_names_beyond_alpha_beta(self):
+        # Azure Service Operator publishes versions such as v1api20230301 and v1api20230501preview.
+        for version in ['v1api20230301', 'v1api20230501preview', 'v1beta']:
+            name = f'example.io/widget_{version}.json'
+            api = FakeAPI(); api.files[0]['filename'] = name; api.pr['body'] = BODY.replace(FILE, name)
+            with patch.object(sys.modules[__name__], 'CRD', CRD.replace(b'name: v1', b'name: ' + version.encode())):
+                self.assertEqual(p.evaluate(api, 1, NOW)['decision'], 'eligible')
+
     def test_count_limit(self):
         api = FakeAPI(); api.pr['changed_files'] = 26
         self.assertEqual(p.evaluate(api, 1, NOW)['decision'], 'manual-review')

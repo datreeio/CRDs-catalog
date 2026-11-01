@@ -287,6 +287,10 @@ def source_identities(raw):
     signal.alarm(15)
     loader = None
     try:
+        # YAML 1.1 resolves unquoted '=' to tag:yaml.org,2002:value (e.g. enum: [!=, =, =~]).
+        # SafeLoader has no default constructor for this tag; construct it as a string.
+        if "tag:yaml.org,2002:value" not in yaml.SafeLoader.yaml_constructors:
+            yaml.SafeLoader.add_constructor("tag:yaml.org,2002:value", yaml.SafeLoader.construct_yaml_str)
         loader = yaml.SafeLoader(raw)
         identities, budget = set(), [0]
         while loader.check_data():

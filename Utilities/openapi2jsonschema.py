@@ -19,6 +19,27 @@ def test_additional_properties():
     },{
         "input": {"something": {"somethingelse": {}}},
         "expect": {'something': {'somethingelse': {}}}
+    },{
+        "input": {
+            "type": "object",
+            "properties": {
+                "properties": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}}
+                }
+            }
+        },
+        "expect": {
+            "type": "object",
+            "properties": {
+                "properties": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "additionalProperties": False
+                }
+            },
+            "additionalProperties": False
+        }
     }]):
         assert additional_properties(test["input"]) == test["expect"]
 
@@ -28,8 +49,9 @@ def additional_properties(data, skip=False):
         if "properties" in data and not skip:
             if "additionalProperties" not in data:
                 data["additionalProperties"] = False
-        for _, v in data.items():
-            additional_properties(v)
+        for key, value in data.items():
+            # Skip fields named "properties" so they aren't treated as schemas.
+            additional_properties(value, skip=not skip and key == "properties")
     return data
 
 def test_replace_int_or_string():

@@ -711,6 +711,10 @@
                 },
                 "storageClassName": {
                   "type": "string"
+                },
+                "volumeAttributesClassName": {
+                  "description": "VolumeAttributesClassName references a VolumeAttributesClass for the PVC.",
+                  "type": "string"
                 }
               },
               "type": "object",
@@ -934,6 +938,36 @@
                 "additionalProperties": false
               }
             },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "filters": {
+          "description": "Filters are the filters to load into MaxScale. They are not applied automatically, they must be\nreferenced explicitly from 'spec.services[].filters'.",
+          "items": {
+            "description": "MaxScaleFilter defines a MaxScale filter to be applied to services.\nFilters must be referenced explicitly from 'spec.services[].filters'.",
+            "properties": {
+              "module": {
+                "description": "Module is the filter module to load.",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the identifier of the MaxScale filter.",
+                "type": "string"
+              },
+              "params": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Params defines extra parameters to pass to the filter.\nAny parameter supported by the filter module may be specified here. See reference:\nhttps://mariadb.com/docs/maxscale/reference/maxscale-filters",
+                "type": "object"
+              }
+            },
+            "required": [
+              "module",
+              "name"
+            ],
             "type": "object",
             "additionalProperties": false
           },
@@ -2010,6 +2044,10 @@
             "serviceMonitor": {
               "description": "ServiceMonitor defines the ServiceMonior object.",
               "properties": {
+                "enabled": {
+                  "description": "Enabled is a flag to enable the ServiceMonitor creation. It defaults to true when metrics are enabled.\nWhen disabled, the exporter is still deployed, but no ServiceMonitor is created,\nand the ServiceMonitor CRD is no longer required to be installed in the cluster.",
+                  "type": "boolean"
+                },
                 "interval": {
                   "description": "Interval for scraping metrics.",
                   "type": "string"
@@ -2482,6 +2520,13 @@
           "items": {
             "description": "Services define how the traffic is forwarded to the MariaDB servers.",
             "properties": {
+              "filters": {
+                "description": "Filters are the names of the filters defined in 'spec.filters' to apply to this service, in order.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "listener": {
                 "description": "MaxScaleListener defines how the MaxScale server will listen for connections.",
                 "properties": {
@@ -2546,6 +2591,199 @@
               "listener",
               "name",
               "router"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
+        },
+        "sidecarContainers": {
+          "description": "SidecarContainers to be used in the Pod.",
+          "items": {
+            "description": "Container object definition.",
+            "properties": {
+              "args": {
+                "description": "Args to be used in the Container.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "command": {
+                "description": "Command to be used in the Container.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "env": {
+                "description": "Env represents the environment variables to be injected in a container.",
+                "items": {
+                  "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#envvarsource-v1-core.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "valueFrom": {
+                      "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#envvarsource-v1-core.",
+                      "properties": {
+                        "configMapKeyRef": {
+                          "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#configmapkeyselector-v1-core.",
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "default": "",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "key"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "fieldRef": {
+                          "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectfieldselector-v1-core.",
+                          "properties": {
+                            "apiVersion": {
+                              "type": "string"
+                            },
+                            "fieldPath": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "fieldPath"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        },
+                        "secretKeyRef": {
+                          "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secretkeyselector-v1-core.",
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "default": "",
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "key"
+                          ],
+                          "type": "object",
+                          "x-kubernetes-map-type": "atomic",
+                          "additionalProperties": false
+                        }
+                      },
+                      "type": "object",
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              },
+              "image": {
+                "description": "Image name to be used by the container. The supported format is `<image>:<tag>`.",
+                "type": "string"
+              },
+              "imagePullPolicy": {
+                "description": "ImagePullPolicy is the image pull policy. One of `Always`, `Never` or `IfNotPresent`. If not defined, it defaults to `IfNotPresent`.",
+                "enum": [
+                  "Always",
+                  "Never",
+                  "IfNotPresent"
+                ],
+                "type": "string"
+              },
+              "name": {
+                "description": "Name to be given to the container.",
+                "type": "string"
+              },
+              "resources": {
+                "description": "Resources describes the compute resource requirements.",
+                "properties": {
+                  "limits": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "description": "ResourceList is a set of (resource name, quantity) pairs.",
+                    "type": "object"
+                  },
+                  "requests": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                      "x-kubernetes-int-or-string": true
+                    },
+                    "description": "ResourceList is a set of (resource name, quantity) pairs.",
+                    "type": "object"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "volumeMounts": {
+                "description": "VolumeMounts to be used in the Container.",
+                "items": {
+                  "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#volumemount-v1-core.",
+                  "properties": {
+                    "mountPath": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "This must match the Name of a Volume.",
+                      "type": "string"
+                    },
+                    "readOnly": {
+                      "type": "boolean"
+                    },
+                    "subPath": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "mountPath",
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "image"
             ],
             "type": "object",
             "additionalProperties": false
@@ -2971,6 +3209,163 @@
             "additionalProperties": false
           },
           "type": "array"
+        },
+        "volumes": {
+          "description": "Volumes to be used in the Pod.",
+          "items": {
+            "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#volume-v1-core.",
+            "properties": {
+              "configMap": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#configmapvolumesource-v1-core.",
+                "properties": {
+                  "defaultMode": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "name": {
+                    "default": "",
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "csi": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#csivolumesource-v1-core.",
+                "properties": {
+                  "driver": {
+                    "type": "string"
+                  },
+                  "fsType": {
+                    "type": "string"
+                  },
+                  "nodePublishSecretRef": {
+                    "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core.",
+                    "properties": {
+                      "name": {
+                        "default": "",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "volumeAttributes": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "driver"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "emptyDir": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#emptydirvolumesource-v1-core.",
+                "properties": {
+                  "medium": {
+                    "description": "StorageMedium defines ways that storage can be allocated to a volume.",
+                    "type": "string"
+                  },
+                  "sizeLimit": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ],
+                    "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                    "x-kubernetes-int-or-string": true
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              },
+              "hostPath": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#hostpathvolumesource-v1-core",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string"
+              },
+              "nfs": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#nfsvolumesource-v1-core.",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  },
+                  "server": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "server"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "persistentVolumeClaim": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#persistentvolumeclaimvolumesource-v1-core.",
+                "properties": {
+                  "claimName": {
+                    "type": "string"
+                  },
+                  "readOnly": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "claimName"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "secret": {
+                "description": "Refer to the Kubernetes docs: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secretvolumesource-v1-core.",
+                "properties": {
+                  "defaultMode": {
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "secretName": {
+                    "type": "string"
+                  }
+                },
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array"
         }
       },
       "type": "object",
@@ -3051,6 +3446,10 @@
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "filtersSpec": {
+          "description": "FiltersSpec is a hashed version of spec.filters to be able to track changes during reconciliation.",
+          "type": "string"
         },
         "listeners": {
           "description": "Listeners is the state of the listeners in the MaxScale API.",

@@ -19,6 +19,14 @@ def test_additional_properties():
     },{
         "input": {"something": {"somethingelse": {}}},
         "expect": {'something': {'somethingelse': {}}}
+    },{
+        # A field literally named "properties" must not be mistaken for a schema:
+        # the flag belongs next to the "properties" keyword, never inside the map.
+        "input": {"something": {"properties": {"name": {"type": "string"}, "properties": {"type": "array", "items": {"type": "string"}}}}},
+        "expect": {'something': {'properties': {'name': {'type': 'string'}, 'properties': {'type': 'array', 'items': {'type': 'string'}}}, "additionalProperties": False}}
+    },{
+        "input": {"something": {"properties": {"properties": {"type": "object", "properties": {"a": {"type": "string"}}}}}},
+        "expect": {'something': {'properties': {'properties': {'type': 'object', 'properties': {'a': {'type': 'string'}}, "additionalProperties": False}}, "additionalProperties": False}}
     }]):
         assert additional_properties(test["input"]) == test["expect"]
 
@@ -28,8 +36,14 @@ def additional_properties(data, skip=False):
         if "properties" in data and not skip:
             if "additionalProperties" not in data:
                 data["additionalProperties"] = False
-        for _, v in data.items():
-            additional_properties(v)
+        for k, v in data.items():
+            if k == "properties" and isinstance(v, dict):
+                # A map of field name -> schema, not a schema itself: recurse into
+                # each field's schema so a field named "properties" isn't flagged.
+                for field_schema in v.values():
+                    additional_properties(field_schema)
+            else:
+                additional_properties(v)
     return data
 
 def test_replace_int_or_string():

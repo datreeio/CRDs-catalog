@@ -130,6 +130,26 @@ def walk(value):
             stack.extend((v, depth + 1) for v in item)
 
 
+def re2_format_checker(base_checker):
+    """Clone a validator FormatChecker with Go RE2 regex checking matching kubeconform."""
+    from jsonschema import FormatChecker
+    import re2
+
+    options = re2.Options()
+    options.log_errors = False
+    checker = FormatChecker(formats=())
+    checker.checkers = dict(base_checker.checkers)
+
+    @checker.checks("regex", raises=(re2.error, UnicodeError))
+    def is_re2_regex(instance):
+        if not isinstance(instance, str):
+            return True
+        re2.compile(instance, options=options)
+        return True
+
+    return checker
+
+
 def validate_schema(raw):
     from jsonschema import Draft4Validator, Draft6Validator, Draft7Validator, Draft201909Validator, Draft202012Validator
     from jsonschema.exceptions import SchemaError
@@ -152,7 +172,9 @@ def validate_schema(raw):
         validator = Draft7Validator if uri is None else by_uri.get(uri)
         if validator is None:
             raise ValueError("Unsupported JSON Schema dialect")
-        validator.check_schema(schema)
+        # Kubernetes CRDs and kubeconform use Go RE2 rather than Python re, which rejects
+        # RE2 constructs like \PC, \p{L}, inline flags after ^, and literal '-' after \d.
+        validator.check_schema(schema, format_checker=re2_format_checker(validator.FORMAT_CHECKER))
         return schema
     except (ValueError, SchemaError, RecursionError, UnicodeError):
         raise PolicyError("needs-contributor-input", "A schema is invalid, has duplicate keys, an unsupported dialect, or an external reference/identifier. Correct the schema and push an update.") from None

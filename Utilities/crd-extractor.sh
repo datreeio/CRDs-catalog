@@ -127,11 +127,9 @@ shopt -u nullglob
 
 # Only proceed if we have new schemas
 if [ ${#NEW_SCHEMAS[@]} -gt 0 ]; then
-    # Copy and rename files to support kubeval
+    # Recreate the kubeval schema directory
     rm -rf "$SCHEMAS_DIR/master-standalone"
     mkdir -p "$SCHEMAS_DIR/master-standalone"
-    cp "$CONVERSION_TMP"/*.json "$SCHEMAS_DIR/master-standalone/" 2>/dev/null
-    find "$SCHEMAS_DIR/master-standalone" -name '*json' -exec bash -c ' mv -f $0 ${0/\_/-stable-}' {} \;
 
     # Organize schemas by group
     for schema in "${NEW_SCHEMAS[@]}"; do
@@ -140,6 +138,8 @@ if [ ${#NEW_SCHEMAS[@]} -gt 0 ]; then
         outName=$(echo "$crdFileName" | cut -d"_" -f2-)
         mkdir -p "$SCHEMAS_DIR/$crdGroup"
         cp "$schema" "$SCHEMAS_DIR/$crdGroup/$outName"
+        # kubeval looks up <kind>-<first label of the group>-<version>.json
+        cp "$schema" "$SCHEMAS_DIR/master-standalone/${outName/_/-${crdGroup%%.*}-}"
         PROCESSED_GROUPS[$crdGroup]=1
     done
 

@@ -40,6 +40,10 @@
                       "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
                       "type": "string"
                     },
+                    "optional": {
+                      "description": "Optional, when set to true, allows the copy operation to silently\nskip when the source path or glob pattern matches no files.\nWhen false (default), the reconciliation fails with an error if\nno files are matched.",
+                      "type": "boolean"
+                    },
                     "strategy": {
                       "description": "Strategy specifies the copy strategy to use.\n'Overwrite' will overwrite existing files in the destination.\n'Merge' is for merging YAML files using Helm values merge strategy.\n'Extract' is for extracting the contents of tarball archives (.tar.gz, .tgz)\nWhen using glob patterns, non-tarball files are silently skipped. For single file sources,\nthe file must be a tarball or an error is returned. Directories are not supported.\nIf not specified, defaults to 'Overwrite'.",
                       "enum": [
@@ -67,10 +71,21 @@
                 "minItems": 1,
                 "type": "array"
               },
-              "name": {
-                "description": "Name is the name of the generated artifact.\nWhen pathPattern is set, this field may use capture placeholders such as \"{app}\".",
-                "maxLength": 253,
+              "inputsFrom": {
+                "description": "InputsFrom specifies a source path to a YAML file whose contents are\nexported in the ExternalArtifact .status.exportedInputs field.\nThe format is \"@<alias>/<path>\", where <alias> references a source or\n\"artifact\" for the generated artifact itself. When pathPattern is set,\nthe path may use capture placeholders such as \"{module}\".",
+                "maxLength": 1024,
                 "minLength": 1,
+                "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the name of the generated artifact.\nWhen pathPattern is set, this field may use capture placeholders such as \"{app}\".\nThe maximum length accommodates capture placeholders; the effective\nlimits are enforced by the CEL validation when pathPattern is not set.",
+                "maxLength": 1024,
+                "type": "string"
+              },
+              "namespace": {
+                "description": "Namespace is the namespace of the generated artifact.\nIf not provided, defaults to the same namespace as the ArtifactGenerator.\nWhen pathPattern is set, this field may use capture placeholders such as \"{app}\".\nThe credentials used to reconcile the artifact are described in\n.spec.serviceAccountName: an explicit ServiceAccount applies to every\ngenerated artifact, while the --default-service-account flag only applies\nto artifacts in a namespace other than the ArtifactGenerator namespace.\nThe maximum length accommodates capture placeholders; the effective\nlimits are enforced by the CEL validation when pathPattern is not set.",
+                "maxLength": 1024,
                 "type": "string"
               },
               "originRevision": {
@@ -118,10 +133,134 @@
           "type": "object",
           "additionalProperties": false
         },
+        "managedNamespaces": {
+          "description": "ManagedNamespaces defines how the controller manages the namespaces\ntargeted by the generated artifacts. When omitted, the target namespaces\nare unmanaged: they must already exist and are left untouched.",
+          "properties": {
+            "allowedNames": {
+              "description": "AllowedNames is a list of CEL expressions that define the set of\nnamespaces the ArtifactGenerator agrees to manage. Each expression\nreceives the namespace name through the 'ns' string variable and must\nreturn a boolean. A namespace is managed only when at least one\nexpression returns true. The 'default', 'kube-system', 'kube-public'\nand 'flux-system' namespaces are always rejected, regardless of the\nexpressions.",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "metadata": {
+              "description": "Metadata defines how the metadata of the desired namespaces is built,\non top of .spec.commonMetadata.",
+              "properties": {
+                "from": {
+                  "description": "From is a list of metadata operations applied in order to the desired\nnamespaces, on top of .spec.commonMetadata and .fromSource.",
+                  "items": {
+                    "description": "NamespaceMetadataFrom defines a metadata operation applied to a desired\nnamespace.",
+                    "properties": {
+                      "annotations": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "Annotations to be applied to the namespace.",
+                        "type": "object"
+                      },
+                      "labels": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "Labels to be applied to the namespace.",
+                        "type": "object"
+                      },
+                      "namespace": {
+                        "description": "Namespace is the name of the desired namespace the metadata applies to,\nor '*' to apply the metadata to all desired namespaces.",
+                        "maxLength": 63,
+                        "pattern": "^(\\*|[a-z0-9]([-a-z0-9]*[a-z0-9])?)$",
+                        "type": "string"
+                      },
+                      "strategy": {
+                        "description": "Strategy specifies how the labels and annotations are applied.\n'Reset' clears all the existing labels and annotations before applying\nthe ones defined in the operation (fields that are not set clear the\ncorresponding metadata), 'Override' merges the ones defined in the\noperation into the existing values, overriding existing keys, while\n'Merge' merges only the absent keys, preserving existing values.",
+                        "enum": [
+                          "Reset",
+                          "Override",
+                          "Merge"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "namespace",
+                      "strategy"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "fromSource": {
+                  "description": "FromSource sources namespace metadata from a NamespaceMetadata file\ninside a source artifact.",
+                  "properties": {
+                    "allowedAnnotations": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "AllowedAnnotations is a schema for the annotations that the\nNamespaceMetadata file is allowed to set. Each key is an annotation key\nand each value is a CEL expression that receives the annotation value\nthrough the 'value' string variable and must return a boolean.\nAnnotations whose key is not present in this map are ignored, while\nannotations whose value does not satisfy the respective expression are\nrejected.\nThe expressions are compiled, so a malformed expression or one that\ndoes not return a boolean fails validation at the start of the\nreconciliation.",
+                      "type": "object"
+                    },
+                    "allowedLabels": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "AllowedLabels is a schema for the labels that the NamespaceMetadata\nfile is allowed to set. Each key is a label key and each value is a\nCEL expression that receives the label value through the 'value' string\nvariable and must return a boolean. Labels whose key is not present in\nthis map are ignored, while labels whose value does not satisfy the\nrespective expression are rejected.\nThe expressions are compiled, so a malformed expression or one that\ndoes not return a boolean fails validation at the start of the\nreconciliation.",
+                      "type": "object"
+                    },
+                    "path": {
+                      "description": "Path is the path to the NamespaceMetadata file inside a source artifact,\nin the format \"@<alias>/<path>\". When pathPattern is set, the path may\nuse capture placeholders such as \"{namespace}\". Only namespace-level\ncaptures are allowed, so that every artifact targeting a namespace\nresolves to the same file.",
+                      "maxLength": 1024,
+                      "minLength": 1,
+                      "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "type": "object",
+                  "x-kubernetes-validations": [
+                    {
+                      "message": "at least one annotation or label must be set",
+                      "rule": "(has(self.allowedAnnotations) && size(self.allowedAnnotations) > 0) || (has(self.allowedLabels) && size(self.allowedLabels) > 0)"
+                    }
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "either fromSource or at least one from operation must be set",
+                  "rule": "has(self.fromSource) || (has(self.from) && size(self.from) > 0)"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "prune": {
+              "description": "Prune specifies whether the controller deletes managed namespaces that\nare no longer targeted by any generated artifact, or when the\nArtifactGenerator is deleted.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "allowedNames",
+            "prune"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "pathPattern": {
           "description": "PathPattern specifies a directory traversal pattern to match within the sources.\nThe format is \"@<alias>/<pattern>\". Named captures in the pattern (e.g. \"{app}\")\ncan be used as placeholders in OutputArtifacts fields.",
           "maxLength": 1024,
           "pattern": "^@([a-z0-9]([a-z0-9_-]*[a-z0-9])?)/(.*)$",
+          "type": "string"
+        },
+        "serviceAccountName": {
+          "description": "ServiceAccountName is the name of the ServiceAccount used to authorize\nthe reconciliation of the generated ExternalArtifacts and the managed\nNamespaces. The name is resolved in the ArtifactGenerator namespace. When\nspecified, the controller checks this ServiceAccount with\nSubjectAccessReview for every namespace targeted by the generated\nExternalArtifacts, including the ArtifactGenerator namespace, and its\nRBAC bindings determine the namespaces in which they can be created,\nupdated and deleted.\nWhen not specified, the controller uses its own credentials for\nExternalArtifacts in the ArtifactGenerator namespace, and the\nServiceAccount configured with the --default-service-account flag\n(when set) for artifacts targeting another namespace.\nNamespace management (.spec.managedNamespaces) always requires a\nServiceAccount for authorization, so either this field or the\n--default-service-account flag must be set; otherwise the reconciliation\nfails with a terminal error. The controller performs the namespace\noperations with its own credentials.",
+          "maxLength": 63,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
           "type": "string"
         },
         "sources": {
@@ -181,7 +320,11 @@
       "x-kubernetes-validations": [
         {
           "message": "artifact names must be valid Kubernetes object names when pathPattern is not set",
-          "rule": "has(self.pathPattern) && size(self.pathPattern) > 0 || self.artifacts.all(a, a.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$'))"
+          "rule": "has(self.pathPattern) && size(self.pathPattern) > 0 || self.artifacts.all(a, a.name.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$') && a.name.size() <= 253)"
+        },
+        {
+          "message": "artifact namespaces must be valid Kubernetes namespaces when pathPattern is not set",
+          "rule": "has(self.pathPattern) && size(self.pathPattern) > 0 || self.artifacts.all(a, !has(a.__namespace__) || (a.__namespace__.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$') && a.__namespace__.size() <= 63))"
         }
       ],
       "additionalProperties": false
@@ -246,32 +389,38 @@
           "type": "array"
         },
         "inventory": {
-          "description": "Inventory contains the list of generated ExternalArtifact references.",
+          "description": "Inventory contains the list of objects managed by the ArtifactGenerator,\nsuch as the generated ExternalArtifacts and the managed Namespaces.",
           "items": {
-            "description": "ExternalArtifactReference contains the reference to a\ngenerated ExternalArtifact along with its digest.",
+            "description": "InventoryEntry contains a reference to an object managed by the\nArtifactGenerator, such as a generated ExternalArtifact or a managed\nNamespace.",
             "properties": {
               "digest": {
-                "description": "Digest of the referent artifact.",
+                "description": "Digest of the referent object. For generated artifacts this is the\nartifact content digest; for managed namespaces this is a digest of the\nmetadata applied by the controller.",
                 "type": "string"
               },
               "filename": {
                 "description": "Filename is the name of the artifact file.",
                 "type": "string"
               },
+              "kind": {
+                "description": "Kind is the kind of the referent object.",
+                "enum": [
+                  "ExternalArtifact",
+                  "Namespace"
+                ],
+                "type": "string"
+              },
               "name": {
-                "description": "Name of the referent artifact.",
+                "description": "Name of the referent object.",
                 "type": "string"
               },
               "namespace": {
-                "description": "Namespace of the referent artifact.",
+                "description": "Namespace of the referent object. Empty for cluster-scoped objects.",
                 "type": "string"
               }
             },
             "required": [
               "digest",
-              "filename",
-              "name",
-              "namespace"
+              "name"
             ],
             "type": "object",
             "additionalProperties": false

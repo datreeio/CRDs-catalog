@@ -16,8 +16,16 @@
       "description": "HelmReleaseSpec defines the desired state of a Helm release.",
       "properties": {
         "chart": {
-          "description": "Chart defines the template of the v1.HelmChart that should be created\nfor this HelmRelease.",
+          "description": "Chart defines the template of the source object that should be\ncreated for this HelmRelease. The Kind field determines whether a\nsourcev1.HelmChart or sourcev1.OCIRepository is created.",
           "properties": {
+            "kind": {
+              "description": "Kind is the kind of the source object generated from this template. Valid values:\n  - HelmChart (default): generates a source.toolkit.fluxcd.io/v1 HelmChart from\n    the HelmChartSpec-compatible fields under .spec.chart.spec. In particular,\n    .spec.chart.spec.chart and .spec.chart.spec.sourceRef are required.\n  - OCIRepository: generates a source.toolkit.fluxcd.io/v1 OCIRepository from\n    the OCIRepositorySpec fields under .spec.chart.spec. In particular,\n    .spec.chart.spec.url is required, and .spec.chart.spec.interval defaults\n    to .spec.interval (interval is required in a plain OCIRepository).\nUse OCIRepository for charts hosted in OCI registries; use HelmChart for\nHelmRepository, GitRepository or Bucket sources.",
+              "enum": [
+                "HelmChart",
+                "OCIRepository"
+              ],
+              "type": "string"
+            },
             "metadata": {
               "description": "ObjectMeta holds the template for metadata like labels and annotations.",
               "properties": {
@@ -40,30 +48,135 @@
               "additionalProperties": false
             },
             "spec": {
-              "description": "Spec holds the template for the v1.HelmChartSpec for this HelmRelease.",
+              "description": "Spec holds the spec of the object generated for this HelmRelease.",
               "properties": {
+                "certSecretRef": {
+                  "description": "CertSecretRef can be given the name of a Secret containing\neither or both of\n\n- a PEM-encoded client certificate (`tls.crt`) and private\nkey (`tls.key`);\n- a PEM-encoded CA certificate (`ca.crt`)\n\nand whichever are supplied, will be used for connecting to the\nregistry. The client cert and key are useful if you are\nauthenticating with a certificate; the CA cert is useful if\nyou are using a self-signed server certificate. The Secret must\nbe of type `Opaque` or `kubernetes.io/tls`.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the referent.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "chart": {
                   "description": "The name or path the Helm chart is available at in the SourceRef.",
                   "maxLength": 2048,
                   "minLength": 1,
                   "type": "string"
                 },
+                "ignore": {
+                  "description": "Ignore overrides the set of excluded patterns in the .sourceignore format\n(which is the same as .gitignore). If not provided, a default will be used,\nconsult the documentation for your version to find out what those are.",
+                  "type": "string"
+                },
                 "ignoreMissingValuesFiles": {
                   "description": "IgnoreMissingValuesFiles controls whether to silently ignore missing values files rather than failing.",
                   "type": "boolean"
                 },
+                "insecure": {
+                  "description": "Insecure allows connecting to a non-TLS HTTP container registry.",
+                  "type": "boolean"
+                },
                 "interval": {
-                  "description": "Interval at which to check the v1.Source for updates. Defaults to\n'HelmReleaseSpec.Interval'.",
+                  "description": "Interval at which the OCIRepository URL is checked for updates.\nThis interval is approximate and may be subject to jitter to ensure\nefficient use of resources.",
                   "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m|h))+$",
                   "type": "string"
                 },
+                "layerSelector": {
+                  "description": "LayerSelector specifies which layer should be extracted from the OCI artifact.\nWhen not specified, the first layer found in the artifact is selected.",
+                  "properties": {
+                    "mediaType": {
+                      "description": "MediaType specifies the OCI media type of the layer\nwhich should be extracted from the OCI Artifact. The\nfirst layer matching this type is selected.",
+                      "type": "string"
+                    },
+                    "operation": {
+                      "description": "Operation specifies how the selected layer should be processed.\nBy default, the layer compressed content is extracted to storage.\nWhen the operation is set to 'copy', the layer compressed content\nis persisted to storage as it is.",
+                      "enum": [
+                        "extract",
+                        "copy"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "provider": {
+                  "description": "The provider used for authentication, can be 'aws', 'azure', 'gcp' or 'generic'.\nWhen not specified, defaults to 'generic'.",
+                  "enum": [
+                    "generic",
+                    "aws",
+                    "azure",
+                    "gcp"
+                  ],
+                  "type": "string"
+                },
+                "proxySecretRef": {
+                  "description": "ProxySecretRef specifies the Secret containing the proxy configuration\nto use while communicating with the container registry.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the referent.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "reconcileStrategy": {
-                  "default": "ChartVersion",
                   "description": "Determines what enables the creation of a new artifact. Valid values are\n('ChartVersion', 'Revision').\nSee the documentation of the values for an explanation on their behavior.\nDefaults to ChartVersion when omitted.",
                   "enum": [
                     "ChartVersion",
                     "Revision"
                   ],
+                  "type": "string"
+                },
+                "ref": {
+                  "description": "The OCI reference to pull and monitor for changes,\ndefaults to the latest tag.",
+                  "properties": {
+                    "digest": {
+                      "description": "Digest is the image digest to pull, takes precedence over SemVer.\nThe value should be in the format 'sha256:<HASH>'.",
+                      "type": "string"
+                    },
+                    "semver": {
+                      "description": "SemVer is the range of tags to pull selecting the latest within\nthe range, takes precedence over Tag.",
+                      "type": "string"
+                    },
+                    "semverFilter": {
+                      "description": "SemverFilter is a regex pattern to filter the tags within the SemVer range.",
+                      "type": "string"
+                    },
+                    "tag": {
+                      "description": "Tag is the image tag to pull, defaults to latest.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "secretRef": {
+                  "description": "SecretRef contains the secret name containing the registry login\ncredentials to resolve image metadata.\nThe secret must be of type kubernetes.io/dockerconfigjson.",
+                  "properties": {
+                    "name": {
+                      "description": "Name of the referent.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                },
+                "serviceAccountName": {
+                  "description": "ServiceAccountName is the name of the Kubernetes ServiceAccount used to authenticate\nthe image pull, either with the pull secrets attached to the service account or with\nan object identity.\nFor more information about object identity:\nhttps://fluxcd.io/flux/integrations/object-identity/\nFor more information about image pull secrets:\nhttps://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account",
                   "type": "string"
                 },
                 "sourceRef": {
@@ -102,6 +215,20 @@
                   "type": "object",
                   "additionalProperties": false
                 },
+                "suspend": {
+                  "description": "This flag tells the controller to suspend the reconciliation of this source.",
+                  "type": "boolean"
+                },
+                "timeout": {
+                  "description": "The timeout for remote OCI Repository operations like pulling, defaults to 60s.",
+                  "pattern": "^([0-9]+(\\.[0-9]+)?(ms|s|m))+$",
+                  "type": "string"
+                },
+                "url": {
+                  "description": "URL is a reference to an OCI artifact repository hosted\non a remote container registry.",
+                  "pattern": "^oci://.*$",
+                  "type": "string"
+                },
                 "valuesFiles": {
                   "description": "Alternative list of values files to use as the chart values (values.yaml\nis not included by default), expected to be a relative path in the SourceRef.\nValues files are merged in the order of this list with the last file overriding\nthe first. Ignored when omitted.",
                   "items": {
@@ -110,11 +237,34 @@
                   "type": "array"
                 },
                 "verify": {
-                  "description": "Verify contains the secret name containing the trusted public keys\nused to verify the signature and specifies which provider to use to check\nwhether OCI image is authentic.\nThis field is only supported for OCI sources.\nChart dependencies, which are not bundled in the umbrella chart artifact,\nare not verified.",
+                  "description": "Verify contains the secret name containing the trusted public keys\nused to verify the signature and specifies which provider to use to check\nwhether OCI image is authentic.",
                   "properties": {
+                    "matchOIDCIdentity": {
+                      "description": "MatchOIDCIdentity specifies the identity matching criteria to use\nwhile verifying an OCI artifact which was signed using Cosign keyless\nsigning. The artifact's identity is deemed to be verified if any of the\nspecified matchers match against the identity.",
+                      "items": {
+                        "description": "OIDCIdentityMatch specifies options for verifying the certificate identity,\ni.e. the issuer and the subject of the certificate.",
+                        "properties": {
+                          "issuer": {
+                            "description": "Issuer specifies the regex pattern to match against to verify\nthe OIDC issuer in the Fulcio certificate. The pattern must be a\nvalid Go regular expression.",
+                            "type": "string"
+                          },
+                          "subject": {
+                            "description": "Subject specifies the regex pattern to match against to verify\nthe identity subject in the Fulcio certificate. The pattern must\nbe a valid Go regular expression.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "issuer",
+                          "subject"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "type": "array"
+                    },
                     "provider": {
                       "default": "cosign",
-                      "description": "Provider specifies the technology used to sign the OCI Helm chart.",
+                      "description": "Provider specifies the technology used to sign the OCI Artifact.",
                       "enum": [
                         "cosign",
                         "notation"
@@ -123,6 +273,20 @@
                     },
                     "secretRef": {
                       "description": "SecretRef specifies the Kubernetes Secret containing the\ntrusted public keys.",
+                      "properties": {
+                        "name": {
+                          "description": "Name of the referent.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    "trustedRootSecretRef": {
+                      "description": "TrustedRootSecretRef specifies the Kubernetes Secret containing a\nSigstore trusted_root.json file. This enables verification against\nself-hosted Sigstore infrastructure (custom Fulcio CA, self-hosted\nRekor instance). The Secret must contain a key named \"trusted_root.json\".",
                       "properties": {
                         "name": {
                           "description": "Name of the referent.",
@@ -143,15 +307,10 @@
                   "additionalProperties": false
                 },
                 "version": {
-                  "default": "*",
-                  "description": "Version semver expression, ignored for charts from v1.GitRepository and\nv1beta2.Bucket sources. Defaults to latest when omitted.",
+                  "description": "Version semver expression, ignored for charts from v1.GitRepository and\nv1beta2.Bucket sources. Defaults to latest when omitted i.e. to '*'.",
                   "type": "string"
                 }
               },
-              "required": [
-                "chart",
-                "sourceRef"
-              ],
               "type": "object",
               "additionalProperties": false
             }
@@ -160,6 +319,44 @@
             "spec"
           ],
           "type": "object",
+          "x-kubernetes-validations": [
+            {
+              "message": "chart.spec.url must be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || (has(self.spec.url) && size(self.spec.url) > 0)"
+            },
+            {
+              "message": "chart.spec.url requires chart.kind: 'OCIRepository'; for a HelmChart template set spec.chart and spec.sourceRef instead",
+              "rule": "!has(self.spec.url) || (has(self.kind) && self.kind == 'OCIRepository')"
+            },
+            {
+              "message": "chart.spec.chart and chart.spec.sourceRef must be set when chart.kind is not 'OCIRepository'",
+              "rule": "(has(self.kind) && self.kind == 'OCIRepository') || (has(self.spec.chart) && has(self.spec.sourceRef))"
+            },
+            {
+              "message": "chart.spec.chart cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.chart)"
+            },
+            {
+              "message": "chart.spec.version cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.version) || self.spec.version == '*'"
+            },
+            {
+              "message": "chart.spec.sourceRef cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.sourceRef)"
+            },
+            {
+              "message": "chart.spec.reconcileStrategy cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.reconcileStrategy) || self.spec.reconcileStrategy == 'ChartVersion'"
+            },
+            {
+              "message": "chart.spec.valuesFiles cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.valuesFiles)"
+            },
+            {
+              "message": "chart.spec.ignoreMissingValuesFiles cannot be set when chart.kind is 'OCIRepository'",
+              "rule": "!has(self.kind) || self.kind != 'OCIRepository' || !has(self.spec.ignoreMissingValuesFiles)"
+            }
+          ],
           "additionalProperties": false
         },
         "chartRef": {
@@ -467,10 +664,10 @@
           "type": "string"
         },
         "kubeConfig": {
-          "description": "KubeConfig for reconciling the HelmRelease on a remote cluster.\nWhen used in combination with HelmReleaseSpec.ServiceAccountName,\nforces the controller to act on behalf of that Service Account at the\ntarget cluster.\nIf the --default-service-account flag is set, its value will be used as\na controller level fallback for when HelmReleaseSpec.ServiceAccountName\nis empty.",
+          "description": "KubeConfig for reconciling the HelmRelease on a remote cluster.\nWhen used in combination with HelmReleaseSpec.ServiceAccountName,\nforces the controller to act on behalf of that Service Account at the\ntarget cluster.\nIf the --default-service-account flag is set, its value will be used as\nthe default for HelmReleaseSpec.ServiceAccountName when it is empty.",
           "properties": {
             "configMapRef": {
-              "description": "ConfigMapRef holds an optional name of a ConfigMap that contains\nthe following keys:\n\n- `provider`: the provider to use. One of `aws`, `azure`, `gcp`, or\n   `generic`. Required.\n- `cluster`: the fully qualified resource name of the Kubernetes\n   cluster in the cloud provider API. Not used by the `generic`\n   provider. Required when one of `address` or `ca.crt` is not set.\n- `address`: the address of the Kubernetes API server. Required\n   for `generic`. For the other providers, if not specified, the\n   first address in the cluster resource will be used, and if\n   specified, it must match one of the addresses in the cluster\n   resource.\n   If audiences is not set, will be used as the audience for the\n   `generic` provider.\n- `ca.crt`: the optional PEM-encoded CA certificate for the\n   Kubernetes API server. If not set, the controller will use the\n   CA certificate from the cluster resource.\n- `audiences`: the optional audiences as a list of\n   line-break-separated strings for the Kubernetes ServiceAccount\n   token. Defaults to the `address` for the `generic` provider, or\n   to specific values for the other providers depending on the\n   provider.\n-  `serviceAccountName`: the optional name of the Kubernetes\n   ServiceAccount in the same namespace that should be used\n   for authentication. If not specified, the controller\n   ServiceAccount will be used.\n\nMutually exclusive with SecretRef.",
+              "description": "ConfigMapRef holds an optional name of a ConfigMap that contains\nthe following keys:\n\n- `provider`: the provider to use. One of `aws`, `azure`, `gcp`, or\n   `generic`. Required.\n- `cluster`: the fully qualified resource name of the Kubernetes\n   cluster in the cloud provider API. Not used by the `generic`\n   provider. Required when one of `address` or `ca.crt` is not set.\n- `address`: the address of the Kubernetes API server. Required\n   for `generic`. For the other providers, if not specified, the\n   first address in the cluster resource will be used, and if\n   specified, it must match one of the addresses in the cluster\n   resource.\n   If audiences is not set, will be used as the audience for the\n   `generic` provider.\n- `ca.crt`: the optional PEM-encoded CA certificate for the\n   Kubernetes API server. If not set, the controller will use the\n   CA certificate from the cluster resource.\n-  `serviceAccountName`: the optional name of the Kubernetes\n   ServiceAccount in the same namespace that should be used\n   for authentication. If not specified, the controller\n   ServiceAccount will be used.\n- `audiences`: the optional audiences as a list of string separated by\n   commas and/or whitespaces/newlines for the Kubernetes ServiceAccount\n   token. Defaults to the `address` for the `generic` provider, or\n   to specific values for the other providers depending on the\n   provider.\n\nMutually exclusive with SecretRef.",
               "properties": {
                 "name": {
                   "description": "Name of the referent.",
@@ -506,11 +703,7 @@
           "x-kubernetes-validations": [
             {
               "message": "exactly one of spec.kubeConfig.configMapRef or spec.kubeConfig.secretRef must be specified",
-              "rule": "has(self.configMapRef) || has(self.secretRef)"
-            },
-            {
-              "message": "exactly one of spec.kubeConfig.configMapRef or spec.kubeConfig.secretRef must be specified",
-              "rule": "!has(self.configMapRef) || !has(self.secretRef)"
+              "rule": "has(self.configMapRef) != has(self.secretRef)"
             }
           ],
           "additionalProperties": false
@@ -1071,7 +1264,7 @@
           "type": "integer"
         },
         "helmChart": {
-          "description": "HelmChart is the namespaced name of the HelmChart resource created by\nthe controller for the HelmRelease.",
+          "description": "HelmChart is the namespaced name of the HelmChart resource created by\nthe controller for the HelmRelease, in the format '<namespace>/<name>',\nor the typed and namespaced name of the OCIRepository resource, in the\nformat '<kind>/<namespace>/<name>'.",
           "type": "string"
         },
         "history": {

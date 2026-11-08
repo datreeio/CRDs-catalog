@@ -15,6 +15,13 @@
     "spec": {
       "description": "Spec defines the desired state of HTTPRouteFilter.",
       "properties": {
+        "backendPriority": {
+          "description": "BackendPriority sets the Envoy locality priority of the endpoints belonging to the\nbackendRef this filter is attached to, enabling priority-based failover between the\nbackendRefs of a single route rule. 0 is the highest priority.\n\nEnvoy sends traffic to the lowest priority value that has enough healthy endpoints,\nand only spills over to the next value as that health degrades. It is highly\nrecommended to configure active or passive health checks so that failover can be\ndetected when the higher priority backends become unhealthy.\n\nThis overrides the priority derived from the referenced Backend's fallback field.\nFor additional details, see\nhttps://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/upstream/load_balancing/priority\n\nThis filter is only valid when referenced from a backendRef's filters. Referencing it\nfrom a route rule's filters is rejected: a rule-level filter applies uniformly to every\nbackendRef of the rule, and a uniform priority carries no failover meaning.",
+          "format": "int32",
+          "maximum": 128,
+          "minimum": 0,
+          "type": "integer"
+        },
         "credentialInjection": {
           "description": "HTTPCredentialInjectionFilter defines the configuration to inject credentials into the request.\nThis is useful when the backend service requires credentials in the request, and the original\nrequest does not contain them. The filter can inject credentials into the request before forwarding\nit to the backend service.",
           "properties": {
@@ -262,6 +269,98 @@
           "type": "object",
           "additionalProperties": false
         },
+        "grpcJSONTranscoder": {
+          "description": "GRPCJSONTranscoder converts a JSON/HTTP request to a gRPC request, and the gRPC\nresponse back to JSON.\n\nIt can only be used in the rule filters of an HTTPRoute. It is not supported in a\nGRPCRoute or in the filters of a backendRef.",
+          "properties": {
+            "convertGRPCStatus": {
+              "description": "ConvertGRPCStatus converts the gRPC status of an error response to the HTTP\nstatus code and a JSON body.",
+              "type": "boolean"
+            },
+            "ignoreUnknownQueryParameters": {
+              "description": "IgnoreUnknownQueryParameters ignores the query parameters that can't be mapped to\na field of the gRPC request.\n\nIf false, a request with such a parameter is not transcoded and is sent to the\nbackend as is.",
+              "type": "boolean"
+            },
+            "printOptions": {
+              "description": "PrintOptions defines how the gRPC response is printed as JSON.",
+              "properties": {
+                "addWhitespace": {
+                  "description": "AddWhitespace adds spaces, line breaks and indentation to the JSON output.",
+                  "type": "boolean"
+                },
+                "alwaysPrintPrimitiveFields": {
+                  "description": "AlwaysPrintPrimitiveFields prints the primitive fields even when they have\ndefault values.",
+                  "type": "boolean"
+                },
+                "preserveProtoFieldNames": {
+                  "description": "PreserveProtoFieldNames uses the field names in the proto file instead of\nlowerCamelCase names.",
+                  "type": "boolean"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "protoDescriptor": {
+              "description": "ProtoDescriptor defines where to find the protobuf descriptor set of the gRPC services.",
+              "properties": {
+                "valueRef": {
+                  "description": "ValueRef references a ConfigMap in the same namespace that holds the descriptor set.\n\nThe descriptor set is read from the `proto-descriptor` key, either in `binaryData`\nor in `data`, where it can be base64-encoded. If the ConfigMap has no `data` and only\none `binaryData` entry, that entry is used.\n\nThe descriptor set must include all the imported files. It can be generated with\n`protoc --include_imports --descriptor_set_out=...`.",
+                  "properties": {
+                    "group": {
+                      "description": "Group is the group of the referent. For example, \"gateway.networking.k8s.io\".\nWhen unspecified or empty string, core API group is inferred.",
+                      "maxLength": 253,
+                      "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Kind is kind of the referent. For example \"HTTPRoute\" or \"Service\".",
+                      "maxLength": 63,
+                      "minLength": 1,
+                      "pattern": "^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "Name is the name of the referent.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "kind",
+                    "name"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "valueRef"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "valueRef must refer to a core ConfigMap",
+                  "rule": "size(self.valueRef.group) == 0 && self.valueRef.kind == 'ConfigMap'"
+                }
+              ],
+              "additionalProperties": false
+            },
+            "services": {
+              "description": "Services defines the gRPC services to transcode.\n\nIf not specified, all the services defined in the descriptor are transcoded,\nexcept the ones that come from imported files.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "set"
+            }
+          },
+          "required": [
+            "protoDescriptor"
+          ],
+          "type": "object",
+          "additionalProperties": false
+        },
         "matches": {
           "description": "Matches defines additional matching criteria for the HTTPRoute rule.\nAs with HTTPRouteRule.Matches, the rule is matched if any one match applies.\nWhen both HTTPRouteRule.Matches and HTTPRouteFilter.Matches are set, the\neffective matching is the logical AND of the two sets.",
           "items": {
@@ -312,6 +411,48 @@
           },
           "maxItems": 8,
           "type": "array"
+        },
+        "requestMirror": {
+          "description": "RequestMirror defines configuration for request mirroring modifiers.\nThis configuration works together with the Gateway API RequestMirror filter\non the attached HTTPRoute rule.",
+          "properties": {
+            "hostname": {
+              "description": "Hostname defines the configuration to rewrite the Host header for mirrored requests.",
+              "properties": {
+                "literal": {
+                  "description": "Literal specifies a fixed hostname to rewrite the Host header to.\nRequired when Type is \"Literal\". Must be empty when Type is \"Backend\".\nNote: gwapiv1.PreciseHostname already carries MinLength=1, MaxLength=253,\nand RFC 1123 pattern validation, which automatically flow into the generated CRD.",
+                  "maxLength": 253,
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "Type defines the type of hostname rewrite.",
+                  "enum": [
+                    "Backend",
+                    "Literal"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type"
+              ],
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "literal must be nil if the type is not Literal",
+                  "rule": "!(has(self.literal) && self.type != 'Literal')"
+                },
+                {
+                  "message": "literal must be specified for Literal type",
+                  "rule": "!(!has(self.literal) && self.type == 'Literal')"
+                }
+              ],
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "urlRewrite": {
           "description": "HTTPURLRewriteFilter define rewrites of HTTP URL components such as path and host",

@@ -59,6 +59,7 @@
                   "description": "TrustedCIDRs is a list of CIDR ranges to trust when evaluating\nthe remote IP address to determine the original client\u2019s IP address.\nWhen the remote IP address matches a trusted CIDR and the x-forwarded-for header was sent,\neach entry in the x-forwarded-for header is evaluated from right to left\nand the first public non-trusted address is used as the original client address.\nIf all addresses in x-forwarded-for are within the trusted list, the first (leftmost) entry is used.\nOnly one of NumTrustedHops and TrustedCIDRs must be set.",
                   "items": {
                     "description": "CIDR defines a CIDR Address range.\nA CIDR can be an IPv4 address range such as \"192.168.1.0/24\" or an IPv6 address range such as \"2001:0db8:11a3:09d7::/64\".",
+                    "maxLength": 64,
                     "pattern": "((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\\/([0-9]+))",
                     "type": "string"
                   },
@@ -121,6 +122,13 @@
                   "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                   "type": "string"
                 },
+                "maxConnectionDurationJitter": {
+                  "description": "MaxConnectionDurationJitter adds a random extra amount of time to each connection's\nMaxConnectionDuration, up to this percentage of that duration. This keeps connections\nopened together from expiring at the same moment. Requires MaxConnectionDuration.\nIf not specified, no jitter is added.",
+                  "format": "int32",
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                },
                 "maxRequestsPerConnection": {
                   "description": "MaxRequestsPerConnection defines the maximum number of requests allowed over a single connection.\nIf not specified, there is no limit. Setting this parameter to 1 will effectively disable keep alive.",
                   "format": "int32",
@@ -143,6 +151,10 @@
                 {
                   "message": "closeDelay can only be configured when value is set",
                   "rule": "!has(self.closeDelay) || has(self.value)"
+                },
+                {
+                  "message": "maxConnectionDurationJitter can only be configured when maxConnectionDuration is set",
+                  "rule": "!has(self.maxConnectionDurationJitter) || has(self.maxConnectionDuration)"
                 }
               ],
               "additionalProperties": false
@@ -178,7 +190,7 @@
           "additionalProperties": false
         },
         "enableProxyProtocol": {
-          "description": "EnableProxyProtocol interprets the ProxyProtocol header and adds the\nClient Address into the X-Forwarded-For header.\nNote Proxy Protocol must be present when this field is set, else the connection\nis closed.\n\nDeprecated: Use ProxyProtocol instead.",
+          "description": "EnableProxyProtocol interprets the ProxyProtocol header and adds the\nClient Address into the X-Forwarded-For header.\nNote Proxy Protocol must be present when this field is set, else the connection\nis closed.\n\nDeprecated: Use ProxyProtocol instead. This field will be removed in v1.11.",
           "type": "boolean"
         },
         "grpc": {
@@ -197,6 +209,10 @@
           "properties": {
             "disableRateLimitHeaders": {
               "description": "DisableRateLimitHeaders configures Envoy Proxy to omit the \"X-RateLimit-\" response headers\nwhen rate limiting is enabled.",
+              "type": "boolean"
+            },
+            "disableRetryAfterHeader": {
+              "description": "DisableRetryAfterHeader configures Envoy Proxy to omit the \"Retry-After\" response header\non rate-limited 429 responses.",
               "type": "boolean"
             },
             "earlyRequestHeaders": {
@@ -269,6 +285,101 @@
                     "name"
                   ],
                   "x-kubernetes-list-type": "map"
+                },
+                "mutations": {
+                  "description": "Mutations is an ordered list of header operations that are applied in\nexactly the order specified. Use this field when the sequence of\noperations matters, for example setting a header and then appending to\nit, or removing a header and then re-adding it.\n\nMutations are always applied FIRST, in list order. The Set, Add,\nAddIfAbsent, Remove and RemoveOnMatch fields below are then applied after\nthe mutations, preserving their existing ordering (Add, then Set, then\nAddIfAbsent, then Remove, then RemoveOnMatch).",
+                  "items": {
+                    "description": "HTTPHeaderMutation defines a single header mutation operation.",
+                    "maxProperties": 1,
+                    "minProperties": 1,
+                    "properties": {
+                      "remove": {
+                        "description": "Remove removes the named header if it exists. Header names are\ncase-insensitive.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "removeOnMatch": {
+                        "description": "RemoveOnMatch removes every header whose name matches the specified string\nmatcher. Matching is performed on the header name (case-insensitive).",
+                        "properties": {
+                          "type": {
+                            "default": "Exact",
+                            "description": "Type specifies how to match against a string.",
+                            "enum": [
+                              "Exact",
+                              "Prefix",
+                              "Suffix",
+                              "RegularExpression"
+                            ],
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "Value specifies the string value that the match must have.",
+                            "maxLength": 1024,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "value"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "write": {
+                        "description": "Write adds or modifies a header using the specified action.",
+                        "properties": {
+                          "action": {
+                            "default": "Add",
+                            "description": "Action controls how the header value is written when a header with the\nsame name already exists. Defaults to Add.",
+                            "enum": [
+                              "Add",
+                              "Set",
+                              "AddIfAbsent",
+                              "SetIfExists"
+                            ],
+                            "type": "string"
+                          },
+                          "header": {
+                            "description": "Header is the header name and value to write. The value may contain\nEnvoy substitution format operators such as \"%REQ(x-foo)%\", which are\nevaluated per request.\nSee https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#command-operators",
+                            "properties": {
+                              "name": {
+                                "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                                "maxLength": 256,
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                "type": "string"
+                              },
+                              "value": {
+                                "description": "Value is the value of HTTP Header to be matched.\n<gateway:experimental:description>\nMust consist of printable US-ASCII characters, optionally separated\nby single tabs or spaces. See: https://tools.ietf.org/html/rfc7230#section-3.2\n</gateway:experimental:description>\n\n<gateway:experimental:validation:Pattern=`^[!-~]+([\\t ]?[!-~]+)*$`>",
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "keepEmptyValue": {
+                            "description": "KeepEmptyValue controls whether the header is still written when its\nvalue is empty. This matters for values produced by substitution\nformatters, e.g. \"%REQ(x-foo)%\", which may resolve to an empty string at\nrequest time. Envoy drops such headers by default; set this to true to\nkeep them with an empty value.\n\nWhen unset, it defaults to true only if the configured value itself is\nthe empty string, so a literal empty header is always written.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "header"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 64,
+                  "type": "array"
                 },
                 "remove": {
                   "description": "Remove the given header(s) from the HTTP request before the action. The\nvalue of Remove is a list of HTTP header names. Note that the header\nnames are case-insensitive (see\nhttps://datatracker.ietf.org/doc/html/rfc2616#section-4.2).\n\nInput:\n  GET /foo HTTP/1.1\n  my-header1: foo\n  my-header2: bar\n  my-header3: baz\n\nConfig:\n  remove: [\"my-header1\", \"my-header3\"]\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header2: bar",
@@ -437,6 +548,101 @@
                   ],
                   "x-kubernetes-list-type": "map"
                 },
+                "mutations": {
+                  "description": "Mutations is an ordered list of header operations that are applied in\nexactly the order specified. Use this field when the sequence of\noperations matters, for example setting a header and then appending to\nit, or removing a header and then re-adding it.\n\nMutations are always applied FIRST, in list order. The Set, Add,\nAddIfAbsent, Remove and RemoveOnMatch fields below are then applied after\nthe mutations, preserving their existing ordering (Add, then Set, then\nAddIfAbsent, then Remove, then RemoveOnMatch).",
+                  "items": {
+                    "description": "HTTPHeaderMutation defines a single header mutation operation.",
+                    "maxProperties": 1,
+                    "minProperties": 1,
+                    "properties": {
+                      "remove": {
+                        "description": "Remove removes the named header if it exists. Header names are\ncase-insensitive.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "removeOnMatch": {
+                        "description": "RemoveOnMatch removes every header whose name matches the specified string\nmatcher. Matching is performed on the header name (case-insensitive).",
+                        "properties": {
+                          "type": {
+                            "default": "Exact",
+                            "description": "Type specifies how to match against a string.",
+                            "enum": [
+                              "Exact",
+                              "Prefix",
+                              "Suffix",
+                              "RegularExpression"
+                            ],
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "Value specifies the string value that the match must have.",
+                            "maxLength": 1024,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "value"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      },
+                      "write": {
+                        "description": "Write adds or modifies a header using the specified action.",
+                        "properties": {
+                          "action": {
+                            "default": "Add",
+                            "description": "Action controls how the header value is written when a header with the\nsame name already exists. Defaults to Add.",
+                            "enum": [
+                              "Add",
+                              "Set",
+                              "AddIfAbsent",
+                              "SetIfExists"
+                            ],
+                            "type": "string"
+                          },
+                          "header": {
+                            "description": "Header is the header name and value to write. The value may contain\nEnvoy substitution format operators such as \"%REQ(x-foo)%\", which are\nevaluated per request.\nSee https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#command-operators",
+                            "properties": {
+                              "name": {
+                                "description": "Name is the name of the HTTP Header to be matched. Name matching MUST be\ncase-insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).\n\nIf multiple entries specify equivalent header names, the first entry with\nan equivalent name MUST be considered for a match. Subsequent entries\nwith an equivalent header name MUST be ignored. Due to the\ncase-insensitivity of header names, \"foo\" and \"Foo\" are considered\nequivalent.",
+                                "maxLength": 256,
+                                "minLength": 1,
+                                "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                "type": "string"
+                              },
+                              "value": {
+                                "description": "Value is the value of HTTP Header to be matched.\n<gateway:experimental:description>\nMust consist of printable US-ASCII characters, optionally separated\nby single tabs or spaces. See: https://tools.ietf.org/html/rfc7230#section-3.2\n</gateway:experimental:description>\n\n<gateway:experimental:validation:Pattern=`^[!-~]+([\\t ]?[!-~]+)*$`>",
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "keepEmptyValue": {
+                            "description": "KeepEmptyValue controls whether the header is still written when its\nvalue is empty. This matters for values produced by substitution\nformatters, e.g. \"%REQ(x-foo)%\", which may resolve to an empty string at\nrequest time. Envoy drops such headers by default; set this to true to\nkeep them with an empty value.\n\nWhen unset, it defaults to true only if the configured value itself is\nthe empty string, so a literal empty header is always written.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "header"
+                        ],
+                        "type": "object",
+                        "additionalProperties": false
+                      }
+                    },
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "maxItems": 64,
+                  "type": "array"
+                },
                 "remove": {
                   "description": "Remove the given header(s) from the HTTP request before the action. The\nvalue of Remove is a list of HTTP header names. Note that the header\nnames are case-insensitive (see\nhttps://datatracker.ietf.org/doc/html/rfc2616#section-4.2).\n\nInput:\n  GET /foo HTTP/1.1\n  my-header1: foo\n  my-header2: bar\n  my-header3: baz\n\nConfig:\n  remove: [\"my-header1\", \"my-header3\"]\n\nOutput:\n  GET /foo HTTP/1.1\n  my-header2: bar",
                   "items": {
@@ -518,8 +724,28 @@
               "type": "object",
               "additionalProperties": false
             },
+            "maxRequestHeaderLimit": {
+              "allOf": [
+                {
+                  "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$"
+                },
+                {
+                  "pattern": "^[1-9]+[0-9]*([EPTGMK]i|[EPTGMk])?$"
+                }
+              ],
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "description": "MaxRequestHeaderLimit provides configuration for the maximum size of the\nrequest headers allowed for incoming connections, mapping to the Envoy\n`max_request_headers_kb` HTTP connection manager setting. Requests whose\nheaders exceed this limit receive a 431 (Request Header Fields Too Large)\nresponse. The value is rounded up to the nearest KiB, must be at least 1Ki,\nand cannot exceed 8192Ki (the maximum Envoy supports).\nFor example, 60Ki, 96Ki, 128Ki etc.\nNote that when the suffix is not provided, the value is interpreted as bytes.\nDefault: 60Ki bytes.",
+              "x-kubernetes-int-or-string": true
+            },
             "preserveXRequestID": {
-              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nDefaults to false and cannot be combined with RequestID.\n\nDeprecated: use RequestID=PreserveOrGenerate instead",
+              "description": "PreserveXRequestID configures Envoy to keep the X-Request-ID header if passed for a request that is edge\n(Edge request is the request from external clients to front Envoy) and not reset it, which is the current Envoy behaviour.\nDefaults to false and cannot be combined with RequestID.\n\nDeprecated: use RequestID=PreserveOrGenerate instead. This field will be removed in v1.11.",
               "type": "boolean"
             },
             "requestID": {
@@ -553,11 +779,12 @@
                       "Cert",
                       "Chain",
                       "DNS",
-                      "URI"
+                      "URI",
+                      "Issuer"
                     ],
                     "type": "string"
                   },
-                  "maxItems": 5,
+                  "maxItems": 6,
                   "type": "array"
                 },
                 "mode": {
@@ -615,11 +842,11 @@
               "type": "boolean"
             },
             "enableTrailers": {
-              "description": "EnableTrailers defines if HTTP/1 trailers should be proxied by Envoy.",
+              "description": "EnableTrailers defines if HTTP/1 trailers should be proxied by Envoy.\n\nNote: this field currently configures both the client connection and the backend HTTP/1\nprotocol settings. In a future release it will be restricted to the client connection only.\nUse BackendTrafficPolicy.http1.enableTrailers for backend settings.\nEnable the EnvoyGateway runtimeFlag ApplyClientTrafficPolicyHTTP1SettingsToClientsOnly\nto opt in to the new behavior now.",
               "type": "boolean"
             },
             "http10": {
-              "description": "HTTP10 turns on support for HTTP/1.0 and HTTP/0.9 requests.",
+              "description": "HTTP10 turns on support for HTTP/1.0 and HTTP/0.9 requests.\n\nNote: this field currently forces explicit HTTP/1 for backend connections when other\nbackend-relevant HTTP/1 fields like EnableTrailers and PreserveHeaderCase are absent.\nIn a future release it will no longer force explicit HTTP/1 on backend connections.\nUse BackendTrafficPolicy.http1: {} to force HTTP/1 on a backend cluster explicitly.",
               "properties": {
                 "useDefaultHost": {
                   "description": "UseDefaultHost specifies whether a default Host header should be injected\ninto HTTP/1.0 requests that do not include one.\n\nWhen set to true, Envoy Gateway injects the hostname associated with the\nlistener or route into the request, in the following order:\n\n  1. If the targeted listener has a non-wildcard hostname, use that hostname.\n  2. If there is exactly one HTTPRoute with a non-wildcard hostname under\n     the targeted listener, use that hostname.\n\n Note: Setting this field to true without a non-wildcard hostname makes the\nClientTrafficPolicy invalid.",
@@ -661,7 +888,7 @@
               "type": "array"
             },
             "preserveHeaderCase": {
-              "description": "PreserveHeaderCase defines if Envoy should preserve the letter case of headers.\nBy default, Envoy will lowercase all the headers.",
+              "description": "PreserveHeaderCase defines if Envoy should preserve the letter case of headers.\nBy default, Envoy will lowercase all the headers.\n\nNote: this field currently configures both the client connection and the backend HTTP/1\nprotocol settings. In a future release it will be restricted to the client connection only.\nUse BackendTrafficPolicy.http1.preserveHeaderCase for backend settings.\nEnable the EnvoyGateway runtimeFlag ApplyClientTrafficPolicyHTTP1SettingsToClientsOnly\nto opt in to the new behavior now.",
               "type": "boolean"
             }
           },
@@ -763,7 +990,21 @@
         },
         "http3": {
           "description": "HTTP3 provides HTTP/3 configuration on the listener.",
-          "type": "object"
+          "properties": {
+            "advertisedPort": {
+              "description": "AdvertisedPort specifies the port advertised to clients in the HTTP/3\n`alt-svc` response header. It does not change the listener or Service port.\nIf unset, the Gateway listener port is advertised.",
+              "format": "int32",
+              "type": "integer",
+              "x-kubernetes-validations": [
+                {
+                  "message": "advertisedPort must be between 1 and 65535",
+                  "rule": "self >= 1 && self <= 65535"
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         },
         "path": {
           "description": "Path enables managing how the incoming path set by clients can be normalized.",
@@ -790,6 +1031,55 @@
           "description": "ProxyProtocol configures the Proxy Protocol settings. When configured,\nthe Proxy Protocol header will be interpreted and the Client Address\nwill be added into the X-Forwarded-For header.\nIf both EnableProxyProtocol and ProxyProtocol are set, ProxyProtocol takes precedence.",
           "minProperties": 0,
           "properties": {
+            "forwardProtoConfig": {
+              "description": "ForwardProtoConfig infers the x-forwarded-proto header from the PROXY protocol\ndestination port. Only takes effect when PROXY protocol is enabled.\n\nThis is useful when a Layer 4 load balancer (such as AWS NLB) terminates TLS and\nforwards traffic to Envoy over PROXY protocol, so that Envoy can set the correct\nscheme for the forwarded request.",
+              "properties": {
+                "httpDestinationPorts": {
+                  "description": "HTTPDestinationPorts are the destination ports treated as HTTP.\nWhen the PROXY protocol destination port matches one of these, the\nx-forwarded-proto header is set to \"http\".\nCommon values: 80, 8080.",
+                  "items": {
+                    "format": "int32",
+                    "type": "integer",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "port must be in the range [1, 65535]",
+                        "rule": "self >= 1 && self <= 65535"
+                      }
+                    ]
+                  },
+                  "maxItems": 16,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "httpsDestinationPorts": {
+                  "description": "HTTPSDestinationPorts are the destination ports treated as HTTPS.\nWhen the PROXY protocol destination port matches one of these, the\nx-forwarded-proto header is set to \"https\".\nCommon values: 443, 8443.",
+                  "items": {
+                    "format": "int32",
+                    "type": "integer",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "port must be in the range [1, 65535]",
+                        "rule": "self >= 1 && self <= 65535"
+                      }
+                    ]
+                  },
+                  "maxItems": 16,
+                  "minItems": 1,
+                  "type": "array"
+                }
+              },
+              "type": "object",
+              "x-kubernetes-validations": [
+                {
+                  "message": "at least one of httpsDestinationPorts or httpDestinationPorts must be set",
+                  "rule": "(has(self.httpsDestinationPorts) ? self.httpsDestinationPorts.size() : 0) + (has(self.httpDestinationPorts) ? self.httpDestinationPorts.size() : 0) >= 1"
+                },
+                {
+                  "message": "httpsDestinationPorts and httpDestinationPorts must be disjoint",
+                  "rule": "!(has(self.httpsDestinationPorts) && has(self.httpDestinationPorts) && self.httpsDestinationPorts.exists(p, p in self.httpDestinationPorts))"
+                }
+              ],
+              "additionalProperties": false
+            },
             "optional": {
               "description": "Optional allows requests without a Proxy Protocol header to be proxied.\nIf set to true, the listener will accept requests without a Proxy Protocol header.\nIf set to false, the listener will reject requests without a Proxy Protocol header.\nIf not set, the default behavior is to reject requests without a Proxy Protocol header.\nWarning: Optional breaks conformance with the specification. Only enable if ALL traffic to the listener comes from a trusted source.\nFor more information on security implications, see haproxy.org/download/2.1/doc/proxy-protocol.txt",
               "type": "boolean"
@@ -807,7 +1097,7 @@
           "type": "string"
         },
         "targetRef": {
-          "description": "TargetRef is the name of the resource this policy is being attached to.\nThis policy and the TargetRef MUST be in the same namespace for this\nPolicy to have effect\n\nDeprecated: use targetRefs/targetSelectors instead",
+          "description": "TargetRef is the name of the resource this policy is being attached to.\nThis policy and the TargetRef MUST be in the same namespace for this\nPolicy to have effect\n\nDeprecated: use targetRefs/targetSelectors instead. This field will be removed in v1.11.",
           "properties": {
             "group": {
               "description": "Group is the group of the target resource.",
@@ -1178,7 +1468,7 @@
                   "type": "array"
                 },
                 "certificateHashes": {
-                  "description": "An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will\nverify that the SHA-256 of the DER-encoded presented certificate matches\none of the specified values.",
+                  "description": "An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will\nverify that the SHA-256 of the DER-encoded presented certificate matches\none of the specified values.\nSetting this requires a client certificate, so it cannot be combined with\nmode VerifyIfGiven or the deprecated optional: true.",
                   "items": {
                     "type": "string"
                   },
@@ -1257,14 +1547,14 @@
                   "type": "boolean"
                 },
                 "spkiHashes": {
-                  "description": "An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will\nverify that the SHA-256 of the DER-encoded Subject Public Key Information\n(SPKI) of the presented certificate matches one of the specified values.",
+                  "description": "An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will\nverify that the SHA-256 of the DER-encoded Subject Public Key Information\n(SPKI) of the presented certificate matches one of the specified values.\nSetting this requires a client certificate, so it cannot be combined with\nmode VerifyIfGiven or the deprecated optional: true.",
                   "items": {
                     "type": "string"
                   },
                   "type": "array"
                 },
                 "subjectAltNames": {
-                  "description": "An optional list of Subject Alternative name matchers. If specified, Envoy\nwill verify that the Subject Alternative Name of the presented certificate\nmatches one of the specified matchers",
+                  "description": "An optional list of Subject Alternative name matchers. If specified, Envoy\nwill verify that the Subject Alternative Name of the presented certificate\nmatches one of the specified matchers.\nSetting this requires a client certificate, so it cannot be combined with\nmode VerifyIfGiven or the deprecated optional: true.",
                   "properties": {
                     "dnsNames": {
                       "description": "DNS names matchers",
@@ -1435,6 +1725,10 @@
                 {
                   "message": "allowExpiredCertificate can only be set when mode is VerifyIfGiven or RequireAndVerify",
                   "rule": "!has(self.allowExpiredCertificate) || !self.allowExpiredCertificate || !has(self.mode) || self.mode in ['VerifyIfGiven', 'RequireAndVerify']"
+                },
+                {
+                  "message": "subjectAltNames, certificateHashes and spkiHashes cannot be used with mode VerifyIfGiven, because Envoy requires a client certificate whenever they are set",
+                  "rule": "!((has(self.mode) ? self.mode == 'VerifyIfGiven' : (has(self.optional) && self.optional)) && (has(self.subjectAltNames) || has(self.certificateHashes) || has(self.spkiHashes)))"
                 }
               ],
               "additionalProperties": false

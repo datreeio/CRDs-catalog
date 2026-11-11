@@ -152,7 +152,9 @@ def validate_schema(raw):
         validator = Draft7Validator if uri is None else by_uri.get(uri)
         if validator is None:
             raise ValueError("Unsupported JSON Schema dialect")
-        validator.check_schema(schema)
+        # Format checks in meta-schemas validate 'pattern' with Python's re module, which
+        # rejects ECMA-262 / Go RE2 character classes like \p or \P (e.g. \PC, \p{L}).
+        validator.check_schema(schema, format_checker=None)
         return schema
     except (ValueError, SchemaError, RecursionError, UnicodeError):
         raise PolicyError("needs-contributor-input", "A schema is invalid, has duplicate keys, an unsupported dialect, or an external reference/identifier. Correct the schema and push an update.") from None

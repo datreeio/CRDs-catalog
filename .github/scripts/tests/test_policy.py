@@ -134,6 +134,9 @@ class PolicyTests(unittest.TestCase):
         for raw in [b'{', b'{"type":"object","type":"string"}', b'{"type":"object","required":"a"}', b'{"type":"object","maximum":NaN}', b'{"type":"object","$schema":"https://evil.test/schema"}', b'{"type":"object","$ref":"https://evil.test/schema"}', b'{"type":"object","$dynamicRef":"other.json"}']:
             self.expect_error('needs-contributor-input', p.validate_schema, raw)
         p.validate_schema(b'{"type":"object","definitions":{"x":{"type":"string"}},"properties":{"a":{"$ref":"#/definitions/x"}}}')
+        # Kubernetes CRDs permit Go RE2 / ECMA-262 regexes with Unicode property classes like \PC and \p{L}.
+        p.validate_schema(b'{"type":"object","properties":{"val":{"type":"string","pattern":"^\\\\PC*$"}}}')
+        p.validate_schema(b'{"type":"object","properties":{"val":{"type":"string","pattern":"^([a-zA-Z0-9\\\\p{S}\\\\p{L}])$"}}}')
 
     def test_sources_exact_mapping(self):
         for body in ['', BODY+'\n'+BODY, BODY.replace(FILE, 'other.io/widget_v1.json'), BODY.replace(SHA, 'main'), BODY.replace('github.com/', 'github.com.evil.test/'), BODY.replace('/config/', '/../'), BODY.replace(URL, URL+'?token=foo')]:

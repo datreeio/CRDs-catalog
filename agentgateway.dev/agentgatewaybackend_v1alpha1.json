@@ -204,6 +204,19 @@
                           ],
                           "additionalProperties": false
                         },
+                        "copilot": {
+                          "description": "GitHub Copilot provider settings.",
+                          "properties": {
+                            "model": {
+                              "description": "Model name override.\nIf unset, the model name is taken from the request.",
+                              "maxLength": 256,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "type": "object",
+                          "additionalProperties": false
+                        },
                         "custom": {
                           "description": "Custom provider configures a non-managed or self-hosted LLM provider.\nUse this when the provider target and API formats should be declared\nexplicitly instead of inferred from a managed provider such as OpenAI or\nAnthropic.",
                           "properties": {
@@ -265,11 +278,13 @@
                                     "enum": [
                                       "AnthropicTokenCount",
                                       "Completions",
+                                      "Decisions",
                                       "Embeddings",
                                       "Messages",
                                       "Realtime",
                                       "Rerank",
-                                      "Responses"
+                                      "Responses",
+                                      "SystemOne"
                                     ],
                                     "type": "string"
                                   }
@@ -581,7 +596,7 @@
                                   "additionalProperties": false
                                 },
                                 "promptCaching": {
-                                  "description": "Automatic prompt caching for supported\nproviders, currently AWS Bedrock.\nReduces API costs by caching static content like system prompts and tool definitions.\nOnly applicable for Bedrock Claude 3+ and Nova models.",
+                                  "description": "Automatic prompt caching for supported providers: Anthropic, Anthropic\nmodels on Vertex AI, and AWS Bedrock (Claude 3+ and Nova models).\nReduces API costs by caching static content like system prompts and tool definitions.\nCache marks sent by the client take precedence: if a request already has any,\nthe policy adds none.",
                                   "properties": {
                                     "cacheMessageOffset": {
                                       "description": "Shifts the message cache point further back in the\nconversation. 0 (default) places it at the second-to-last message.\nHigher values move it N additional messages towards the start, clamped\nto bounds.",
@@ -597,11 +612,11 @@
                                       "type": "boolean"
                                     },
                                     "cacheTools": {
-                                      "description": "Enables caching for tool definitions. Defaults to false.\nInserts a cache point after all tool specifications.",
+                                      "description": "Enables caching for tool definitions. Defaults to false.\nInserts a cache point after all tool specifications.\nIgnored for Bedrock Nova models, which do not support caching tools.",
                                       "type": "boolean"
                                     },
                                     "minTokens": {
-                                      "description": "Minimum estimated token count\nbefore caching is enabled. Uses rough heuristic (word count \u00d7 1.3) to estimate tokens.\nDefaults to 1024. Bedrock requires at least 1,024 tokens for caching to be effective.",
+                                      "description": "Minimum estimated token count\nbefore caching is enabled. Uses rough heuristic (word count \u00d7 1.3) to estimate tokens.\nApplies to system prompt caching. Defaults to 1024; most models require at least\n1,024 tokens for caching to be effective.",
                                       "minimum": 0,
                                       "type": "integer"
                                     }
@@ -2245,6 +2260,34 @@
                                           "response": {
                                             "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                                             "properties": {
+                                              "headers": {
+                                                "description": "Headers to include in the rejection response.",
+                                                "items": {
+                                                  "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                                                  "properties": {
+                                                    "name": {
+                                                      "description": "Name of the HTTP header, case-insensitive",
+                                                      "maxLength": 256,
+                                                      "minLength": 1,
+                                                      "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                                      "type": "string"
+                                                    },
+                                                    "value": {
+                                                      "description": "Value for the HTTP header",
+                                                      "maxLength": 4096,
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "name",
+                                                    "value"
+                                                  ],
+                                                  "type": "object",
+                                                  "additionalProperties": false
+                                                },
+                                                "type": "array"
+                                              },
                                               "message": {
                                                 "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                                                 "type": "string"
@@ -2261,9 +2304,9 @@
                                             "additionalProperties": false
                                           },
                                           "scope": {
-                                            "description": "Which parts of the request this guard inspects. When unset, defaults to\n`SystemPrompt` and `Messages`. Tool call inputs and outputs are not\ninspected unless `ToolInput`/`ToolOutput` are listed explicitly.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
+                                            "description": "Which parts of the request this guard inspects. When unset, defaults to\n`SystemPrompt`, `Messages`, and `ToolOutput`. Tool call inputs are not\ninspected unless `ToolInput` is listed explicitly. Webhook guards do not\nsupport scope and always inspect `SystemPrompt` and `Messages`.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
                                             "items": {
-                                              "description": "Which category of request content a prompt guard inspects.",
+                                              "description": "Which category of request or response content a prompt guard inspects.\nEncrypted payloads are excluded. Signed response payloads are scanned but\na mask that would change them rejects the response instead.",
                                               "enum": [
                                                 "Messages",
                                                 "SystemPrompt",
@@ -2406,8 +2449,8 @@
                                         "type": "object",
                                         "x-kubernetes-validations": [
                                           {
-                                            "message": "scope: only regex and bedrockGuardrails guards support a non-default scope; other guard kinds always inspect the default (SystemPrompt + Messages)",
-                                            "rule": "!has(self.scope) || has(self.regex) || has(self.bedrockGuardrails) || (self.scope.size() == 2 && 'SystemPrompt' in self.scope && 'Messages' in self.scope)"
+                                            "message": "scope: webhook guards do not support scope; they always inspect SystemPrompt + Messages",
+                                            "rule": "!has(self.scope) || !has(self.webhook) || (self.scope.size() == 2 && 'SystemPrompt' in self.scope && 'Messages' in self.scope)"
                                           },
                                           {
                                             "message": "exactly one of the fields in [regex webhook openAIModeration bedrockGuardrails googleModelArmor] must be set",
@@ -3571,6 +3614,34 @@
                                           "response": {
                                             "description": "Custom response message to return to the client. If not specified, defaults to\n`The response was rejected due to inappropriate content`.",
                                             "properties": {
+                                              "headers": {
+                                                "description": "Headers to include in the rejection response.",
+                                                "items": {
+                                                  "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                                                  "properties": {
+                                                    "name": {
+                                                      "description": "Name of the HTTP header, case-insensitive",
+                                                      "maxLength": 256,
+                                                      "minLength": 1,
+                                                      "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                                      "type": "string"
+                                                    },
+                                                    "value": {
+                                                      "description": "Value for the HTTP header",
+                                                      "maxLength": 4096,
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "name",
+                                                    "value"
+                                                  ],
+                                                  "type": "object",
+                                                  "additionalProperties": false
+                                                },
+                                                "type": "array"
+                                              },
                                               "message": {
                                                 "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                                                 "type": "string"
@@ -3585,6 +3656,23 @@
                                             },
                                             "type": "object",
                                             "additionalProperties": false
+                                          },
+                                          "scope": {
+                                            "description": "Which parts of the response this guard inspects. When unset, defaults to\n`Messages`. Tool calls generated by the model are not inspected unless\n`ToolInput` is listed explicitly; `ToolOutput` covers results of\nserverside tools.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
+                                            "items": {
+                                              "description": "Which category of request or response content a prompt guard inspects.\nEncrypted payloads are excluded. Signed response payloads are scanned but\na mask that would change them rejects the response instead.",
+                                              "enum": [
+                                                "Messages",
+                                                "SystemPrompt",
+                                                "ToolInput",
+                                                "ToolOutput"
+                                              ],
+                                              "type": "string"
+                                            },
+                                            "maxItems": 4,
+                                            "minItems": 1,
+                                            "type": "array",
+                                            "x-kubernetes-list-type": "set"
                                           },
                                           "webhook": {
                                             "description": "Webhook that receives responses for prompt guarding.",
@@ -3715,6 +3803,10 @@
                                         "type": "object",
                                         "x-kubernetes-validations": [
                                           {
+                                            "message": "scope: webhook guards do not support a non-default scope; they always inspect the default (Messages)",
+                                            "rule": "!has(self.scope) || !has(self.webhook) || (self.scope.size() == 1 && 'Messages' in self.scope)"
+                                          },
+                                          {
                                             "message": "exactly one of the fields in [regex webhook bedrockGuardrails googleModelArmor] must be set",
                                             "rule": "(has(self.regex)?1:0)+(has(self.webhook)?1:0)+(has(self.bedrockGuardrails)?1:0)+(has(self.googleModelArmor)?1:0) == 1"
                                           }
@@ -3736,6 +3828,10 @@
                                   "type": "object",
                                   "x-kubernetes-validations": [
                                     {
+                                      "message": "streaming response guards only support the Messages scope",
+                                      "rule": "!has(self.streaming) || self.streaming != 'Enabled' || !has(self.response) || self.response.all(g, !has(g.scope) || g.scope.all(s, s == 'Messages'))"
+                                    },
+                                    {
                                       "message": "at least one of the fields in [request response] must be set",
                                       "rule": "[has(self.request),has(self.response)].filter(x,x==true).size() >= 1"
                                     }
@@ -3748,6 +3844,7 @@
                                     "enum": [
                                       "AnthropicTokenCount",
                                       "Completions",
+                                      "Decisions",
                                       "Detect",
                                       "Embeddings",
                                       "GeminiCountTokens",
@@ -3757,7 +3854,8 @@
                                       "Passthrough",
                                       "Realtime",
                                       "Rerank",
-                                      "Responses"
+                                      "Responses",
+                                      "SystemOne"
                                     ],
                                     "type": "string"
                                   },
@@ -4152,7 +4250,7 @@
                                   "x-kubernetes-list-type": "atomic"
                                 },
                                 "crossAppAccess": {
-                                  "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.",
+                                  "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                                   "properties": {
                                     "accessTokenScopes": {
                                       "description": "Scopes requested when exchanging the ID-JAG for an access token.\nWhen omitted, defaults to Scopes. Set to an empty list to omit scope.",
@@ -5136,7 +5234,7 @@
                                   "additionalProperties": false
                                 },
                                 "oauthTokenExchange": {
-                                  "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.",
+                                  "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                                   "properties": {
                                     "actorToken": {
                                       "description": "RFC 8693 delegation actor token. TokenExchange grant only.",
@@ -6566,8 +6664,8 @@
                           "rule": "has(self.pathPrefix) ? has(self.host) : true"
                         },
                         {
-                          "message": "exactly one of the fields in [openai azureopenai azure anthropic gemini vertexai bedrock custom] must be set",
-                          "rule": "(has(self.openai)?1:0)+(has(self.azureopenai)?1:0)+(has(self.azure)?1:0)+(has(self.anthropic)?1:0)+(has(self.gemini)?1:0)+(has(self.vertexai)?1:0)+(has(self.bedrock)?1:0)+(has(self.custom)?1:0) == 1"
+                          "message": "exactly one of the fields in [openai azureopenai azure anthropic gemini vertexai bedrock custom copilot] must be set",
+                          "rule": "(has(self.openai)?1:0)+(has(self.azureopenai)?1:0)+(has(self.azure)?1:0)+(has(self.anthropic)?1:0)+(has(self.gemini)?1:0)+(has(self.vertexai)?1:0)+(has(self.bedrock)?1:0)+(has(self.custom)?1:0)+(has(self.copilot)?1:0) == 1"
                         }
                       ],
                       "additionalProperties": false
@@ -6751,6 +6849,19 @@
                   ],
                   "additionalProperties": false
                 },
+                "copilot": {
+                  "description": "GitHub Copilot provider settings.",
+                  "properties": {
+                    "model": {
+                      "description": "Model name override.\nIf unset, the model name is taken from the request.",
+                      "maxLength": 256,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "type": "object",
+                  "additionalProperties": false
+                },
                 "custom": {
                   "description": "Custom provider configures a non-managed or self-hosted LLM provider.\nUse this when the provider target and API formats should be declared\nexplicitly instead of inferred from a managed provider such as OpenAI or\nAnthropic.",
                   "properties": {
@@ -6812,11 +6923,13 @@
                             "enum": [
                               "AnthropicTokenCount",
                               "Completions",
+                              "Decisions",
                               "Embeddings",
                               "Messages",
                               "Realtime",
                               "Rerank",
-                              "Responses"
+                              "Responses",
+                              "SystemOne"
                             ],
                             "type": "string"
                           }
@@ -7025,8 +7138,8 @@
                   "rule": "has(self.pathPrefix) ? has(self.host) : true"
                 },
                 {
-                  "message": "exactly one of the fields in [openai azureopenai azure anthropic gemini vertexai bedrock custom] must be set",
-                  "rule": "(has(self.openai)?1:0)+(has(self.azureopenai)?1:0)+(has(self.azure)?1:0)+(has(self.anthropic)?1:0)+(has(self.gemini)?1:0)+(has(self.vertexai)?1:0)+(has(self.bedrock)?1:0)+(has(self.custom)?1:0) == 1"
+                  "message": "exactly one of the fields in [openai azureopenai azure anthropic gemini vertexai bedrock custom copilot] must be set",
+                  "rule": "(has(self.openai)?1:0)+(has(self.azureopenai)?1:0)+(has(self.azure)?1:0)+(has(self.anthropic)?1:0)+(has(self.gemini)?1:0)+(has(self.vertexai)?1:0)+(has(self.bedrock)?1:0)+(has(self.custom)?1:0)+(has(self.copilot)?1:0) == 1"
                 }
               ],
               "additionalProperties": false
@@ -7109,6 +7222,12 @@
               "items": {
                 "description": "MCP target selection for this backend.",
                 "properties": {
+                  "condition": {
+                    "description": "CEL expression evaluated per request; when it evaluates to false, the\ntarget is excluded from the virtual MCP. `mcp.target.name` is available.\nWith `selector`, the condition applies to each selected target.",
+                    "maxLength": 16384,
+                    "minLength": 1,
+                    "type": "string"
+                  },
                   "name": {
                     "description": "Name of the MCP target.",
                     "maxLength": 253,
@@ -7117,7 +7236,7 @@
                     "type": "string"
                   },
                   "selector": {
-                    "description": "Label selector used to select `Service` resources.\nIf policies are needed on a per-service basis, `AgentgatewayPolicy` can\ntarget the desired `Service`.",
+                    "description": "Label selector used to select `Service` resources.\nSelected `Service` ports must set `appProtocol: agentgateway.dev/mcp` for\nstreamable HTTP or `appProtocol: agentgateway.dev/mcp-sse` for SSE. Ports\nwithout a recognized MCP `appProtocol` value are ignored.\nIf policies are needed on a per-service basis, `AgentgatewayPolicy` can\ntarget the desired `Service`.",
                     "properties": {
                       "namespaces": {
                         "description": "`namespace` is the label selector for namespaces that `Service`\nresources should be selected from. If unset, only the namespace of the\n`AgentgatewayBackend` is searched.",
@@ -7599,7 +7718,7 @@
                                 "x-kubernetes-list-type": "atomic"
                               },
                               "crossAppAccess": {
-                                "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.",
+                                "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                                 "properties": {
                                   "accessTokenScopes": {
                                     "description": "Scopes requested when exchanging the ID-JAG for an access token.\nWhen omitted, defaults to Scopes. Set to an empty list to omit scope.",
@@ -8583,7 +8702,7 @@
                                 "additionalProperties": false
                               },
                               "oauthTokenExchange": {
-                                "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.",
+                                "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                                 "properties": {
                                   "actorToken": {
                                     "description": "RFC 8693 delegation actor token. TokenExchange grant only.",
@@ -9632,7 +9751,13 @@
               "x-kubernetes-list-map-keys": [
                 "name"
               ],
-              "x-kubernetes-list-type": "map"
+              "x-kubernetes-list-type": "map",
+              "x-kubernetes-validations": [
+                {
+                  "message": "mcp target condition requires at least two targets unless the target uses selector",
+                  "rule": "self.size() > 1 || self.all(t, !has(t.condition) || has(t.selector))"
+                }
+              ]
             }
           },
           "required": [
@@ -9796,7 +9921,7 @@
                   "additionalProperties": false
                 },
                 "promptCaching": {
-                  "description": "Automatic prompt caching for supported\nproviders, currently AWS Bedrock.\nReduces API costs by caching static content like system prompts and tool definitions.\nOnly applicable for Bedrock Claude 3+ and Nova models.",
+                  "description": "Automatic prompt caching for supported providers: Anthropic, Anthropic\nmodels on Vertex AI, and AWS Bedrock (Claude 3+ and Nova models).\nReduces API costs by caching static content like system prompts and tool definitions.\nCache marks sent by the client take precedence: if a request already has any,\nthe policy adds none.",
                   "properties": {
                     "cacheMessageOffset": {
                       "description": "Shifts the message cache point further back in the\nconversation. 0 (default) places it at the second-to-last message.\nHigher values move it N additional messages towards the start, clamped\nto bounds.",
@@ -9812,11 +9937,11 @@
                       "type": "boolean"
                     },
                     "cacheTools": {
-                      "description": "Enables caching for tool definitions. Defaults to false.\nInserts a cache point after all tool specifications.",
+                      "description": "Enables caching for tool definitions. Defaults to false.\nInserts a cache point after all tool specifications.\nIgnored for Bedrock Nova models, which do not support caching tools.",
                       "type": "boolean"
                     },
                     "minTokens": {
-                      "description": "Minimum estimated token count\nbefore caching is enabled. Uses rough heuristic (word count \u00d7 1.3) to estimate tokens.\nDefaults to 1024. Bedrock requires at least 1,024 tokens for caching to be effective.",
+                      "description": "Minimum estimated token count\nbefore caching is enabled. Uses rough heuristic (word count \u00d7 1.3) to estimate tokens.\nApplies to system prompt caching. Defaults to 1024; most models require at least\n1,024 tokens for caching to be effective.",
                       "minimum": 0,
                       "type": "integer"
                     }
@@ -11460,6 +11585,34 @@
                           "response": {
                             "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                             "properties": {
+                              "headers": {
+                                "description": "Headers to include in the rejection response.",
+                                "items": {
+                                  "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                                  "properties": {
+                                    "name": {
+                                      "description": "Name of the HTTP header, case-insensitive",
+                                      "maxLength": 256,
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "Value for the HTTP header",
+                                      "maxLength": 4096,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "value"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "type": "array"
+                              },
                               "message": {
                                 "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                                 "type": "string"
@@ -11476,9 +11629,9 @@
                             "additionalProperties": false
                           },
                           "scope": {
-                            "description": "Which parts of the request this guard inspects. When unset, defaults to\n`SystemPrompt` and `Messages`. Tool call inputs and outputs are not\ninspected unless `ToolInput`/`ToolOutput` are listed explicitly.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
+                            "description": "Which parts of the request this guard inspects. When unset, defaults to\n`SystemPrompt`, `Messages`, and `ToolOutput`. Tool call inputs are not\ninspected unless `ToolInput` is listed explicitly. Webhook guards do not\nsupport scope and always inspect `SystemPrompt` and `Messages`.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
                             "items": {
-                              "description": "Which category of request content a prompt guard inspects.",
+                              "description": "Which category of request or response content a prompt guard inspects.\nEncrypted payloads are excluded. Signed response payloads are scanned but\na mask that would change them rejects the response instead.",
                               "enum": [
                                 "Messages",
                                 "SystemPrompt",
@@ -11621,8 +11774,8 @@
                         "type": "object",
                         "x-kubernetes-validations": [
                           {
-                            "message": "scope: only regex and bedrockGuardrails guards support a non-default scope; other guard kinds always inspect the default (SystemPrompt + Messages)",
-                            "rule": "!has(self.scope) || has(self.regex) || has(self.bedrockGuardrails) || (self.scope.size() == 2 && 'SystemPrompt' in self.scope && 'Messages' in self.scope)"
+                            "message": "scope: webhook guards do not support scope; they always inspect SystemPrompt + Messages",
+                            "rule": "!has(self.scope) || !has(self.webhook) || (self.scope.size() == 2 && 'SystemPrompt' in self.scope && 'Messages' in self.scope)"
                           },
                           {
                             "message": "exactly one of the fields in [regex webhook openAIModeration bedrockGuardrails googleModelArmor] must be set",
@@ -12786,6 +12939,34 @@
                           "response": {
                             "description": "Custom response message to return to the client. If not specified, defaults to\n`The response was rejected due to inappropriate content`.",
                             "properties": {
+                              "headers": {
+                                "description": "Headers to include in the rejection response.",
+                                "items": {
+                                  "description": "HTTPHeader represents an HTTP Header name and value as defined by RFC 7230.",
+                                  "properties": {
+                                    "name": {
+                                      "description": "Name of the HTTP header, case-insensitive",
+                                      "maxLength": 256,
+                                      "minLength": 1,
+                                      "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "description": "Value for the HTTP header",
+                                      "maxLength": 4096,
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "value"
+                                  ],
+                                  "type": "object",
+                                  "additionalProperties": false
+                                },
+                                "type": "array"
+                              },
                               "message": {
                                 "description": "Custom response message to return to the client. If not specified, defaults to\n`The request was rejected due to inappropriate content`.",
                                 "type": "string"
@@ -12800,6 +12981,23 @@
                             },
                             "type": "object",
                             "additionalProperties": false
+                          },
+                          "scope": {
+                            "description": "Which parts of the response this guard inspects. When unset, defaults to\n`Messages`. Tool calls generated by the model are not inspected unless\n`ToolInput` is listed explicitly; `ToolOutput` covers results of\nserverside tools.\nIn APIs that send tool arguments as opaque JSON, such as Completions, the\narguments are masked as a single string, meaning a prompt guard has the\npotential to rewrite the arguments into invalid JSON.",
+                            "items": {
+                              "description": "Which category of request or response content a prompt guard inspects.\nEncrypted payloads are excluded. Signed response payloads are scanned but\na mask that would change them rejects the response instead.",
+                              "enum": [
+                                "Messages",
+                                "SystemPrompt",
+                                "ToolInput",
+                                "ToolOutput"
+                              ],
+                              "type": "string"
+                            },
+                            "maxItems": 4,
+                            "minItems": 1,
+                            "type": "array",
+                            "x-kubernetes-list-type": "set"
                           },
                           "webhook": {
                             "description": "Webhook that receives responses for prompt guarding.",
@@ -12930,6 +13128,10 @@
                         "type": "object",
                         "x-kubernetes-validations": [
                           {
+                            "message": "scope: webhook guards do not support a non-default scope; they always inspect the default (Messages)",
+                            "rule": "!has(self.scope) || !has(self.webhook) || (self.scope.size() == 1 && 'Messages' in self.scope)"
+                          },
+                          {
                             "message": "exactly one of the fields in [regex webhook bedrockGuardrails googleModelArmor] must be set",
                             "rule": "(has(self.regex)?1:0)+(has(self.webhook)?1:0)+(has(self.bedrockGuardrails)?1:0)+(has(self.googleModelArmor)?1:0) == 1"
                           }
@@ -12951,6 +13153,10 @@
                   "type": "object",
                   "x-kubernetes-validations": [
                     {
+                      "message": "streaming response guards only support the Messages scope",
+                      "rule": "!has(self.streaming) || self.streaming != 'Enabled' || !has(self.response) || self.response.all(g, !has(g.scope) || g.scope.all(s, s == 'Messages'))"
+                    },
+                    {
                       "message": "at least one of the fields in [request response] must be set",
                       "rule": "[has(self.request),has(self.response)].filter(x,x==true).size() >= 1"
                     }
@@ -12963,6 +13169,7 @@
                     "enum": [
                       "AnthropicTokenCount",
                       "Completions",
+                      "Decisions",
                       "Detect",
                       "Embeddings",
                       "GeminiCountTokens",
@@ -12972,7 +13179,8 @@
                       "Passthrough",
                       "Realtime",
                       "Rerank",
-                      "Responses"
+                      "Responses",
+                      "SystemOne"
                     ],
                     "type": "string"
                   },
@@ -13367,7 +13575,7 @@
                   "x-kubernetes-list-type": "atomic"
                 },
                 "crossAppAccess": {
-                  "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.",
+                  "description": "Cross App Access (Identity Assertion / ID-JAG) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                   "properties": {
                     "accessTokenScopes": {
                       "description": "Scopes requested when exchanging the ID-JAG for an access token.\nWhen omitted, defaults to Scopes. Set to an empty list to omit scope.",
@@ -14351,7 +14559,7 @@
                   "additionalProperties": false
                 },
                 "oauthTokenExchange": {
-                  "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.",
+                  "description": "OAuth 2.0 token exchange (RFC 8693) / jwt-bearer (RFC 7523) authentication.\nIf this configuration is invalid, requests using it are rejected.",
                   "properties": {
                     "actorToken": {
                       "description": "RFC 8693 delegation actor token. TokenExchange grant only.",
@@ -15649,13 +15857,44 @@
                   "additionalProperties": false
                 },
                 "guardrails": {
-                  "description": "`guardrails` routes selected JSON-RPC methods through a remote policy server.",
+                  "description": "Remote and in-process CEL policy processors for MCP requests and responses.",
                   "properties": {
                     "processors": {
                       "description": "`processors` is the ordered list of policy processors applied to matched\nmethods. Processors run in the order listed; the first to reject a request\nshort-circuits the chain.",
                       "items": {
                         "description": "MCPGuardrailsProcessor selects a single policy processor. Exactly one variant must be set.",
                         "properties": {
+                          "expression": {
+                            "description": "In-process guardrail driven by CEL expressions.",
+                            "properties": {
+                              "condition": {
+                                "description": "Condition gating the action; absent means always.",
+                                "maxLength": 16384,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "reject": {
+                                "description": "Reject with this message.",
+                                "maxLength": 4096,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "transform": {
+                                "description": "Returns a replacement body (`mcp.params` on requests or `mcp.result` on responses).\nUse `merge` to preserve fields you do not wish to mutate; `null` leaves the body unchanged.",
+                                "maxLength": 16384,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "type": "object",
+                            "x-kubernetes-validations": [
+                              {
+                                "message": "exactly one of the fields in [reject transform] must be set",
+                                "rule": "(has(self.reject)?1:0)+(has(self.transform)?1:0) == 1"
+                              }
+                            ],
+                            "additionalProperties": false
+                          },
                           "methods": {
                             "additionalProperties": {
                               "description": "MCPMethodPhase controls when an MCP method is run through the guardrails pipeline.",
@@ -15817,8 +16056,8 @@
                         "type": "object",
                         "x-kubernetes-validations": [
                           {
-                            "message": "exactly one of the fields in [remote] must be set",
-                            "rule": "(has(self.remote)?1:0) == 1"
+                            "message": "exactly one of the fields in [remote expression] must be set",
+                            "rule": "(has(self.remote)?1:0)+(has(self.expression)?1:0) == 1"
                           }
                         ],
                         "additionalProperties": false

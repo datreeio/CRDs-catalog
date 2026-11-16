@@ -27,12 +27,13 @@
               "type": "string"
             },
             "balancingMode": {
-              "description": "BalancingMode specifies how to determine whether the backend of a load balancer can handle\nadditional traffic or is fully loaded.\nCan be set as RATE, UTILIZATION, CUSTOM_METRICS or IN_FLIGHT.",
+              "description": "BalancingMode specifies how to determine whether the backend of a load balancer can handle\nadditional traffic or is fully loaded.\nCan be set as RATE, UTILIZATION, CONNECTION, CUSTOM_METRICS or IN_FLIGHT.",
               "enum": [
                 "RATE",
                 "UTILIZATION",
                 "CUSTOM_METRICS",
-                "IN_FLIGHT"
+                "IN_FLIGHT",
+                "CONNECTION"
               ],
               "type": "string"
             },
@@ -155,6 +156,13 @@
               },
               "type": "object",
               "additionalProperties": false
+            },
+            "maxConnectionsPerEndpoint": {
+              "description": "MaxConnectionsPerEndpoint configures the target number of simultaneous connections for an\nendpoint. Only available if balancingMode is CONNECTION.\nIf the field is omitted, a default value (1e8) will be used.\nRequires protocol TCP.",
+              "format": "int64",
+              "maximum": 1000000000,
+              "minimum": 1,
+              "type": "integer"
             },
             "maxInFlightRequestsPerEndpoint": {
               "description": "MaxInFlightRequestsPerEndpoint configures the maximum number of concurrent requests that can be\nin-flight on an endpoint at a given time. Not available if backend\u2019s balancing mode is RATE\nor CONNECTION. Not available if trafficDuration is SHORT or default.\nIf the field is omitted, a default value (1e8) will be used.",
@@ -425,9 +433,26 @@
             {
               "message": "considering the combined Default and Scopes configurations, trafficDuration cannot be LONG when maxRatePerEndpoint is configured",
               "rule": "!has(self.scopes) || self.scopes.all(s, !((has(self.maxRatePerEndpoint) || has(s.maxRatePerEndpoint)) && (has(self.trafficDuration) || has(s.trafficDuration)) && (has(s.trafficDuration) ? s.trafficDuration : self.trafficDuration) == 'LONG'))"
+            },
+            {
+              "message": "maxConnectionsPerEndpoint can only be configured when balancingMode is CONNECTION",
+              "rule": "!(has(self.maxConnectionsPerEndpoint) && (!has(self.balancingMode) || self.balancingMode != 'CONNECTION'))"
+            },
+            {
+              "message": "maxRatePerEndpoint cannot be configured when balancingMode is CONNECTION",
+              "rule": "!(has(self.maxRatePerEndpoint) && has(self.balancingMode) && self.balancingMode == 'CONNECTION')"
             }
           ],
           "additionalProperties": false
+        },
+        "protocol": {
+          "default": "HTTP",
+          "description": "Protocol specifies the load balancer backend protocol family that this policy applies to. It\nseparates configuration for Application Load Balancing from proxy Network Load Balancing.\n\n  - HTTP: applies to backends serving HTTP-based traffic, for example backends of an HTTPRoute.\n  - TCP: applies to backends serving TCP-based traffic, for example backends of a TLSRoute.\n    Can only be used with Service and ServiceImport targets.\n\nAll configured fields must be supported by the selected protocol; otherwise, the policy is\nrejected.\n\nDefaults to HTTP.",
+          "enum": [
+            "HTTP",
+            "TCP"
+          ],
+          "type": "string"
         },
         "targetRef": {
           "description": "TargetRef identifies an API object to apply policy to.",
@@ -480,6 +505,34 @@
         {
           "message": "sessionAffinity cannot be configured for InferencePool and GCPInferencePoolImport targets",
           "rule": "(self.targetRef.kind != 'InferencePool' && self.targetRef.kind != 'GCPInferencePoolImport') || !(has(self.default) && has(self.default.sessionAffinity))"
+        },
+        {
+          "message": "spec.protocol TCP can only be used with Service and ServiceImport targets",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP') || self.targetRef.kind == 'Service' || self.targetRef.kind == 'ServiceImport'"
+        },
+        {
+          "message": "securityPolicy requires spec.protocol HTTP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.securityPolicy))"
+        },
+        {
+          "message": "iap requires spec.protocol HTTP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.iap))"
+        },
+        {
+          "message": "logging.optionalMode requires spec.protocol HTTP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.logging) && has(self.default.logging.optionalMode))"
+        },
+        {
+          "message": "logging.optionalFields requires spec.protocol HTTP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.logging) && has(self.default.logging.optionalFields))"
+        },
+        {
+          "message": "sessionAffinity.cookieTtlSec requires spec.protocol HTTP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.sessionAffinity) && has(self.default.sessionAffinity.cookieTtlSec))"
+        },
+        {
+          "message": "sessionAffinity.type must be CLIENT_IP or NONE with spec.protocol TCP",
+          "rule": "!(has(self.protocol) && self.protocol == 'TCP' && has(self.default) && has(self.default.sessionAffinity) && has(self.default.sessionAffinity.type) && !(self.default.sessionAffinity.type in ['CLIENT_IP', 'NONE']))"
         }
       ],
       "additionalProperties": false

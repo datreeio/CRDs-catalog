@@ -2247,7 +2247,14 @@
             "type": "object",
             "additionalProperties": false
           },
-          "type": "array"
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "container name 'server-init' is reserved for the operator-managed init container",
+              "reason": "FieldValueForbidden",
+              "rule": "!self.exists(c, c.name == 'server-init')"
+            }
+          ]
         },
         "exporter": {
           "description": "Exporter defines the metrics exporter sidecar configuration.",
@@ -2565,6 +2572,7 @@
                 },
                 {
                   "message": "annotation keys under valkey.io/ are reserved for the operator",
+                  "reason": "FieldValueForbidden",
                   "rule": "self.all(k, !k.startsWith('valkey.io/'))"
                 }
               ]
@@ -2586,6 +2594,7 @@
                 },
                 {
                   "message": "label keys under valkey.io/ and app.kubernetes.io/ name, instance, component, part-of and managed-by are reserved for the operator",
+                  "reason": "FieldValueForbidden",
                   "rule": "self.all(k, !k.startsWith('valkey.io/') && !(k in ['app.kubernetes.io/name', 'app.kubernetes.io/instance', 'app.kubernetes.io/component', 'app.kubernetes.io/part-of', 'app.kubernetes.io/managed-by']))"
                 }
               ]
@@ -2828,6 +2837,10 @@
           "description": "ServerConfigMapName specifies the name of the ConfigMap that contains the\nscripts, and Valkey config for the ValkeyNode.",
           "type": "string"
         },
+        "service": {
+          "description": "Service is set by the ValkeyCluster controller from\nspec.networking.perNodeServices. When set, this node has one ClusterIP\nService. Unset means no Service.",
+          "type": "object"
+        },
         "serviceAccountName": {
           "description": "ServiceAccountName is the name of the Kubernetes ServiceAccount used by\nthe ValkeyNode pod.",
           "maxLength": 253,
@@ -2862,6 +2875,22 @@
                   ],
                   "type": "object",
                   "additionalProperties": false
+                },
+                "trustBundle": {
+                  "description": "TrustBundle, when set, replaces the server secret's `ca.crt` as the\ntrust root Valkey verifies clients and peers against\n(`tls-ca-cert-file`). It must therefore include the root the server\ncertificate chains to. The node reloads it live when its contents\nchange, once its ACL is confirmed live. Probes and the metrics exporter\nkeep verifying the server against the server secret's `ca.crt`.",
+                  "properties": {
+                    "secretName": {
+                      "description": "SecretName is the name of the secret.",
+                      "maxLength": 253,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "secretName"
+                  ],
+                  "type": "object",
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -2875,7 +2904,7 @@
               "properties": {
                 "certificateUser": {
                   "default": "Disabled",
-                  "description": "CertificateUser configures how Valkey maps an authenticated client\ncertificate to an ACL user. Set to `CN` to use the certificate's Common Name\n(requires Valkey >= 9.0), or `URI` to use the first matching URI from the\ncertificate's Subject Alternative Name (SAN) (requires Valkey >= 9.1).\nDefaults to `Disabled`, which leaves the directive unset.",
+                  "description": "CertificateUser configures how Valkey maps an authenticated client\ncertificate to an ACL user. Maps to `tls-auth-clients-user`. Defaults to\n`Disabled`, which leaves the directive unset.",
                   "enum": [
                     "CN",
                     "URI",
@@ -2885,7 +2914,7 @@
                 },
                 "mode": {
                   "default": "Optional",
-                  "description": "Mode controls whether clients must authenticate with a TLS certificate.\n`Required` enforces mTLS, `Optional` allows both authenticated and\nunauthenticated clients, and `Disabled` turns client certificate processing\noff entirely.\nDefaults to `Optional`.",
+                  "description": "Mode controls whether clients must authenticate with a TLS certificate.\nMaps to `tls-auth-clients`. Defaults to `Optional`.",
                   "enum": [
                     "Required",
                     "Optional",
@@ -2897,7 +2926,9 @@
               "type": "object",
               "x-kubernetes-validations": [
                 {
+                  "fieldPath": ".certificateUser",
                   "message": "certificateUser has no effect when mode=Disabled: Valkey ignores client certificates in that mode",
+                  "reason": "FieldValueForbidden",
                   "rule": "!(has(self.mode) && self.mode == 'Disabled' && has(self.certificateUser) && self.certificateUser != 'Disabled')"
                 }
               ],
@@ -3070,6 +3101,7 @@
           "x-kubernetes-validations": [
             {
               "message": "workloadType is immutable",
+              "reason": "FieldValueForbidden",
               "rule": "self == oldSelf"
             }
           ]
@@ -3078,23 +3110,33 @@
       "type": "object",
       "x-kubernetes-validations": [
         {
+          "fieldPath": ".persistence",
           "message": "persistence requires workloadType StatefulSet",
+          "reason": "FieldValueForbidden",
           "rule": "!(has(self.persistence) && self.workloadType == 'Deployment')"
         },
         {
+          "fieldPath": ".persistence",
           "message": "persistence cannot be removed once set",
+          "reason": "FieldValueForbidden",
           "rule": "!has(oldSelf.persistence) || has(self.persistence)"
         },
         {
+          "fieldPath": ".persistence",
           "message": "persistence cannot be added after creation",
+          "reason": "FieldValueForbidden",
           "rule": "has(oldSelf.persistence) || !has(self.persistence)"
         },
         {
+          "fieldPath": ".persistence.size",
           "message": "persistence.size may only be expanded",
+          "reason": "FieldValueForbidden",
           "rule": "!has(self.persistence) || !has(oldSelf.persistence) || quantity(self.persistence.size).compareTo(quantity(oldSelf.persistence.size)) >= 0"
         },
         {
+          "fieldPath": ".persistence.storageClassName",
           "message": "persistence.storageClassName is immutable",
+          "reason": "FieldValueForbidden",
           "rule": "!has(self.persistence) || !has(oldSelf.persistence) || ((!has(self.persistence.storageClassName) && !has(oldSelf.persistence.storageClassName)) || (has(self.persistence.storageClassName) && has(oldSelf.persistence.storageClassName) && self.persistence.storageClassName == oldSelf.persistence.storageClassName))"
         }
       ],
@@ -3103,6 +3145,10 @@
     "status": {
       "description": "ValkeyNodeStatus defines the observed state of ValkeyNode.",
       "properties": {
+        "appliedACLRevision": {
+          "description": "AppliedACLRevision is the revision of the operator-managed aclfile that\nthe running server was last confirmed to hold, recorded as ACLApplied\nbecomes True.",
+          "type": "string"
+        },
         "conditions": {
           "description": "Conditions represent the current state of the ValkeyNode.",
           "items": {

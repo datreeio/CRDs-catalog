@@ -131,9 +131,32 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(p.evaluate(api, 1, NOW)['decision'], 'manual-review')
 
     def test_json_schema_validation(self):
-        for raw in [b'{', b'{"type":"object","type":"string"}', b'{"type":"object","required":"a"}', b'{"type":"object","maximum":NaN}', b'{"type":"object","$schema":"https://evil.test/schema"}', b'{"type":"object","$ref":"https://evil.test/schema"}', b'{"type":"object","$dynamicRef":"other.json"}']:
+        for raw in [
+            b'{',
+            b'{"type":"object","type":"string"}',
+            b'{"type":"object","required":"a"}',
+            b'{"type":"object","maximum":NaN}',
+            b'{"type":"object","$schema":"https://evil.test/schema"}',
+            b'{"type":"object","$ref":"https://evil.test/schema"}',
+            b'{"type":"object","$dynamicRef":"other.json"}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":123}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"[unclosed"}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^(?=a)[a-z]+$"}}}',
+            b'{"type":"object","patternProperties":{"[unclosed":{"type":"string"}}}',
+        ]:
             self.expect_error('needs-contributor-input', p.validate_schema, raw)
         p.validate_schema(b'{"type":"object","definitions":{"x":{"type":"string"}},"properties":{"a":{"$ref":"#/definitions/x"}}}')
+        # Kubernetes CRDs and kubeconform accept RE2 regexes rejected by Python's re module.
+        for raw in [
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^\\\\PC*$"}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^([a-zA-Z0-9\\\\p{S}\\\\p{L}])$"}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^(?i)[a-z]+$"}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^a(?i)b$"}}}',
+            b'{"type":"object","properties":{"val":{"type":"string","pattern":"^[a-zA-Z\\\\d-_]+$"}}}',
+            b'{"type":"object","patternProperties":{"^\\\\PC*$":{"type":"string"}}}',
+            b'{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"val":{"type":"string","pattern":"^\\\\PC*$"}}}',
+        ]:
+            p.validate_schema(raw)
 
     def test_sources_exact_mapping(self):
         for body in ['', BODY+'\n'+BODY, BODY.replace(FILE, 'other.io/widget_v1.json'), BODY.replace(SHA, 'main'), BODY.replace('github.com/', 'github.com.evil.test/'), BODY.replace('/config/', '/../'), BODY.replace(URL, URL+'?token=foo')]:

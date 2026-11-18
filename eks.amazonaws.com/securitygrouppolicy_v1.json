@@ -1,0 +1,312 @@
+{
+  "description": "SecurityGroupPolicy defines security groups for pods on EKS Auto Mode\nnodes. Matching pods are attached to a branch network interface carrying\nexactly the security groups this policy resolves \u2014 they do not inherit the\nnode's security groups.\n\nMatching semantics:\n  - If both podSelector and serviceAccountSelector are set, a pod must\n    match BOTH (logical AND).\n  - If multiple SecurityGroupPolicies in a namespace match the same pod,\n    exactly ONE policy applies: the one with the lexically smallest name.\n    Policies are never combined for a single pod.",
+  "properties": {
+    "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object.\nServers should convert recognized schemas to the latest internal value, and\nmay reject unrecognized values.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+      "type": "string"
+    },
+    "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents.\nServers may infer this from the endpoint the client submits requests to.\nCannot be updated.\nIn CamelCase.\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "spec": {
+      "description": "SecurityGroupPolicySpec defines the desired state.",
+      "properties": {
+        "nodeSelector": {
+          "description": "NodeSelector scopes this policy to nodes by label. When omitted, the\npolicy applies to every node in the cluster. When set, it currently must\npositively reference the \"karpenter.sh/nodepool\" node label in\nmatchLabels or matchExpressions (In/Exists only); Exists selects all\nNodePools. Broader node-label selection may be permitted in the\nfuture. Only pods scheduled to selected nodes receive branch\ninterfaces from this policy.",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "x-kubernetes-validations": [
+            {
+              "message": "nodeSelector must positively reference 'karpenter.sh/nodepool' in matchLabels or matchExpressions (In/Exists only)",
+              "rule": "(has(self.matchLabels) && 'karpenter.sh/nodepool' in self.matchLabels) || (has(self.matchExpressions) && self.matchExpressions.exists(e, e.key == 'karpenter.sh/nodepool' && e.operator in ['In', 'Exists']))"
+            }
+          ],
+          "additionalProperties": false
+        },
+        "podSelector": {
+          "description": "PodSelector selects pods by label. If serviceAccountSelector is also\nset, a pod must match both selectors. An empty selector ({}) selects\nall pods in the namespace.",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        },
+        "securityGroupSelectorTerms": {
+          "description": "SecurityGroupSelectorTerms is a list of security group selector terms. Terms are ORed.\nEach term selects security groups by ID, name, or tags.\nThe resolved set is hard-rejected above 16 security groups (the EC2\nquota ceiling) and surfaced via the SecurityGroupsResolved status\ncondition. Values within 16 but above your account's security-groups-\nper-network-interface quota (default 5) fail at network interface\ncreation time, surfaced on the pending pod's ResourceClaim events;\naffected pods stay pending.",
+          "items": {
+            "description": "SecurityGroupSelectorTerm defines a selector for security groups by ID, name, or tags.",
+            "properties": {
+              "id": {
+                "description": "ID is the security group ID (e.g., \"sg-0123456789abcdef0\").",
+                "maxLength": 20,
+                "pattern": "^sg-([0-9a-f]{8}|[0-9a-f]{17})$",
+                "type": "string"
+              },
+              "name": {
+                "description": "Name is the security group name in EC2.\nThis value is the name field, which is different from the name tag.",
+                "maxLength": 255,
+                "type": "string"
+              },
+              "tags": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Tags is a map of key/value tags used to select security groups.\nSpecifying '*' for a value selects all values for a given tag key.",
+                "maxProperties": 20,
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "empty tag keys or values aren't supported",
+                    "rule": "self.all(k, k != '' && self[k] != '')"
+                  },
+                  {
+                    "message": "tag keys are limited to 128 and values to 256 characters",
+                    "rule": "self.all(k, size(k) <= 128 && size(self[k]) <= 256)"
+                  }
+                ]
+              }
+            },
+            "type": "object",
+            "additionalProperties": false
+          },
+          "maxItems": 30,
+          "type": "array",
+          "x-kubernetes-validations": [
+            {
+              "message": "securityGroupSelectorTerms cannot be empty",
+              "rule": "self.size() != 0"
+            },
+            {
+              "message": "expected at least one, got none, ['tags', 'id', 'name']",
+              "rule": "self.all(x, has(x.tags) || has(x.id) || has(x.name))"
+            },
+            {
+              "message": "'id' is mutually exclusive, cannot be set with a combination of other fields in securityGroupSelectorTerms",
+              "rule": "!self.exists(x, has(x.id) && (has(x.tags) || has(x.name)))"
+            },
+            {
+              "message": "'name' is mutually exclusive, cannot be set with a combination of other fields in securityGroupSelectorTerms",
+              "rule": "!self.exists(x, has(x.name) && (has(x.tags) || has(x.id)))"
+            }
+          ]
+        },
+        "serviceAccountSelector": {
+          "description": "ServiceAccountSelector selects pods whose ServiceAccount's labels\nmatch. If podSelector is also set, a pod must match both selectors.\nAn empty selector ({}) matches any ServiceAccount that exists; if the\npod's ServiceAccount cannot be fetched at admission time, the policy\ndoes not match.",
+          "properties": {
+            "matchExpressions": {
+              "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
+              "items": {
+                "description": "A label selector requirement is a selector that contains values, a key, and an operator that\nrelates the key and values.",
+                "properties": {
+                  "key": {
+                    "description": "key is the label key that the selector applies to.",
+                    "type": "string"
+                  },
+                  "operator": {
+                    "description": "operator represents a key's relationship to a set of values.\nValid operators are In, NotIn, Exists and DoesNotExist.",
+                    "type": "string"
+                  },
+                  "values": {
+                    "description": "values is an array of string values. If the operator is In or NotIn,\nthe values array must be non-empty. If the operator is Exists or DoesNotExist,\nthe values array must be empty. This array is replaced during a strategic\nmerge patch.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "x-kubernetes-list-type": "atomic"
+                  }
+                },
+                "required": [
+                  "key",
+                  "operator"
+                ],
+                "type": "object",
+                "additionalProperties": false
+              },
+              "type": "array",
+              "x-kubernetes-list-type": "atomic"
+            },
+            "matchLabels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels\nmap is equivalent to an element of matchExpressions, whose key field is \"key\", the\noperator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
+              "type": "object"
+            }
+          },
+          "type": "object",
+          "x-kubernetes-map-type": "atomic",
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "securityGroupSelectorTerms"
+      ],
+      "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "must specify at least one of podSelector or serviceAccountSelector",
+          "rule": "has(self.podSelector) || has(self.serviceAccountSelector)"
+        }
+      ],
+      "additionalProperties": false
+    },
+    "status": {
+      "description": "SecurityGroupPolicyStatus defines the observed state.",
+      "properties": {
+        "conditions": {
+          "items": {
+            "description": "Condition contains details for one aspect of the current state of this API Resource.",
+            "properties": {
+              "lastTransitionTime": {
+                "description": "lastTransitionTime is the last time the condition transitioned from one status to another.\nThis should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "message": {
+                "description": "message is a human readable message indicating details about the transition.\nThis may be an empty string.",
+                "maxLength": 32768,
+                "type": "string"
+              },
+              "observedGeneration": {
+                "description": "observedGeneration represents the .metadata.generation that the condition was set based upon.\nFor instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date\nwith respect to the current state of the instance.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition.\nProducers of specific condition types may define expected values and meanings for this field,\nand whether the values are considered a guaranteed API.\nThe value should be a CamelCase string.\nThis field may not be empty.",
+                "maxLength": 1024,
+                "minLength": 1,
+                "pattern": "^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$",
+                "type": "string"
+              },
+              "status": {
+                "description": "status of the condition, one of True, False, Unknown.",
+                "enum": [
+                  "True",
+                  "False",
+                  "Unknown"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
+                "maxLength": 316,
+                "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "lastTransitionTime",
+              "message",
+              "reason",
+              "status",
+              "type"
+            ],
+            "type": "object",
+            "additionalProperties": false
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "resolvedSecurityGroupIDs": {
+          "description": "ResolvedSecurityGroupIDs is the list of EC2 security group IDs that the\ncontroller resolved from the spec's securityGroupSelectorTerms.\nUpdated on SGP create, spec update, or periodic re-resolution (if enabled).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "type": "object"
+}

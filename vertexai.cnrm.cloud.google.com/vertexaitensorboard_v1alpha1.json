@@ -1,39 +1,91 @@
 {
+  "description": "VertexAITensorboard is the Schema for the VertexAITensorboard API",
   "properties": {
     "apiVersion": {
-      "description": "apiVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
       "type": "string"
     },
     "kind": {
-      "description": "kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
       "type": "string"
     },
     "metadata": {
       "type": "object"
     },
     "spec": {
+      "description": "VertexAITensorboardSpec defines the desired state of VertexAITensorboard",
       "properties": {
         "description": {
           "description": "Description of this Tensorboard.",
           "type": "string"
         },
         "displayName": {
-          "description": "User provided name of this Tensorboard.",
+          "description": "Required. User provided name of this Tensorboard.",
           "type": "string"
         },
         "encryptionSpec": {
-          "description": "Immutable. Customer-managed encryption key spec for a Tensorboard. If set, this Tensorboard and all sub-resources of this Tensorboard will be secured by this key.",
+          "description": "Customer-managed encryption key spec for a Tensorboard. If set, this Tensorboard and all sub-resources of this Tensorboard will be secured by this key.",
           "properties": {
-            "kmsKeyName": {
-              "description": "Immutable. The Cloud KMS resource identifier of the customer managed encryption key used to protect a resource.\nHas the form: projects/my-project/locations/my-region/keyRings/my-kr/cryptoKeys/my-key. The key needs to be in the same region as where the resource is created.",
-              "type": "string"
+            "kmsKeyRef": {
+              "description": "Required. The Cloud KMS resource identifier of the customer managed encryption key used to protect a resource. The key needs to be in the same region as where the compute resource is created.",
+              "oneOf": [
+                {
+                  "not": {
+                    "required": [
+                      "external"
+                    ]
+                  },
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "name"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "namespace"
+                        ]
+                      }
+                    ]
+                  },
+                  "required": [
+                    "external"
+                  ]
+                }
+              ],
+              "properties": {
+                "external": {
+                  "description": "A reference to an externally managed KMSCryptoKey resource. Should be in the format \"projects/{{projectID}}/locations/{{location}}/keyRings/{{keyring}}/cryptoKeys/{{cryptokey}}\".",
+                  "type": "string"
+                },
+                "name": {
+                  "description": "The name of a KMSCryptoKey resource.",
+                  "type": "string"
+                },
+                "namespace": {
+                  "description": "The namespace of a KMSCryptoKey resource.",
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
             }
           },
           "required": [
-            "kmsKeyName"
+            "kmsKeyRef"
           ],
           "type": "object",
           "additionalProperties": false
+        },
+        "isDefault": {
+          "description": "Used to indicate if the TensorBoard instance is the default one. Each project & region can have at most one default TensorBoard instance. Creation of a default TensorBoard instance and updating an existing TensorBoard instance to be default will mark all other TensorBoard instances (if any) as non default.",
+          "type": "boolean"
         },
         "projectRef": {
           "description": "The project that this resource belongs to.",
@@ -70,15 +122,19 @@
           ],
           "properties": {
             "external": {
-              "description": "Allowed value: The `name` field of a `Project` resource.",
+              "description": "The `projectID` field of a project, when not managed by Config Connector.",
+              "type": "string"
+            },
+            "kind": {
+              "description": "The kind of the Project resource; optional but must be `Project` if provided.",
               "type": "string"
             },
             "name": {
-              "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+              "description": "The `name` field of a `Project` resource.",
               "type": "string"
             },
             "namespace": {
-              "description": "Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/",
+              "description": "The `namespace` field of a `Project` resource.",
               "type": "string"
             }
           },
@@ -86,11 +142,11 @@
           "additionalProperties": false
         },
         "region": {
-          "description": "Immutable. The region of the tensorboard. eg us-central1.",
+          "description": "The region of this resource.",
           "type": "string"
         },
         "resourceID": {
-          "description": "Immutable. Optional. The service-generated name of the resource. Used for acquisition only. Leave unset to create a new resource.",
+          "description": "The VertexAITensorboard ID (which is server-generated). If not given, Config Connector will create a new Tensorboard. If given, Config Connector will acquire the existing Tensorboard with this ID.",
           "type": "string"
         }
       },
@@ -103,13 +159,10 @@
       "additionalProperties": false
     },
     "status": {
+      "description": "VertexAITensorboardStatus defines the config connector machine state of VertexAITensorboard",
       "properties": {
-        "blobStoragePathPrefix": {
-          "description": "Consumer project Cloud Storage path prefix used to store blob data, which can either be a bucket or directory. Does not end with a '/'.",
-          "type": "string"
-        },
         "conditions": {
-          "description": "Conditions represent the latest available observation of the resource's current state.",
+          "description": "Conditions represent the latest available observations of the object's current state.",
           "items": {
             "properties": {
               "lastTransitionTime": {
@@ -138,25 +191,50 @@
           },
           "type": "array"
         },
-        "createTime": {
-          "description": "The timestamp of when the Tensorboard was created in RFC3339 UTC \"Zulu\" format, with nanosecond resolution and up to nine fractional digits.",
-          "type": "string"
-        },
-        "name": {
-          "description": "Name of the Tensorboard.",
+        "externalRef": {
+          "description": "A unique specifier for the VertexAITensorboard resource in GCP.",
           "type": "string"
         },
         "observedGeneration": {
           "description": "ObservedGeneration is the generation of the resource that was most recently observed by the Config Connector controller. If this is equal to metadata.generation, then that means that the current reported status reflects the most recent desired state of the resource.",
+          "format": "int64",
           "type": "integer"
         },
-        "runCount": {
-          "description": "The number of Runs stored in this Tensorboard.",
-          "type": "string"
-        },
-        "updateTime": {
-          "description": "The timestamp of when the Tensorboard was last updated in RFC3339 UTC \"Zulu\" format, with nanosecond resolution and up to nine fractional digits.",
-          "type": "string"
+        "observedState": {
+          "description": "ObservedState is the state of the resource as most recently observed in GCP.",
+          "properties": {
+            "blobStoragePathPrefix": {
+              "description": "Output only. Consumer project Cloud Storage path prefix used to store blob data, which can either be a bucket or directory. Does not end with a '/'.",
+              "type": "string"
+            },
+            "createTime": {
+              "description": "Output only. Timestamp when this Tensorboard was created.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Output only. Name of the Tensorboard. Format: `projects/{project}/locations/{location}/tensorboards/{tensorboard}`",
+              "type": "string"
+            },
+            "runCount": {
+              "description": "Output only. The number of Runs stored in this Tensorboard.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "satisfiesPzi": {
+              "description": "Output only. Reserved for future use.",
+              "type": "boolean"
+            },
+            "satisfiesPzs": {
+              "description": "Output only. Reserved for future use.",
+              "type": "boolean"
+            },
+            "updateTime": {
+              "description": "Output only. Timestamp when this Tensorboard was last updated.",
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
         }
       },
       "type": "object",

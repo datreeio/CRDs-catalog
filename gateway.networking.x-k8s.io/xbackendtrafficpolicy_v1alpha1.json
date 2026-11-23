@@ -81,15 +81,15 @@
           "additionalProperties": false
         },
         "sessionPersistence": {
-          "description": "SessionPersistence defines and configures session persistence\nfor the backend.\n\nSupport: Extended",
+          "description": "Deprecated: use the Backend resource for session persistence (GEP-4894).\n\nSessionPersistence defines and configures session persistence\nfor the backend.\n\nSupport: Extended",
           "properties": {
             "absoluteTimeout": {
               "description": "AbsoluteTimeout defines the absolute timeout of the persistent\nsession. Once the AbsoluteTimeout duration has elapsed, the\nsession becomes invalid.\n\nSupport: Extended",
               "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
               "type": "string"
             },
-            "cookieConfig": {
-              "description": "CookieConfig provides configuration settings that are specific\nto cookie-based session persistence.\n\nSupport: Core",
+            "cookie": {
+              "description": "Cookie provides configuration settings that are specific\nto cookie-based session persistence.\n\nSupport: Core",
               "properties": {
                 "lifetimeType": {
                   "default": "Session",
@@ -99,15 +99,40 @@
                     "Session"
                   ],
                   "type": "string"
+                },
+                "name": {
+                  "description": "Name defines the name of the cookie used for session persistence.\nIf not specified, a unique cookie name SHOULD be generated.\nUsers should avoid reusing cookie names to prevent unintended\nconsequences, such as rejection or unpredictable behavior.\n\n\nSupport: Extended",
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                  "type": "string"
+                },
+                "path": {
+                  "default": "/",
+                  "description": "Path defines the cookie Path attribute. When not specified,\nimplementations MUST default the cookie path to \"/\".\n\n\nSupport: Extended",
+                  "maxLength": 1024,
+                  "type": "string"
                 }
               },
               "type": "object",
               "additionalProperties": false
             },
-            "sessionName": {
-              "description": "SessionName defines the name of the persistent session token\nwhich may be reflected in the cookie or the header. Users\nshould avoid reusing session names to prevent unintended\nconsequences, such as rejection or unpredictable behavior.\n\nSupport: Implementation-specific",
-              "maxLength": 128,
-              "type": "string"
+            "header": {
+              "description": "Header provides configuration settings that are specific\nto header-based session persistence.\n\nSupport: Extended",
+              "properties": {
+                "name": {
+                  "description": "Name defines the name of the header used for session persistence.\nThe client must include this header in subsequent requests to\nmaintain the session.\n\nSupport: Core",
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object",
+              "additionalProperties": false
             },
             "type": {
               "default": "Cookie",
@@ -123,11 +148,23 @@
           "x-kubernetes-validations": [
             {
               "message": "AbsoluteTimeout must be specified when cookie lifetimeType is Permanent",
-              "rule": "!has(self.cookieConfig) || !has(self.cookieConfig.lifetimeType) || self.cookieConfig.lifetimeType != 'Permanent' || has(self.absoluteTimeout)"
+              "rule": "!has(self.cookie) || !has(self.cookie.lifetimeType) || self.cookie.lifetimeType != 'Permanent' || has(self.absoluteTimeout)"
             },
             {
-              "message": "cookieConfig can only be set with type Cookie",
-              "rule": "!has(self.cookieConfig) || self.type == 'Cookie'"
+              "message": "cookie must be nil if type is not Cookie",
+              "rule": "!has(self.cookie) || self.type == 'Cookie'"
+            },
+            {
+              "message": "cookie must be specified for Cookie type",
+              "rule": "self.type != 'Cookie' || has(self.cookie)"
+            },
+            {
+              "message": "header must be nil if type is not Header",
+              "rule": "!has(self.header) || self.type == 'Header'"
+            },
+            {
+              "message": "header must be specified for Header type",
+              "rule": "self.type != 'Header' || has(self.header)"
             }
           ],
           "additionalProperties": false

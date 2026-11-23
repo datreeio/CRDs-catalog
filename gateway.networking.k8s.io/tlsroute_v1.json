@@ -16,7 +16,7 @@
       "description": "Spec defines the desired state of TLSRoute.",
       "properties": {
         "hostnames": {
-          "description": "Hostnames defines a set of SNI hostnames that should match against the\nSNI attribute of TLS ClientHello message in TLS handshake. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n1. IPs are not allowed in SNI hostnames per RFC 6066.\n2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n   label must appear by itself as the first label.",
+          "description": "Hostnames defines a set of SNI hostnames that should match against the\nSNI attribute of TLS ClientHello message in TLS handshake. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n1. IPs are not allowed in SNI hostnames per RFC 6066.\n2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n   label must appear by itself as the first label.\n\n\nIn the event that multiple TLSRoutes specify intersecting hostnames (e.g.\noverlapping wildcard matching and exact matching hostnames), precedence must\nbe given to rules from the TLSRoute with the largest number of:\n\n* Characters in a matching non-wildcard hostname.\n* Characters in a matching hostname.\n\nWhen multiple TLSRoutes attach to the same Listener and yield identical\nListener/Route intersected hostnames, implementations SHOULD evaluate\nprecedence using the original hostnames configured on the Route, not the\ncalculated Listener/Route hostname intersection.\n\nResolving Route precedence using original Route hostname specificity is an\nExtended feature. Implementations that support this behavior SHOULD claim\nsupport for the `GatewayRouteHostnameIntersectionPrecedence` feature.\nImplementations that do not support this feature MAY evaluate precedence\nusing the calculated Listener/Route hostname intersection.",
           "items": {
             "description": "Hostname is the fully qualified domain name of a network host. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n 1. IPs are not allowed.\n 2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n    label must appear by itself as the first label.\n\nHostname can be \"precise\" which is a domain name without the terminating\ndot of a network host (e.g. \"foo.example.com\") or \"wildcard\", which is a\ndomain name prefixed with a single wildcard label (e.g. `*.example.com`).\n\nNote that as per RFC1035 and RFC1123, a *label* must consist of lower case\nalphanumeric characters or '-', and must start and end with an alphanumeric\ncharacter. No other punctuation is allowed.",
             "maxLength": 253,
@@ -173,6 +173,10 @@
                     {
                       "message": "Must have port for Service reference",
                       "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                    },
+                    {
+                      "message": "Must not have port for Backend reference",
+                      "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                     }
                   ],
                   "additionalProperties": false

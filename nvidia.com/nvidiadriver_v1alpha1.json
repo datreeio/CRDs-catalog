@@ -13,7 +13,7 @@
       "type": "object"
     },
     "spec": {
-      "description": "NVIDIADriverSpec defines the desired state of NVIDIADriver",
+      "description": "NVIDIADriverSpec defines the desired state of NVIDIADriver.\nThe CEL validation allows non-default drivers to use nodeSelector, but requires\ndefault drivers to leave nodeSelector unset or empty.",
       "properties": {
         "annotations": {
           "additionalProperties": {
@@ -38,6 +38,11 @@
           },
           "type": "object",
           "additionalProperties": false
+        },
+        "default": {
+          "default": false,
+          "description": "Default indicates that this NVIDIADriver acts as the fallback driver daemon set manager for GPU nodes\nthat do not match any non-default NVIDIADriver nodeSelector.",
+          "type": "boolean"
         },
         "driverType": {
           "default": "gpu",
@@ -887,6 +892,109 @@
           },
           "type": "array"
         },
+        "upgradePolicy": {
+          "description": "UpgradePolicy allows to control automatic upgrade of the driver on nodes",
+          "properties": {
+            "autoUpgrade": {
+              "default": true,
+              "description": "AutoUpgrade is a switch for automatic upgrade feature.\nIf set to false all other options are ignored.",
+              "type": "boolean"
+            },
+            "drain": {
+              "description": "DrainSpec describes configuration for node drain during automatic upgrade",
+              "properties": {
+                "deleteEmptyDir": {
+                  "default": false,
+                  "description": "DeleteEmptyDir indicates if should continue even if there are pods using emptyDir\n(local data that will be deleted when the node is drained)",
+                  "type": "boolean"
+                },
+                "enable": {
+                  "default": false,
+                  "description": "Enable indicates if node draining is allowed during upgrade",
+                  "type": "boolean"
+                },
+                "force": {
+                  "default": false,
+                  "description": "Force indicates if force draining is allowed",
+                  "type": "boolean"
+                },
+                "podSelector": {
+                  "description": "PodSelector specifies a label selector to filter pods on the node that need to be drained\nFor more details on label selectors, see:\nhttps://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+                  "type": "string"
+                },
+                "timeoutSeconds": {
+                  "default": 300,
+                  "description": "TimeoutSecond specifies the length of time in seconds to wait before giving up drain, zero means infinite",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "maxParallelUpgrades": {
+              "default": 1,
+              "description": "MaxParallelUpgrades indicates how many nodes can be upgraded in parallel.\n0 means no limit, all nodes will be upgraded in parallel.",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxUnavailable": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "default": "25%",
+              "description": "MaxUnavailable is the maximum number of nodes with the driver installed, that can be unavailable during the upgrade.\nValue can be an absolute number (ex: 5) or a percentage of total nodes at the start of upgrade (ex: 10%).\nAbsolute number is calculated from percentage by rounding up.\nBy default, a fixed value of 25% is used.",
+              "x-kubernetes-int-or-string": true
+            },
+            "podDeletion": {
+              "description": "PodDeletionSpec describes configuration for deletion of pods using special resources during automatic upgrade",
+              "properties": {
+                "deleteEmptyDir": {
+                  "default": false,
+                  "description": "DeleteEmptyDir indicates if should continue even if there are pods using emptyDir\n(local data that will be deleted when the pod is deleted)",
+                  "type": "boolean"
+                },
+                "force": {
+                  "default": false,
+                  "description": "Force indicates if force deletion is allowed",
+                  "type": "boolean"
+                },
+                "timeoutSeconds": {
+                  "default": 300,
+                  "description": "TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means\ninfinite",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            },
+            "waitForCompletion": {
+              "description": "WaitForCompletionSpec describes the configuration for waiting on job completions",
+              "properties": {
+                "podSelector": {
+                  "description": "PodSelector specifies a label selector for the pods to wait for completion\nFor more details on label selectors, see:\nhttps://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+                  "type": "string"
+                },
+                "timeoutSeconds": {
+                  "default": 0,
+                  "description": "TimeoutSecond specifies the length of time in seconds to wait before giving up on pod termination, zero means\ninfinite",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "type": "object",
+          "additionalProperties": false
+        },
         "useOpenKernelModules": {
           "description": "Deprecated: This field is no longer honored by the gpu-operator. Please use KernelModuleType instead.\nUseOpenKernelModules indicates if the open GPU kernel modules should be used",
           "type": "boolean"
@@ -918,10 +1026,15 @@
         }
       },
       "required": [
-        "driverType",
         "image"
       ],
       "type": "object",
+      "x-kubernetes-validations": [
+        {
+          "message": "default NVIDIADriver must not use nodeSelector",
+          "rule": "has(self.default) && self.default ? !has(self.nodeSelector) || size(self.nodeSelector) == 0 : true"
+        }
+      ],
       "additionalProperties": false
     },
     "status": {

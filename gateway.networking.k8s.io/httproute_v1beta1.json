@@ -16,7 +16,7 @@
       "description": "Spec defines the desired state of HTTPRoute.",
       "properties": {
         "hostnames": {
-          "description": "Hostnames defines a set of hostnames that should match against the HTTP Host\nheader to select a HTTPRoute used to process the request. Implementations\nMUST ignore any port value specified in the HTTP Host header while\nperforming a match and (absent of any applicable header modification\nconfiguration) MUST forward this header unmodified to the backend.\n\nValid values for Hostnames are determined by RFC 1123 definition of a\nhostname with 2 notable exceptions:\n\n1. IPs are not allowed.\n2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n   label must appear by itself as the first label.\n\nIf a hostname is specified by both the Listener and HTTPRoute, there\nmust be at least one intersecting hostname for the HTTPRoute to be\nattached to the Listener. For example:\n\n* A Listener with `test.example.com` as the hostname matches HTTPRoutes\n  that have either not specified any hostnames, or have specified at\n  least one of `test.example.com` or `*.example.com`.\n* A Listener with `*.example.com` as the hostname matches HTTPRoutes\n  that have either not specified any hostnames or have specified at least\n  one hostname that matches the Listener hostname. For example,\n  `*.example.com`, `test.example.com`, and `foo.test.example.com` would\n  all match. On the other hand, `example.com` and `test.example.net` would\n  not match.\n\nHostnames that are prefixed with a wildcard label (`*.`) are interpreted\nas a suffix match. That means that a match for `*.example.com` would match\nboth `test.example.com`, and `foo.test.example.com`, but not `example.com`.\n\nIf both the Listener and HTTPRoute have specified hostnames, any\nHTTPRoute hostnames that do not match the Listener hostname MUST be\nignored. For example, if a Listener specified `*.example.com`, and the\nHTTPRoute specified `test.example.com` and `test.example.net`,\n`test.example.net` must not be considered for a match.\n\nIf both the Listener and HTTPRoute have specified hostnames, and none\nmatch with the criteria above, then the HTTPRoute is not accepted. The\nimplementation must raise an 'Accepted' Condition with a status of\n`False` in the corresponding RouteParentStatus.\n\nIn the event that multiple HTTPRoutes specify intersecting hostnames (e.g.\noverlapping wildcard matching and exact matching hostnames), precedence must\nbe given to rules from the HTTPRoute with the largest number of:\n\n* Characters in a matching non-wildcard hostname.\n* Characters in a matching hostname.\n\nIf ties exist across multiple Routes, the matching precedence rules for\nHTTPRouteMatches takes over.\n\nSupport: Core",
+          "description": "Hostnames defines a set of hostnames that should match against the HTTP Host\nheader to select a HTTPRoute used to process the request. Implementations\nMUST ignore any port value specified in the HTTP Host header while\nperforming a match and (absent of any applicable header modification\nconfiguration) MUST forward this header unmodified to the backend.\n\nValid values for Hostnames are determined by RFC 1123 definition of a\nhostname with 2 notable exceptions:\n\n1. IPs are not allowed.\n2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n   label must appear by itself as the first label.\n\nIf a hostname is specified by both the Listener and HTTPRoute, there\nmust be at least one intersecting hostname for the HTTPRoute to be\nattached to the Listener. For example:\n\n* A Listener with `test.example.com` as the hostname matches HTTPRoutes\n  that have either not specified any hostnames, or have specified at\n  least one of `test.example.com` or `*.example.com`.\n* A Listener with `*.example.com` as the hostname matches HTTPRoutes\n  that have either not specified any hostnames or have specified at least\n  one hostname that matches the Listener hostname. For example,\n  `*.example.com`, `test.example.com`, and `foo.test.example.com` would\n  all match. On the other hand, `example.com` and `test.example.net` would\n  not match.\n\nHostnames that are prefixed with a wildcard label (`*.`) are interpreted\nas a suffix match. That means that a match for `*.example.com` would match\nboth `test.example.com`, and `foo.test.example.com`, but not `example.com`.\n\nIf both the Listener and HTTPRoute have specified hostnames, any\nHTTPRoute hostnames that do not match the Listener hostname MUST be\nignored. For example, if a Listener specified `*.example.com`, and the\nHTTPRoute specified `test.example.com` and `test.example.net`,\n`test.example.net` must not be considered for a match.\n\nIf both the Listener and HTTPRoute have specified hostnames, and none\nmatch with the criteria above, then the HTTPRoute is not accepted. The\nimplementation must raise an 'Accepted' Condition with a status of\n`False` in the corresponding RouteParentStatus.\n\nIn the event that multiple HTTPRoutes specify intersecting hostnames (e.g.\noverlapping wildcard matching and exact matching hostnames), precedence must\nbe given to rules from the HTTPRoute with the largest number of:\n\n* Characters in a matching non-wildcard hostname.\n* Characters in a matching hostname.\n\nWhen multiple HTTPRoutes attach to the same Listener and yield identical\nListener/Route intersected hostnames, implementations SHOULD evaluate\nprecedence using the original hostnames configured on the Route, not the\ncalculated Listener/Route hostname intersection.\n\nResolving Route precedence using original Route hostname specificity is an\nExtended feature. Implementations that support this behavior SHOULD claim\nsupport for the `GatewayRouteHostnameIntersectionPrecedence` feature.\nImplementations that do not support this feature MAY evaluate precedence\nusing the calculated Listener/Route hostname intersection.\n\nSupport: Core",
           "items": {
             "description": "Hostname is the fully qualified domain name of a network host. This matches\nthe RFC 1123 definition of a hostname with 2 notable exceptions:\n\n 1. IPs are not allowed.\n 2. A hostname may be prefixed with a wildcard label (`*.`). The wildcard\n    label must appear by itself as the first label.\n\nHostname can be \"precise\" which is a domain name without the terminating\ndot of a network host (e.g. \"foo.example.com\") or \"wildcard\", which is a\ndomain name prefixed with a single wildcard label (e.g. `*.example.com`).\n\nNote that as per RFC1035 and RFC1123, a *label* must consist of lower case\nalphanumeric characters or '-', and must start and end with an alphanumeric\ncharacter. No other punctuation is allowed.",
             "maxLength": 253,
@@ -300,6 +300,10 @@
                                   {
                                     "message": "Must have port for Service reference",
                                     "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                                  },
+                                  {
+                                    "message": "Must not have port for Backend reference",
+                                    "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                                   }
                                 ],
                                 "additionalProperties": false
@@ -309,6 +313,8 @@
                                 "properties": {
                                   "maxSize": {
                                     "description": "MaxSize specifies how large in bytes the largest body that will be buffered\nand sent to the authorization server. If the body size is larger than\n`maxSize`, then the body sent to the authorization server must be\ntruncated to `maxSize` bytes.\n\nExperimental note: This behavior needs to be checked against\nvarious dataplanes; it may need to be changed.\nSee https://github.com/kubernetes-sigs/gateway-api/pull/4001#discussion_r2291405746\nfor more.\n\nIf 0, the body will not be sent to the authorization server.",
+                                    "format": "int32",
+                                    "minimum": 0,
                                     "type": "integer"
                                   }
                                 },
@@ -530,6 +536,10 @@
                                   {
                                     "message": "Must have port for Service reference",
                                     "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                                  },
+                                  {
+                                    "message": "Must not have port for Backend reference",
+                                    "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                                   }
                                 ],
                                 "additionalProperties": false
@@ -654,7 +664,7 @@
                               },
                               "statusCode": {
                                 "default": 302,
-                                "description": "StatusCode is the HTTP status code to be used in response.\n\nNote that values may be added to this enum, implementations\nmust ensure that unknown values will not cause a crash.\n\nUnknown values here must result in the implementation setting the\nAccepted Condition for the Route to `status: False`, with a\nReason of `UnsupportedValue`.\n\nSupport: Core",
+                                "description": "StatusCode is the HTTP status code to be used in response.\n\nNote that values may be added to this enum, implementations\nmust ensure that unknown values will not cause a crash.\n\nUnknown values here must result in the implementation setting the\nAccepted Condition for the Route to `status: False`, with a\nReason of `UnsupportedValue`.\n\nSupport: statusCode 301 and 302 are Core; all others are Extended.",
                                 "enum": [
                                   301,
                                   302,
@@ -981,6 +991,10 @@
                     {
                       "message": "Must have port for Service reference",
                       "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                    },
+                    {
+                      "message": "Must not have port for Backend reference",
+                      "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                     }
                   ],
                   "additionalProperties": false
@@ -1171,6 +1185,10 @@
                             {
                               "message": "Must have port for Service reference",
                               "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                            },
+                            {
+                              "message": "Must not have port for Backend reference",
+                              "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                             }
                           ],
                           "additionalProperties": false
@@ -1180,6 +1198,8 @@
                           "properties": {
                             "maxSize": {
                               "description": "MaxSize specifies how large in bytes the largest body that will be buffered\nand sent to the authorization server. If the body size is larger than\n`maxSize`, then the body sent to the authorization server must be\ntruncated to `maxSize` bytes.\n\nExperimental note: This behavior needs to be checked against\nvarious dataplanes; it may need to be changed.\nSee https://github.com/kubernetes-sigs/gateway-api/pull/4001#discussion_r2291405746\nfor more.\n\nIf 0, the body will not be sent to the authorization server.",
+                              "format": "int32",
+                              "minimum": 0,
                               "type": "integer"
                             }
                           },
@@ -1401,6 +1421,10 @@
                             {
                               "message": "Must have port for Service reference",
                               "rule": "(size(self.group) == 0 && self.kind == 'Service') ? has(self.port) : true"
+                            },
+                            {
+                              "message": "Must not have port for Backend reference",
+                              "rule": "(self.group == 'gateway.networking.x-k8s.io' && self.kind == 'XBackend') ? !has(self.port) : true"
                             }
                           ],
                           "additionalProperties": false
@@ -1525,7 +1549,7 @@
                         },
                         "statusCode": {
                           "default": 302,
-                          "description": "StatusCode is the HTTP status code to be used in response.\n\nNote that values may be added to this enum, implementations\nmust ensure that unknown values will not cause a crash.\n\nUnknown values here must result in the implementation setting the\nAccepted Condition for the Route to `status: False`, with a\nReason of `UnsupportedValue`.\n\nSupport: Core",
+                          "description": "StatusCode is the HTTP status code to be used in response.\n\nNote that values may be added to this enum, implementations\nmust ensure that unknown values will not cause a crash.\n\nUnknown values here must result in the implementation setting the\nAccepted Condition for the Route to `status: False`, with a\nReason of `UnsupportedValue`.\n\nSupport: statusCode 301 and 302 are Core; all others are Extended.",
                           "enum": [
                             301,
                             302,
@@ -2002,15 +2026,16 @@
                 "type": "string"
               },
               "retry": {
-                "description": "Retry defines the configuration for when to retry an HTTP request.\n\nSupport: Extended",
+                "description": "Retry defines the configuration for when to retry an HTTP request.\n\nA request is retried when attempts is greater than 0 and the backend did\nnot process it. This is the case when the connection could not be\nestablished, or when the backend explicitly rejected the request, either\nbefore processing it or with one of the configured status codes.\n\nSupport: Extended",
                 "properties": {
                   "attempts": {
-                    "description": "Attempts specifies the maximum number of times an individual request\nfrom the gateway to a backend should be retried.\n\nIf the maximum number of retries has been attempted without a successful\nresponse from the backend, the Gateway MUST return an error.\n\nWhen this field is unspecified, the number of times to attempt to retry\na backend request is implementation-specific.\n\nSupport: Extended",
-                    "minimum": 1,
+                    "default": 1,
+                    "description": "Attempts specifies the maximum number of times an individual request\nfrom the Gateway to a backend should be retried in addition to the\ninitial request.\n\nIf the maximum number of retries has been attempted without a successful\nresponse from the backend, the Gateway MUST return an error.\n\nAn explicit zero value MUST disable retries.\n\nSupport: Extended",
+                    "minimum": 0,
                     "type": "integer"
                   },
                   "backoff": {
-                    "description": "Backoff specifies the minimum duration a Gateway should wait between\nretry attempts and is represented in Gateway API Duration formatting.\n\nFor example, setting the `rules[].retry.backoff` field to the value\n`100ms` will cause a backend request to first be retried approximately\n100 milliseconds after timing out or receiving a response code configured\nto be retriable.\n\nAn implementation MAY use an exponential or alternative backoff strategy\nfor subsequent retry attempts, MAY cap the maximum backoff duration to\nsome amount greater than the specified minimum, and MAY add arbitrary\njitter to stagger requests, as long as unsuccessful backend requests are\nnot retried before the configured minimum duration.\n\nIf a Request timeout (`rules[].timeouts.request`) is configured on the\nroute, the entire duration of the initial request and any retry attempts\nMUST not exceed the Request timeout duration. If any retry attempts are\nstill in progress when the Request timeout duration has been reached,\nthese SHOULD be canceled if possible and the Gateway MUST immediately\nreturn a timeout error.\n\nIf a BackendRequest timeout (`rules[].timeouts.backendRequest`) is\nconfigured on the route, any retry attempts which reach the configured\nBackendRequest timeout duration without a response SHOULD be canceled if\npossible and the Gateway should wait for at least the specified backoff\nduration before attempting to retry the backend request again.\n\nIf a BackendRequest timeout is _not_ configured on the route, retry\nattempts MAY time out after an implementation default duration, or MAY\nremain pending until a configured Request timeout or implementation\ndefault duration for total request time is reached.\n\nWhen this field is unspecified, the time to wait between retry attempts\nis implementation-specific.\n\nSupport: Extended",
+                    "description": "Backoff specifies the base interval for a backoff strategy between\nretry attempts and is represented in Gateway API Duration formatting.\nThe duration a Gateway waits before a retry attempt is determined\nby the base interval and the implementation's retry strategy.\n\nImplementations MAY add random jitter and MAY cap the delay at an\nimplementation-defined maximum, which SHOULD NOT be less than the base\ninterval. The precise backoff curve and jitter calculation are\nimplementation-specific and not exposed in the Gateway API specification.\nImplementations typically apply exponential backoff with jitter to\nmitigate thundering-herd issues.\n\nIf a Request timeout (`rules[].timeouts.request`) is configured on the\nroute, the entire duration of the initial request and any retry attempts\nMUST not exceed the Request timeout duration. If any retry attempts are\nstill in progress when the Request timeout duration has been reached,\nthese SHOULD be canceled if possible and the Gateway MUST immediately\nreturn a timeout error.\n\nIf a BackendRequest timeout (`rules[].timeouts.backendRequest`) is\nconfigured on the route, any retry attempts which reach the configured\nBackendRequest timeout duration without a response SHOULD be canceled if\npossible and the Gateway SHOULD schedule the next retry attempt according\nto the configured backoff.\n\nIf a BackendRequest timeout is _not_ configured on the route, retry\nattempts MAY time out after an implementation default duration, or MAY\nremain pending until a configured Request timeout or implementation\ndefault duration for total request time is reached.\n\nWhen this field is unspecified, the backoff strategy and base interval\nare implementation-specific.\n\nImplementations which retry immediately with no backoff MUST NOT advertise\nsupport for this field and MUST set the Accepted Condition for the Route\nto `status: False` with a Reason of `UnsupportedValue` when this field is\nset.\n\nSupport: Implementation-specific",
                     "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                     "type": "string"
                   },
@@ -2030,15 +2055,15 @@
                 "additionalProperties": false
               },
               "sessionPersistence": {
-                "description": "SessionPersistence defines and configures session persistence\nfor the route rule.\n\nSupport: Extended",
+                "description": "Deprecated: use the Backend resource for session persistence (GEP-4894).\n\nSessionPersistence defines and configures session persistence\nfor the route rule.\n\nSupport: Extended",
                 "properties": {
                   "absoluteTimeout": {
                     "description": "AbsoluteTimeout defines the absolute timeout of the persistent\nsession. Once the AbsoluteTimeout duration has elapsed, the\nsession becomes invalid.\n\nSupport: Extended",
                     "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$",
                     "type": "string"
                   },
-                  "cookieConfig": {
-                    "description": "CookieConfig provides configuration settings that are specific\nto cookie-based session persistence.\n\nSupport: Core",
+                  "cookie": {
+                    "description": "Cookie provides configuration settings that are specific\nto cookie-based session persistence.\n\nSupport: Core",
                     "properties": {
                       "lifetimeType": {
                         "default": "Session",
@@ -2048,15 +2073,40 @@
                           "Session"
                         ],
                         "type": "string"
+                      },
+                      "name": {
+                        "description": "Name defines the name of the cookie used for session persistence.\nIf not specified, a unique cookie name SHOULD be generated.\nUsers should avoid reusing cookie names to prevent unintended\nconsequences, such as rejection or unpredictable behavior.\n\n\nSupport: Extended",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      },
+                      "path": {
+                        "default": "/",
+                        "description": "Path defines the cookie Path attribute. When not specified,\nimplementations MUST default the cookie path to \"/\".\n\n\nSupport: Extended",
+                        "maxLength": 1024,
+                        "type": "string"
                       }
                     },
                     "type": "object",
                     "additionalProperties": false
                   },
-                  "sessionName": {
-                    "description": "SessionName defines the name of the persistent session token\nwhich may be reflected in the cookie or the header. Users\nshould avoid reusing session names to prevent unintended\nconsequences, such as rejection or unpredictable behavior.\n\nSupport: Implementation-specific",
-                    "maxLength": 128,
-                    "type": "string"
+                  "header": {
+                    "description": "Header provides configuration settings that are specific\nto header-based session persistence.\n\nSupport: Extended",
+                    "properties": {
+                      "name": {
+                        "description": "Name defines the name of the header used for session persistence.\nThe client must include this header in subsequent requests to\nmaintain the session.\n\nSupport: Core",
+                        "maxLength": 256,
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z0-9!#$%&'*+\\-.^_\\x60|~]+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
                   },
                   "type": {
                     "default": "Cookie",
@@ -2072,11 +2122,23 @@
                 "x-kubernetes-validations": [
                   {
                     "message": "AbsoluteTimeout must be specified when cookie lifetimeType is Permanent",
-                    "rule": "!has(self.cookieConfig) || !has(self.cookieConfig.lifetimeType) || self.cookieConfig.lifetimeType != 'Permanent' || has(self.absoluteTimeout)"
+                    "rule": "!has(self.cookie) || !has(self.cookie.lifetimeType) || self.cookie.lifetimeType != 'Permanent' || has(self.absoluteTimeout)"
                   },
                   {
-                    "message": "cookieConfig can only be set with type Cookie",
-                    "rule": "!has(self.cookieConfig) || self.type == 'Cookie'"
+                    "message": "cookie must be nil if type is not Cookie",
+                    "rule": "!has(self.cookie) || self.type == 'Cookie'"
+                  },
+                  {
+                    "message": "cookie must be specified for Cookie type",
+                    "rule": "self.type != 'Cookie' || has(self.cookie)"
+                  },
+                  {
+                    "message": "header must be nil if type is not Header",
+                    "rule": "!has(self.header) || self.type == 'Header'"
+                  },
+                  {
+                    "message": "header must be specified for Header type",
+                    "rule": "self.type != 'Header' || has(self.header)"
                   }
                 ],
                 "additionalProperties": false
@@ -2136,12 +2198,12 @@
           "x-kubernetes-list-type": "atomic",
           "x-kubernetes-validations": [
             {
-              "message": "While 16 rules and 64 matches per rule are allowed, the total number of matches across all rules in a route must be less than 128",
-              "rule": "(self.size() > 0 ? self[0].matches.size() : 0) + (self.size() > 1 ? self[1].matches.size() : 0) + (self.size() > 2 ? self[2].matches.size() : 0) + (self.size() > 3 ? self[3].matches.size() : 0) + (self.size() > 4 ? self[4].matches.size() : 0) + (self.size() > 5 ? self[5].matches.size() : 0) + (self.size() > 6 ? self[6].matches.size() : 0) + (self.size() > 7 ? self[7].matches.size() : 0) + (self.size() > 8 ? self[8].matches.size() : 0) + (self.size() > 9 ? self[9].matches.size() : 0) + (self.size() > 10 ? self[10].matches.size() : 0) + (self.size() > 11 ? self[11].matches.size() : 0) + (self.size() > 12 ? self[12].matches.size() : 0) + (self.size() > 13 ? self[13].matches.size() : 0) + (self.size() > 14 ? self[14].matches.size() : 0) + (self.size() > 15 ? self[15].matches.size() : 0) <= 128"
-            },
-            {
               "message": "Rule name must be unique within the route",
               "rule": "self.all(l1, !has(l1.name) || self.exists_one(l2, has(l2.name) && l1.name == l2.name))"
+            },
+            {
+              "message": "While 16 rules and 64 matches per rule are allowed, the total number of matches across all rules in a route must be less than 128",
+              "rule": "(self.size() > 0 ? self[0].matches.size() : 0) + (self.size() > 1 ? self[1].matches.size() : 0) + (self.size() > 2 ? self[2].matches.size() : 0) + (self.size() > 3 ? self[3].matches.size() : 0) + (self.size() > 4 ? self[4].matches.size() : 0) + (self.size() > 5 ? self[5].matches.size() : 0) + (self.size() > 6 ? self[6].matches.size() : 0) + (self.size() > 7 ? self[7].matches.size() : 0) + (self.size() > 8 ? self[8].matches.size() : 0) + (self.size() > 9 ? self[9].matches.size() : 0) + (self.size() > 10 ? self[10].matches.size() : 0) + (self.size() > 11 ? self[11].matches.size() : 0) + (self.size() > 12 ? self[12].matches.size() : 0) + (self.size() > 13 ? self[13].matches.size() : 0) + (self.size() > 14 ? self[14].matches.size() : 0) + (self.size() > 15 ? self[15].matches.size() : 0) <= 128"
             }
           ]
         },
